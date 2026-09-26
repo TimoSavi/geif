@@ -1,0 +1,24 @@
+# Build artifacts in root
+/bin/
+/lib/
+/build/
+*.o
+*.a
+*.so
+*.dylib
+*.dSYM
+
+# Test outputs & temporary files
+/test/bin/
+*.out
+*.tmp
+*.log
+*.geif
+*.ceif
+
+# Editor & OS files
+.DS_Store
+.vscode/
+.idea/
+*~
+*.swp
