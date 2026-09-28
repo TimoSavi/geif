@@ -53,6 +53,10 @@ In contrast, **GEIF features universal Zero Kelvin scale calibration**:
 1. **Zero Kelvin Floor**: At $T = 0.00$, the densest cluster centroids remain almost pure yellow/white, showing that true cluster centers approach the theoretical 0.0 floor without saturation.
 2. **Smooth Boundary**: The transition from inlier white to outlier color is smooth and continuous, free from sharp grid axis-aligned cuts.
 3. **Consistency**: $T = 0.50$ cleanly isolates both Gaussian blobs, the square perimeter, and the circular ring without requiring topological re-tuning or ad-hoc post-scaling.
+4. **Elimination of the "Peanut" Bridging Artifact (Inter-Cluster Independence)**:
+   - In `ceif`, the decision boundary for `2blob` forms a merged "peanut" or hourglass silhouette, where the two clusters bridge across empty space and falsely pull scores lower in the gap.
+   - In `geif`, the space between the two blobs displays the exact same outlier score coloring as the open space around the outer perimeter.
+   - Neighboring clusters do not distort or contaminate each other's local score contours; each manifold is isolated independently according to its own intrinsic Voronoi geometry.
 
 ---
 
