@@ -259,6 +259,55 @@ geif_status_t geif_ensemble_prune_categories(geif_ensemble_t *ens, uint64_t min_
     return GEIF_OK;
 }
 
+geif_status_t geif_ensemble_prune_age(geif_ensemble_t *ens, time_t max_age_seconds, time_t now)
+{
+    if (!ens) return GEIF_ERR_INVALID_ARG;
+    if (max_age_seconds == 0 || ens->count == 0) return GEIF_OK;
+
+    if (now == 0) now = time(NULL);
+    time_t cutoff = (now > max_age_seconds) ? (now - max_age_seconds) : 0;
+
+    size_t new_count = 0;
+    for (size_t i = 0; i < ens->count; i++) {
+        if (ens->entries[i].last_updated < cutoff) {
+            if (ens->entries[i].forest) {
+                geif_forest_destroy(ens->entries[i].forest);
+                ens->entries[i].forest = NULL;
+            }
+        } else {
+            if (new_count != i) {
+                ens->entries[new_count] = ens->entries[i];
+            }
+            new_count++;
+        }
+    }
+    ens->count = new_count;
+
+    // Clear and rebuild hash table
+    for (size_t b = 0; b < ens->hash_size; b++) {
+        geif_cat_hash_node_t *node = ens->hash_buckets[b];
+        while (node) {
+            geif_cat_hash_node_t *next = node->next;
+            free(node);
+            node = next;
+        }
+        ens->hash_buckets[b] = NULL;
+    }
+
+    for (size_t i = 0; i < ens->count; i++) {
+        uint32_t h = ensemble_hash(ens->entries[i].category);
+        size_t b = (size_t)(h % ens->hash_size);
+        geif_cat_hash_node_t *node = (geif_cat_hash_node_t *)malloc(sizeof(geif_cat_hash_node_t));
+        if (node) {
+            node->entry_idx = (uint32_t)i;
+            node->next = ens->hash_buckets[b];
+            ens->hash_buckets[b] = node;
+        }
+    }
+
+    return GEIF_OK;
+}
+
 geif_status_t geif_ensemble_train(geif_ensemble_t *ens)
 {
     if (!ens || ens->count == 0) return GEIF_ERR_EMPTY_DATASET;
@@ -342,15 +391,16 @@ void geif_ensemble_summary(const geif_ensemble_t *ens, char *buffer, size_t buff
 
         if (f) {
             n = snprintf(buffer + written, buffer_size - written,
-                         "  - Sub-forest '%s': rows=%llu, samples=%zu, trees=%u, H_max=%.4f\n",
+                         "  - Sub-forest '%s': rows=%llu, samples=%zu, trees=%u, H_max=%.4f, updated=%ld\n",
                          cat_label,
                          (unsigned long long)entry->total_rows,
                          f->pool_count,
                          f->tree_count,
-                         f->H_max);
+                         f->H_max,
+                         (long)entry->last_updated);
         } else {
             n = snprintf(buffer + written, buffer_size - written,
-                         "  - Sub-forest '%s': (empty)\n", cat_label);
+                         "  - Sub-forest '%s': (empty), updated=%ld\n", cat_label, (long)entry->last_updated);
         }
         if (n > 0) written += (size_t)n;
     }

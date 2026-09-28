@@ -77,6 +77,8 @@ test: $(STATIC_LIB) $(CLI_BIN)
 	@./test/test_cli_categories.sh
 	@echo "--- Running Feature 4: Category Filtering, Lifecycle & Templating Test ---"
 	@./test/test_cli_lifecycle.sh
+	@echo "--- Running Feature 5: Age & Decay Rate Processing Test ---"
+	@./test/test_cli_decay.sh
 	@echo "All unit tests passed successfully!"
 
 clean:

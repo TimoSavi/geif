@@ -166,6 +166,18 @@ geif_status_t geif_ensemble_feed(geif_ensemble_t *ensemble,
 geif_status_t geif_ensemble_prune_categories(geif_ensemble_t *ensemble, uint64_t min_rows);
 
 /**
+ * @brief Prunes any sub-forest whose last_updated timestamp is older than max_age_seconds.
+ *
+ * @param ensemble Ensemble object
+ * @param max_age_seconds Maximum age interval in seconds
+ * @param now Current timestamp reference (0 for time(NULL))
+ * @return GEIF_OK on success
+ */
+geif_status_t geif_ensemble_prune_age(geif_ensemble_t *ensemble,
+                                      time_t max_age_seconds,
+                                      time_t now);
+
+/**
  * @brief Trains all category sub-forests in the ensemble.
  */
 geif_status_t geif_ensemble_train(geif_ensemble_t *ensemble);

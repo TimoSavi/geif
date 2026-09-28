@@ -84,6 +84,7 @@ static void print_usage(const char *prog)
     printf("  -C <range>     Category column indices/ranges (e.g. '12' or '2-4')\n");
     printf("  -F <filter>    Category filter regex during scoring (e.g. '-v ^5' or '^(5|6)$')\n");
     printf("  -R <int>       Minimum row count per category required to train sub-forest\n");
+    printf("  -D <interval>  Drop / prune categories older than interval (e.g. '30d', '7d', '24h', '3600s')\n");
     printf("  -N <tmpl>      Output template for NEW / unseen categories during analysis\n");
     printf("  -M <tmpl>      Output template for MISSED categories (trained but absent in test data)\n");
     printf("  -p <tmpl>      Output template for scored rows (%%s=score, %%l=label, %%c=cat, %%m=metric, %%d=dist, %%a=all)\n");
@@ -136,6 +137,52 @@ static uint32_t tokenize_line(char *line, char delim, char **tokens, uint32_t ma
     }
 
     return count;
+}
+
+static time_t parse_delete_interval(const char *s)
+{
+    if (!s || s[0] == '\0') return 0;
+    size_t len = strlen(s);
+    time_t value = (time_t)atol(s);
+    if (value <= 0) return 0;
+
+    char unit = s[len - 1];
+    switch (unit) {
+    case 'Y':
+    case 'y':
+        value *= 31556926; // 365.2422 days
+        break;
+    case 'M':
+        value *= 2629743;  // 30.4368 days
+        break;
+    case 'W':
+    case 'w':
+        value *= 604800;   // 7 days
+        break;
+    case 'D':
+    case 'd':
+        value *= 86400;    // 1 day
+        break;
+    case 'h':
+    case 'H':
+        value *= 3600;     // 1 hour
+        break;
+    case 'm':
+        value *= 60;       // 1 minute
+        break;
+    case 's':
+    case 'S':
+        break;
+    default:
+        if (unit >= '0' && unit <= '9') {
+            value *= 86400; // default to days (as in CEIF)
+        } else {
+            fprintf(stderr, "geif: error: invalid time format in -D '%s'\n", s);
+            return 0;
+        }
+        break;
+    }
+    return value;
 }
 
 static void process_scoring_row(geif_ensemble_t *ensemble,
@@ -250,6 +297,7 @@ int main(int argc, char *argv[])
     const char *missed_cat_tmpl = NULL;
     const char *point_tmpl    = NULL;
     bool        silent_outliers = false;
+    time_t      delete_interval = 0;
     cat_filter_t cat_filter   = {0};
     char delimiter           = ',';
     char list_separator      = ',';
@@ -264,7 +312,7 @@ int main(int argc, char *argv[])
     geif_config_t config = geif_config_default();
 
     int opt;
-    while ((opt = getopt(argc, argv, "l:a:w:r:o:T:O:t:i:s:m:f:e:HqvhI:U:L:C:F:R:N:M:p:S")) != -1) {
+    while ((opt = getopt(argc, argv, "l:a:w:r:o:T:O:t:i:s:m:f:e:HqvhI:U:L:C:F:R:N:M:p:SD:")) != -1) {
         switch (opt) {
         case 'l': learn_file = optarg; break;
         case 'a': analyze_file = optarg; break;
@@ -300,6 +348,13 @@ int main(int argc, char *argv[])
             break;
         case 'R':
             min_cat_rows = (uint64_t)strtoull(optarg, NULL, 10);
+            break;
+        case 'D':
+            delete_interval = parse_delete_interval(optarg);
+            if (delete_interval == 0) {
+                fprintf(stderr, "geif: error: invalid time interval for -D: '%s'\n", optarg);
+                return 1;
+            }
             break;
         case 'N':
             new_cat_tmpl = optarg;
@@ -348,6 +403,31 @@ int main(int argc, char *argv[])
         return 0;
     }
 
+    // Standalone age pruning: -r <model> -D <interval> -w <model>
+    if (!learn_file && !analyze_file && delete_interval > 0) {
+        if (!ensemble) {
+            fprintf(stderr, "Error: -D pruning requires a loaded model via -r <model.json>\n");
+            return 1;
+        }
+        size_t before = ensemble->count;
+        geif_ensemble_prune_age(ensemble, delete_interval, time(NULL));
+        if (verbose) {
+            printf("Age pruning (-D): dropped %zu stale sub-forests (%zu remaining).\n",
+                   before - ensemble->count, ensemble->count);
+        }
+        if (save_file) {
+            geif_status_t status = geif_ensemble_save_json(ensemble, save_file);
+            if (status != GEIF_OK) {
+                fprintf(stderr, "Error saving ensemble model to '%s': %s\n",
+                        save_file, geif_status_str(status));
+                geif_ensemble_destroy(ensemble);
+                return 1;
+            }
+        }
+        geif_ensemble_destroy(ensemble);
+        return 0;
+    }
+
     // Mode: Train new model (-l)
     if (learn_file) {
         FILE *fp = xfopen(learn_file, "r");
@@ -378,8 +458,13 @@ int main(int argc, char *argv[])
             return 1;
         }
 
+        const char *active_ignore = ignore_spec ? ignore_spec : (ensemble ? (ensemble->ignore_dims_spec[0] ? ensemble->ignore_dims_spec : NULL) : NULL);
+        const char *active_include = include_spec ? include_spec : (ensemble ? (ensemble->include_dims_spec[0] ? ensemble->include_dims_spec : NULL) : NULL);
+        const char *active_label = label_spec ? label_spec : (ensemble ? (ensemble->label_dims_spec[0] ? ensemble->label_dims_spec : NULL) : NULL);
+        const char *active_category = category_spec ? category_spec : (ensemble ? (ensemble->category_dims_spec[0] ? ensemble->category_dims_spec : NULL) : NULL);
+
         geif_column_config_t col_cfg;
-        geif_column_config_init(&col_cfg, ignore_spec, include_spec, label_spec, category_spec);
+        geif_column_config_init(&col_cfg, active_ignore, active_include, active_label, active_category);
         if (!geif_column_config_resolve(&col_cfg, total_cols)) {
             fprintf(stderr, "geif: error: no active feature dimensions remaining after applying column masks (-I, -U, -L, -C)\n");
             xfclose(fp);
@@ -402,10 +487,10 @@ int main(int argc, char *argv[])
 
         // Save column metadata into ensemble
         ensemble->total_input_cols = total_cols;
-        if (ignore_spec) strncpy(ensemble->ignore_dims_spec, ignore_spec, sizeof(ensemble->ignore_dims_spec) - 1);
-        if (include_spec) strncpy(ensemble->include_dims_spec, include_spec, sizeof(ensemble->include_dims_spec) - 1);
-        if (label_spec) strncpy(ensemble->label_dims_spec, label_spec, sizeof(ensemble->label_dims_spec) - 1);
-        if (category_spec) strncpy(ensemble->category_dims_spec, category_spec, sizeof(ensemble->category_dims_spec) - 1);
+        if (active_ignore) strncpy(ensemble->ignore_dims_spec, active_ignore, sizeof(ensemble->ignore_dims_spec) - 1);
+        if (active_include) strncpy(ensemble->include_dims_spec, active_include, sizeof(ensemble->include_dims_spec) - 1);
+        if (active_label) strncpy(ensemble->label_dims_spec, active_label, sizeof(ensemble->label_dims_spec) - 1);
+        if (active_category) strncpy(ensemble->category_dims_spec, active_category, sizeof(ensemble->category_dims_spec) - 1);
 
         if (!skip_header) {
             first_line_is_data = true;
@@ -440,10 +525,19 @@ int main(int argc, char *argv[])
         xfclose(fp);
         geif_column_config_free(&col_cfg);
 
+        if (delete_interval > 0) {
+            size_t before = ensemble->count;
+            geif_ensemble_prune_age(ensemble, delete_interval, time(NULL));
+            if (verbose && before != ensemble->count) {
+                printf("Age pruning (-D): dropped %zu stale sub-forests (%zu remaining).\n",
+                       before - ensemble->count, ensemble->count);
+            }
+        }
+
         if (min_cat_rows > 0) {
             size_t before = ensemble->count;
             geif_ensemble_prune_categories(ensemble, min_cat_rows);
-            if (verbose) {
+            if (verbose && before != ensemble->count) {
                 printf("Pruned categories with fewer than %llu rows (%zu -> %zu categories retained).\n",
                        (unsigned long long)min_cat_rows, before, ensemble->count);
             }
@@ -483,6 +577,15 @@ int main(int argc, char *argv[])
         if (!ensemble) {
             fprintf(stderr, "Error: Analysis requires a model. Train with -l or load with -r.\n");
             return 1;
+        }
+
+        if (delete_interval > 0) {
+            size_t before = ensemble->count;
+            geif_ensemble_prune_age(ensemble, delete_interval, time(NULL));
+            if (verbose && before != ensemble->count) {
+                printf("Age pruning (-D): dropped %zu stale sub-forests (%zu remaining).\n",
+                       before - ensemble->count, ensemble->count);
+            }
         }
 
         FILE *in_fp = xfopen(analyze_file, "r");
