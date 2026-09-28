@@ -81,6 +81,8 @@ test: $(STATIC_LIB) $(CLI_BIN)
 	@./test/test_cli_decay.sh
 	@echo "--- Running Feature 6: Custom Output Templating & Attribution Test ---"
 	@./test/test_cli_attribution.sh
+	@echo "--- Running Feature 7: Model Recalibration & Thresholds Test ---"
+	@./test/test_cli_recalibration.sh
 	@echo "All unit tests passed successfully!"
 
 clean:

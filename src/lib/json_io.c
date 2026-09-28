@@ -324,6 +324,8 @@ geif_status_t geif_ensemble_save_json(const geif_ensemble_t *ens, const char *pa
     json_object_object_add(root, "include_dims", json_object_new_string(ens->include_dims_spec));
     json_object_object_add(root, "ignore_dims", json_object_new_string(ens->ignore_dims_spec));
     json_object_object_add(root, "category_dims", json_object_new_string(ens->category_dims_spec));
+    const char *outlier_spec = (ens->outlier_score_spec[0] != '\0') ? ens->outlier_score_spec : "0.500000";
+    json_object_object_add(root, "outlier_score", json_object_new_string(outlier_spec));
 
     // Globals object for CEIF compatibility
     struct json_object *globals = json_object_new_object();
@@ -331,6 +333,7 @@ geif_status_t geif_ensemble_save_json(const geif_ensemble_t *ens, const char *pa
     json_object_object_add(globals, "includeDims", json_object_new_string(ens->include_dims_spec));
     json_object_object_add(globals, "ignoreDims", json_object_new_string(ens->ignore_dims_spec));
     json_object_object_add(globals, "categoryDims", json_object_new_string(ens->category_dims_spec));
+    json_object_object_add(globals, "outlierScore", json_object_new_string(outlier_spec));
     json_object_object_add(root, "globals", globals);
 
     // Save sub-forests array
@@ -430,6 +433,9 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
     if (json_object_object_get_ex(root, "category_dims", &j_val)) {
         strncpy(ens->category_dims_spec, json_object_get_string(j_val), sizeof(ens->category_dims_spec) - 1);
     }
+    if (json_object_object_get_ex(root, "outlier_score", &j_val)) {
+        strncpy(ens->outlier_score_spec, json_object_get_string(j_val), sizeof(ens->outlier_score_spec) - 1);
+    }
 
     struct json_object *globals = NULL;
     if (json_object_object_get_ex(root, "globals", &globals)) {
@@ -444,6 +450,9 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
         }
         if (ens->category_dims_spec[0] == '\0' && json_object_object_get_ex(globals, "categoryDims", &j_val)) {
             strncpy(ens->category_dims_spec, json_object_get_string(j_val), sizeof(ens->category_dims_spec) - 1);
+        }
+        if (ens->outlier_score_spec[0] == '\0' && json_object_object_get_ex(globals, "outlierScore", &j_val)) {
+            strncpy(ens->outlier_score_spec, json_object_get_string(j_val), sizeof(ens->outlier_score_spec) - 1);
         }
     }
 

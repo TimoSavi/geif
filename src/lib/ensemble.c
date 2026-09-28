@@ -405,3 +405,57 @@ void geif_ensemble_summary(const geif_ensemble_t *ens, char *buffer, size_t buff
         if (n > 0) written += (size_t)n;
     }
 }
+
+geif_status_t geif_forest_remove_outliers(geif_forest_t *f, uint32_t k)
+{
+    if (!f) return GEIF_ERR_INVALID_ARG;
+    if (k == 0) return GEIF_OK;
+    if (f->pool_count <= 2) return GEIF_OK;
+
+    uint32_t d = f->dimensions;
+    uint32_t removed = 0;
+
+    while (removed < k && f->pool_count > 2) {
+        int64_t max_idx = -1;
+        double max_score = -1.0;
+
+        for (size_t i = 0; i < f->pool_count; i++) {
+            const double *sample = &f->sample_pool[i * d];
+            double s = 0.0;
+            geif_forest_score(f, sample, &s);
+            if (s > max_score) {
+                max_score = s;
+                max_idx = (int64_t)i;
+            }
+        }
+
+        if (max_idx >= 0) {
+            memmove(&f->sample_pool[max_idx * d],
+                    &f->sample_pool[(max_idx + 1) * d],
+                    (f->pool_count - (size_t)max_idx - 1) * d * sizeof(double));
+            f->pool_count--;
+            removed++;
+        } else {
+            break;
+        }
+    }
+
+    if (removed > 0) {
+        return geif_forest_train(f);
+    }
+    return GEIF_OK;
+}
+
+geif_status_t geif_ensemble_remove_outliers(geif_ensemble_t *ens, uint32_t k)
+{
+    if (!ens) return GEIF_ERR_INVALID_ARG;
+    if (k == 0) return GEIF_OK;
+
+    for (size_t i = 0; i < ens->count; i++) {
+        if (ens->entries[i].forest) {
+            geif_status_t st = geif_forest_remove_outliers(ens->entries[i].forest, k);
+            if (st != GEIF_OK) return st;
+        }
+    }
+    return GEIF_OK;
+}

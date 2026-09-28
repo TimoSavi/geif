@@ -119,6 +119,7 @@ typedef struct {
     char           include_dims_spec[128]; /**< Included feature columns spec (e.g. "2-10") */
     char           ignore_dims_spec[128];  /**< Ignored columns spec (e.g. "12") */
     char           category_dims_spec[128];/**< Category columns spec (e.g. "12") */
+    char           outlier_score_spec[64]; /**< Outlier score threshold spec (e.g. "0.5", "average", "80%", "0.65s") */
 
     geif_category_entry_t *entries;        /**< Dynamic array of category sub-forests */
     size_t         count;                  /**< Number of active sub-forests */

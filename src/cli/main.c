@@ -71,7 +71,8 @@ static void print_usage(const char *prog)
     printf("  -w <file>      Save trained model to JSON file (use '-' for stdout)\n");
     printf("  -r <file>      Load trained model from JSON file (use '-' for stdin)\n");
     printf("  -o <file>      Output file for scores (default: stdout, '-' for stdout)\n");
-    printf("  -T, -O <thresh>Outlier threshold: float [0..1], 'average', or percentage (e.g. '80%%')\n");
+    printf("  -T, -O <thresh>Outlier threshold: float [0..1], 'average', percentage (e.g. '80%%'), or scaled (e.g. '0.65s')\n");
+    printf("  -k             Prune most extreme outlier from model reservoir and recalibrate (repeatable)\n");
     printf("  -t, -i <int>   Number of trees in forest (default: 100)\n");
     printf("  -s <int>       Number of samples per tree (default: 256)\n");
     printf("  -m <fmt|int>   Dimension format string (e.g. \"%%'.0f\") or max depth cap\n");
@@ -376,21 +377,29 @@ int main(int argc, char *argv[])
 
     char category_sep        = ';';
 
+    bool cli_outlier_score_given = false;
+    char cli_outlier_score_spec[64] = {0};
+    int kill_outliers_count = 0;
+
     geif_config_t config = geif_config_default();
 
     int opt;
-    while ((opt = getopt(argc, argv, "l:a:w:r:o:T:O:t:i:s:m:f:e:HqvhI:U:L:C:F:R:N:M:p:SD:d:j:v::WA")) != -1) {
+    while ((opt = getopt(argc, argv, "l:a:w:r:o:T:O:t:i:s:m:f:e:HqvhI:U:L:C:F:R:N:M:p:SD:d:j:v::WAk")) != -1) {
         switch (opt) {
         case 'l': learn_file = optarg; break;
         case 'a': analyze_file = optarg; break;
         case 'w': save_file = optarg; break;
         case 'r': load_file = optarg; break;
         case 'o': output_file = optarg; break;
+        case 'k': kill_outliers_count++; break;
         case 'T':
         case 'O':
+            cli_outlier_score_given = true;
+            strncpy(cli_outlier_score_spec, optarg, sizeof(cli_outlier_score_spec) - 1);
             if (strcmp(optarg, "average") == 0) {
                 threshold_is_average = true;
             } else {
+                threshold_is_average = false;
                 size_t olen = strlen(optarg);
                 if (olen > 0 && optarg[olen - 1] == '%') {
                     threshold = atof(optarg) / 100.0;
@@ -494,6 +503,23 @@ int main(int argc, char *argv[])
             printf("Loaded model from '%s' (%zu sub-forests, %u dimensions)\n",
                    load_file, ensemble->count, ensemble->dimensions);
         }
+        if (cli_outlier_score_given) {
+            strncpy(ensemble->outlier_score_spec, cli_outlier_score_spec, sizeof(ensemble->outlier_score_spec) - 1);
+        } else if (ensemble->outlier_score_spec[0] != '\0') {
+            if (strcmp(ensemble->outlier_score_spec, "average") == 0) {
+                threshold_is_average = true;
+            } else {
+                threshold_is_average = false;
+                size_t olen = strlen(ensemble->outlier_score_spec);
+                if (olen > 0 && ensemble->outlier_score_spec[olen - 1] == '%') {
+                    threshold = atof(ensemble->outlier_score_spec) / 100.0;
+                } else if (olen > 0 && ensemble->outlier_score_spec[olen - 1] == 's') {
+                    threshold = atof(ensemble->outlier_score_spec);
+                } else {
+                    threshold = atof(ensemble->outlier_score_spec);
+                }
+            }
+        }
     }
 
     // Mode: Model info query (-q)
@@ -509,17 +535,30 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    // Standalone age pruning: -r <model> -D <interval> -w <model>
-    if (!learn_file && !analyze_file && delete_interval > 0) {
+    // Standalone model maintenance (-D pruning and/or -k outlier recalibration): -r <model> [-D <interval>] [-k] -w <model>
+    if (!learn_file && !analyze_file && (delete_interval > 0 || kill_outliers_count > 0)) {
         if (!ensemble) {
-            fprintf(stderr, "Error: -D pruning requires a loaded model via -r <model.json>\n");
+            fprintf(stderr, "Error: maintenance operations (-D, -k) require a loaded model via -r <model.json>\n");
             return 1;
         }
-        size_t before = ensemble->count;
-        geif_ensemble_prune_age(ensemble, delete_interval, time(NULL));
-        if (verbose) {
-            printf("Age pruning (-D): dropped %zu stale sub-forests (%zu remaining).\n",
-                   before - ensemble->count, ensemble->count);
+        if (delete_interval > 0) {
+            size_t before = ensemble->count;
+            geif_ensemble_prune_age(ensemble, delete_interval, time(NULL));
+            if (verbose) {
+                printf("Age pruning (-D): dropped %zu stale sub-forests (%zu remaining).\n",
+                       before - ensemble->count, ensemble->count);
+            }
+        }
+        if (kill_outliers_count > 0) {
+            if (verbose) {
+                printf("Pruning %d outlier(s) per category and recalibrating ensemble...\n", kill_outliers_count);
+            }
+            geif_status_t status = geif_ensemble_remove_outliers(ensemble, (uint32_t)kill_outliers_count);
+            if (status != GEIF_OK) {
+                fprintf(stderr, "Error during outlier pruning (-k): %s\n", geif_status_str(status));
+                geif_ensemble_destroy(ensemble);
+                return 1;
+            }
         }
         if (save_file) {
             geif_status_t status = geif_ensemble_save_json(ensemble, save_file);
@@ -661,8 +700,24 @@ int main(int argc, char *argv[])
             return 1;
         }
 
+        if (cli_outlier_score_given) {
+            strncpy(ensemble->outlier_score_spec, cli_outlier_score_spec, sizeof(ensemble->outlier_score_spec) - 1);
+        }
+
         if (verbose) {
             printf("Training complete across %zu sub-forests.\n", ensemble->count);
+        }
+
+        if (kill_outliers_count > 0) {
+            if (verbose) {
+                printf("Pruning %d outlier(s) per category and recalibrating ensemble...\n", kill_outliers_count);
+            }
+            status = geif_ensemble_remove_outliers(ensemble, (uint32_t)kill_outliers_count);
+            if (status != GEIF_OK) {
+                fprintf(stderr, "Error during outlier pruning (-k): %s\n", geif_status_str(status));
+                geif_ensemble_destroy(ensemble);
+                return 1;
+            }
         }
 
         // Save trained model if requested
@@ -691,6 +746,18 @@ int main(int argc, char *argv[])
             if (verbose && before != ensemble->count) {
                 printf("Age pruning (-D): dropped %zu stale sub-forests (%zu remaining).\n",
                        before - ensemble->count, ensemble->count);
+            }
+        }
+
+        if (kill_outliers_count > 0) {
+            if (verbose) {
+                printf("Pruning %d outlier(s) per category and recalibrating ensemble...\n", kill_outliers_count);
+            }
+            geif_status_t status = geif_ensemble_remove_outliers(ensemble, (uint32_t)kill_outliers_count);
+            if (status != GEIF_OK) {
+                fprintf(stderr, "Error during outlier pruning (-k): %s\n", geif_status_str(status));
+                geif_ensemble_destroy(ensemble);
+                return 1;
             }
         }
 
@@ -852,6 +919,15 @@ int main(int argc, char *argv[])
                     (unsigned long long)analyzed, threshold,
                     (unsigned long long)total_outliers,
                     analyzed > 0 ? (100.0 * (double)total_outliers / (double)analyzed) : 0.0);
+        }
+
+        if (!learn_file && save_file) {
+            geif_status_t status = geif_ensemble_save_json(ensemble, save_file);
+            if (status != GEIF_OK) {
+                fprintf(stderr, "Error saving model to '%s': %s\n", save_file, geif_status_str(status));
+            } else if (verbose && strcmp(save_file, "-") != 0) {
+                printf("Saved model to '%s'\n", save_file);
+            }
         }
     }
 

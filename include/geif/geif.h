@@ -232,6 +232,24 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
  */
 void geif_ensemble_summary(const geif_ensemble_t *ensemble, char *buffer, size_t buffer_size);
 
+/**
+ * @brief Prunes the N most extreme outlier samples from a forest's reservoir pool and retrains it.
+ *
+ * @param f Pointer to forest.
+ * @param k Number of outliers to remove.
+ * @return GEIF_OK on success.
+ */
+geif_status_t geif_forest_remove_outliers(geif_forest_t *f, uint32_t k);
+
+/**
+ * @brief Prunes the N most extreme outlier samples across all sub-forests in the ensemble.
+ *
+ * @param ensemble Pointer to ensemble.
+ * @param k Number of outliers to remove per sub-forest.
+ * @return GEIF_OK on success.
+ */
+geif_status_t geif_ensemble_remove_outliers(geif_ensemble_t *ensemble, uint32_t k);
+
 #ifdef __cplusplus
 }
 #endif

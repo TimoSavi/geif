@@ -17,6 +17,21 @@ static void init_dimension_scales(geif_forest_t *f)
     double sum_span = 0.0;
     uint32_t active_count = 0;
 
+    // Recalibrate bounding envelope from current sample pool if available
+    if (f->pool_count > 0 && f->sample_pool) {
+        for (uint32_t j = 0; j < d; j++) {
+            f->envelope_min[j] = f->sample_pool[j];
+            f->envelope_max[j] = f->sample_pool[j];
+        }
+        for (size_t i = 1; i < f->pool_count; i++) {
+            const double *pt = &f->sample_pool[i * d];
+            for (uint32_t j = 0; j < d; j++) {
+                if (pt[j] < f->envelope_min[j]) f->envelope_min[j] = pt[j];
+                if (pt[j] > f->envelope_max[j]) f->envelope_max[j] = pt[j];
+            }
+        }
+    }
+
     for (uint32_t j = 0; j < d; j++) {
         f->envelope_span[j] = f->envelope_max[j] - f->envelope_min[j];
         if (f->envelope_span[j] >= 1e-9) {
