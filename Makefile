@@ -95,7 +95,13 @@ test: $(STATIC_LIB) $(CLI_BIN)
 	@./test/test_cli_grid.sh
 	@echo "--- Running Feature 10: CEIF to GEIF Model Migration Tool (ceif2geif) Test ---"
 	@./test/test_cli_ceif2geif.sh
-	@echo "All unit tests passed successfully!"
+	@echo "All unit and integration tests passed successfully!"
+
+test-prod: $(STATIC_LIB) $(CLI_BIN) $(MIGRATE_BIN)
+	@echo "--- Running End-to-End Production Cron Suite (plan.md) ---"
+	@./test/test_prod_cron_patterns.sh
+
+test-all: test test-prod
 
 clean:
 	rm -rf $(LIB_OBJS) $(CLI_OBJS) $(LIB_OBJS:.o=.d) $(CLI_OBJS:.o=.d) $(BIN_DIR) $(LIB_DIR) test/bin
