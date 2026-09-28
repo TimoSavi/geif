@@ -24,7 +24,8 @@ LIB_SRCS = src/lib/error.c \
 CLI_SRCS = src/cli/main.c \
            src/cli/xmalloc.c \
            src/cli/columns.c \
-           src/cli/template.c
+           src/cli/template.c \
+           src/cli/rcfile.c
 
 LIB_OBJS = $(LIB_SRCS:.c=.o)
 CLI_OBJS = $(CLI_SRCS:.c=.o)
@@ -83,6 +84,8 @@ test: $(STATIC_LIB) $(CLI_BIN)
 	@./test/test_cli_attribution.sh
 	@echo "--- Running Feature 7: Model Recalibration & Thresholds Test ---"
 	@./test/test_cli_recalibration.sh
+	@echo "--- Running Feature 8: RC Configuration File Parser Test ---"
+	@./test/test_cli_rcfile.sh
 	@echo "All unit tests passed successfully!"
 
 clean:

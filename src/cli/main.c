@@ -7,6 +7,7 @@
 #include "xmalloc.h"
 #include "columns.h"
 #include "template.h"
+#include "rcfile.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -73,6 +74,7 @@ static void print_usage(const char *prog)
     printf("  -o <file>      Output file for scores (default: stdout, '-' for stdout)\n");
     printf("  -T, -O <thresh>Outlier threshold: float [0..1], 'average', percentage (e.g. '80%%'), or scaled (e.g. '0.65s')\n");
     printf("  -k             Prune most extreme outlier from model reservoir and recalibrate (repeatable)\n");
+    printf("  -g <file>      Configuration / RC file (overrides ~/.geifrc and ~/.ceifrc)\n");
     printf("  -t, -i <int>   Number of trees in forest (default: 100)\n");
     printf("  -s <int>       Number of samples per tree (default: 256)\n");
     printf("  -m <fmt|int>   Dimension format string (e.g. \"%%'.0f\") or max depth cap\n");
@@ -381,10 +383,19 @@ int main(int argc, char *argv[])
     char cli_outlier_score_spec[64] = {0};
     int kill_outliers_count = 0;
 
+    geif_rc_config_t rc_cfg;
+    geif_rc_config_init(&rc_cfg);
+    geif_rc_load_default(&rc_cfg);
+
+    bool cli_trees_given = false;
+    bool cli_samples_given = false;
+    bool cli_decimals_given = false;
+    bool cli_print_dim_given = false;
+
     geif_config_t config = geif_config_default();
 
     int opt;
-    while ((opt = getopt(argc, argv, "l:a:w:r:o:T:O:t:i:s:m:f:e:HqvhI:U:L:C:F:R:N:M:p:SD:d:j:v::WAk")) != -1) {
+    while ((opt = getopt(argc, argv, "l:a:w:r:o:T:O:t:i:s:m:f:e:HqvhI:U:L:C:F:R:N:M:p:SD:d:j:v::WAkg:")) != -1) {
         switch (opt) {
         case 'l': learn_file = optarg; break;
         case 'a': analyze_file = optarg; break;
@@ -411,8 +422,20 @@ int main(int argc, char *argv[])
             }
             break;
         case 't':
-        case 'i': config.tree_count = (uint32_t)atoi(optarg); break;
-        case 's': config.samples_per_tree = (uint32_t)atoi(optarg); break;
+        case 'i':
+            config.tree_count = (uint32_t)atoi(optarg);
+            cli_trees_given = true;
+            break;
+        case 's':
+            config.samples_per_tree = (uint32_t)atoi(optarg);
+            cli_samples_given = true;
+            break;
+        case 'g':
+            if (!geif_rc_parse_file(&rc_cfg, optarg)) {
+                fprintf(stderr, "geif: error: cannot read config file '%s'\n", optarg);
+                return 1;
+            }
+            break;
         case 'm':
             if (strchr(optarg, '%') != NULL) {
                 printf_format = optarg;
@@ -422,9 +445,11 @@ int main(int argc, char *argv[])
             break;
         case 'd':
             decimals = atoi(optarg);
+            cli_decimals_given = true;
             break;
         case 'j':
             print_dimension = optarg;
+            cli_print_dim_given = true;
             break;
         case 'f':
             delimiter = optarg[0];
@@ -487,6 +512,46 @@ int main(int argc, char *argv[])
             break;
         case 'h': print_usage(argv[0]); return 0;
         default:  print_usage(argv[0]); return 1;
+        }
+    }
+
+    // Apply configuration file settings if not explicitly specified on CLI
+    if (!cli_trees_given && rc_cfg.tree_count_set) {
+        config.tree_count = rc_cfg.tree_count;
+    }
+    if (!cli_samples_given && rc_cfg.samples_per_tree_set) {
+        config.samples_per_tree = rc_cfg.samples_per_tree;
+    }
+    if (!cli_decimals_given && rc_cfg.decimals_set) {
+        decimals = rc_cfg.decimals;
+    }
+    if (!cli_print_dim_given && rc_cfg.print_dimension_set) {
+        print_dimension = rc_cfg.print_dimension;
+    }
+    if (rc_cfg.low_rgb_set) {
+        low_rgb = rc_cfg.low_rgb;
+    }
+    if (rc_cfg.high_rgb_set) {
+        high_rgb = rc_cfg.high_rgb;
+    }
+    if (rc_cfg.category_sep_set) {
+        category_sep = rc_cfg.category_sep;
+    }
+    if (!cli_outlier_score_given && rc_cfg.outlier_score_set) {
+        cli_outlier_score_given = true;
+        strncpy(cli_outlier_score_spec, rc_cfg.outlier_score_spec, sizeof(cli_outlier_score_spec) - 1);
+        if (strcmp(rc_cfg.outlier_score_spec, "average") == 0) {
+            threshold_is_average = true;
+        } else {
+            threshold_is_average = false;
+            size_t olen = strlen(rc_cfg.outlier_score_spec);
+            if (olen > 0 && rc_cfg.outlier_score_spec[olen - 1] == '%') {
+                threshold = atof(rc_cfg.outlier_score_spec) / 100.0;
+            } else if (olen > 0 && rc_cfg.outlier_score_spec[olen - 1] == 's') {
+                threshold = atof(rc_cfg.outlier_score_spec);
+            } else {
+                threshold = atof(rc_cfg.outlier_score_spec);
+            }
         }
     }
 
