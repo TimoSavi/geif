@@ -8,6 +8,7 @@
 #include "columns.h"
 #include "template.h"
 #include "rcfile.h"
+#include "test_grid.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,12 +19,6 @@
 #include <time.h>
 
 #define GEIF_VERSION "1.0.0"
-
-typedef struct {
-    bool    active;
-    bool    invert;
-    regex_t regex;
-} cat_filter_t;
 
 static bool init_cat_filter(cat_filter_t *cf, const char *arg)
 {
@@ -72,10 +67,12 @@ static void print_usage(const char *prog)
     printf("  -w <file>      Save trained model to JSON file (use '-' for stdout)\n");
     printf("  -r <file>      Load trained model from JSON file (use '-' for stdin)\n");
     printf("  -o <file>      Output file for scores (default: stdout, '-' for stdout)\n");
-    printf("  -T, -O <thresh>Outlier threshold: float [0..1], 'average', percentage (e.g. '80%%'), or scaled (e.g. '0.65s')\n");
+    printf("  -O <thresh>    Outlier threshold: float [0..1], 'average', percentage (e.g. '80%%'), or scaled (e.g. '0.65s')\n");
+    printf("  -T [margin]    Generate synthetic test grid for population drift visualization (margin: e.g. 0.1)\n");
     printf("  -k             Prune most extreme outlier from model reservoir and recalibrate (repeatable)\n");
     printf("  -g <file>      Configuration / RC file (overrides ~/.geifrc and ~/.ceifrc)\n");
-    printf("  -t, -i <int>   Number of trees in forest (default: 100)\n");
+    printf("  -t <int>       Number of trees in forest (default: 100)\n");
+    printf("  -i <int>       Test grid sample intervals (default: 256) or tree count alias\n");
     printf("  -s <int>       Number of samples per tree (default: 256)\n");
     printf("  -m <fmt|int>   Dimension format string (e.g. \"%%'.0f\") or max depth cap\n");
     printf("  -f <char>      Input field delimiter (default: ',')\n");
@@ -383,6 +380,10 @@ int main(int argc, char *argv[])
     char cli_outlier_score_spec[64] = {0};
     int kill_outliers_count = 0;
 
+    bool   run_test_grid         = false;
+    double test_extension_factor = 0.0;
+    int    test_range_interval   = 256;
+
     geif_rc_config_t rc_cfg;
     geif_rc_config_init(&rc_cfg);
     geif_rc_load_default(&rc_cfg);
@@ -395,7 +396,7 @@ int main(int argc, char *argv[])
     geif_config_t config = geif_config_default();
 
     int opt;
-    while ((opt = getopt(argc, argv, "l:a:w:r:o:T:O:t:i:s:m:f:e:HqvhI:U:L:C:F:R:N:M:p:SD:d:j:v::WAkg:")) != -1) {
+    while ((opt = getopt(argc, argv, "l:a:w:r:o:T::O:t:i:s:m:f:e:HqvhI:U:L:C:F:R:N:M:p:SD:d:j:v::WAkg:")) != -1) {
         switch (opt) {
         case 'l': learn_file = optarg; break;
         case 'a': analyze_file = optarg; break;
@@ -404,6 +405,13 @@ int main(int argc, char *argv[])
         case 'o': output_file = optarg; break;
         case 'k': kill_outliers_count++; break;
         case 'T':
+            run_test_grid = true;
+            if (optarg != NULL) {
+                test_extension_factor = atof(optarg);
+            } else if (optind < argc && argv[optind][0] != '-') {
+                test_extension_factor = atof(argv[optind++]);
+            }
+            break;
         case 'O':
             cli_outlier_score_given = true;
             strncpy(cli_outlier_score_spec, optarg, sizeof(cli_outlier_score_spec) - 1);
@@ -422,8 +430,12 @@ int main(int argc, char *argv[])
             }
             break;
         case 't':
+            config.tree_count = (uint32_t)atoi(optarg);
+            cli_trees_given = true;
+            break;
         case 'i':
             config.tree_count = (uint32_t)atoi(optarg);
+            test_range_interval = atoi(optarg);
             cli_trees_given = true;
             break;
         case 's':
@@ -555,6 +567,15 @@ int main(int argc, char *argv[])
         }
     }
 
+    // If analysis file is provided, -T was used as threshold in legacy calls
+    if (analyze_file && run_test_grid && !cli_outlier_score_given) {
+        threshold = test_extension_factor;
+        threshold_is_average = false;
+        cli_outlier_score_given = true;
+        snprintf(cli_outlier_score_spec, sizeof(cli_outlier_score_spec), "%g", test_extension_factor);
+        run_test_grid = false;
+    }
+
     geif_ensemble_t *ensemble = NULL;
 
     // Mode: Load existing model
@@ -634,6 +655,42 @@ int main(int argc, char *argv[])
                 return 1;
             }
         }
+        geif_ensemble_destroy(ensemble);
+        return 0;
+    }
+
+    // Mode: Test Grid Generation (-T [margin]) for population drift visualization
+    if (run_test_grid && !analyze_file) {
+        if (!ensemble) {
+            fprintf(stderr, "Error: -T requires a loaded model via -r <model.json>\n");
+            return 1;
+        }
+
+        FILE *out_fp = stdout;
+        if (output_file && strcmp(output_file, "-") != 0) {
+            out_fp = xfopen(output_file, "w");
+            if (!out_fp) {
+                geif_ensemble_destroy(ensemble);
+                return 1;
+            }
+        }
+
+        geif_generate_test_grid(ensemble,
+                                test_extension_factor,
+                                test_range_interval,
+                                &cat_filter,
+                                threshold,
+                                threshold_is_average,
+                                point_tmpl,
+                                decimals,
+                                list_separator,
+                                low_rgb,
+                                high_rgb,
+                                printf_format,
+                                print_dimension,
+                                out_fp);
+
+        if (out_fp != stdout) fclose(out_fp);
         geif_ensemble_destroy(ensemble);
         return 0;
     }
