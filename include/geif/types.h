@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
+#include <time.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -87,13 +88,42 @@ typedef struct geif_forest {
     size_t        pool_capacity;   /**< Maximum capacity of sample pool (tree_count * samples_per_tree) */
     uint64_t      total_rows_seen; /**< Total rows streamed through the reservoir */
 
-    // Metadata
-    char          category[64];           /**< Optional category name for multi-tenant isolation */
+    char          category[128];          /**< Optional category name for multi-tenant isolation */
     uint32_t      total_input_cols;       /**< Total raw columns in tabular input */
     char          label_dims_spec[128];   /**< Label columns spec (e.g. "1") */
     char          include_dims_spec[128]; /**< Included feature columns spec (e.g. "2-10") */
     char          ignore_dims_spec[128];  /**< Ignored columns spec (e.g. "12") */
+    char          category_dims_spec[128];/**< Category columns spec (e.g. "12") */
 } geif_forest_t;
+
+typedef struct {
+    char           category[128];
+    geif_forest_t *forest;
+    time_t         last_updated;
+    uint64_t       total_rows;
+} geif_category_entry_t;
+
+typedef struct geif_cat_hash_node {
+    uint32_t entry_idx;
+    struct geif_cat_hash_node *next;
+} geif_cat_hash_node_t;
+
+typedef struct {
+    uint32_t       dimensions;             /**< Feature dimensions per sub-forest */
+    geif_config_t  config;                 /**< Default training config */
+    uint32_t       total_input_cols;       /**< Total raw columns in tabular input */
+    char           label_dims_spec[128];   /**< Label columns spec (e.g. "1") */
+    char           include_dims_spec[128]; /**< Included feature columns spec (e.g. "2-10") */
+    char           ignore_dims_spec[128];  /**< Ignored columns spec (e.g. "12") */
+    char           category_dims_spec[128];/**< Category columns spec (e.g. "12") */
+
+    geif_category_entry_t *entries;        /**< Dynamic array of category sub-forests */
+    size_t         count;                  /**< Number of active sub-forests */
+    size_t         capacity;               /**< Allocated entry capacity */
+
+    geif_cat_hash_node_t **hash_buckets;   /**< Hash table for O(1) category lookup */
+    size_t         hash_size;              /**< Number of hash buckets */
+} geif_ensemble_t;
 
 #ifdef __cplusplus
 }

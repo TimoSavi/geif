@@ -89,4 +89,15 @@ void geif_extract_label(const geif_column_config_t *cfg,
                         char *out_buf,
                         size_t max_len);
 
+/**
+ * @brief Build category string from row tokens according to cfg->category_indices.
+ * Concatenates category tokens with sep. If no category columns, out_buf is set to "".
+ */
+void geif_extract_category(const geif_column_config_t *cfg,
+                           char **tokens,
+                           uint32_t total_cols,
+                           char sep,
+                           char *out_buf,
+                           size_t max_len);
+
 #endif /* GEIF_COLUMNS_H */

@@ -18,7 +18,8 @@ LIB_SRCS = src/lib/error.c \
            src/lib/reservoir.c \
            src/lib/train.c \
            src/lib/evaluate.c \
-           src/lib/json_io.c
+           src/lib/json_io.c \
+           src/lib/ensemble.c
 
 CLI_SRCS = src/cli/main.c \
            src/cli/xmalloc.c \
@@ -71,6 +72,8 @@ test: $(STATIC_LIB) $(CLI_BIN)
 	@./test/test_cli_csv.sh
 	@echo "--- Running Feature 2: Column Selection & Filtering Test ---"
 	@./test/test_cli_columns.sh
+	@echo "--- Running Feature 3: Multi-Category Sub-Forest Engine Test ---"
+	@./test/test_cli_categories.sh
 	@echo "All unit tests passed successfully!"
 
 clean:

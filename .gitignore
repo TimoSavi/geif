@@ -3,6 +3,7 @@
 /lib/
 /build/
 *.o
+*.d
 *.a
 *.so
 *.dylib

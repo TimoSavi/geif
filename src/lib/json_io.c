@@ -1,6 +1,6 @@
 /**
  * @file json_io.c
- * @brief JSON serialization and deserialization for GEIF models.
+ * @brief JSON serialization and deserialization for GEIF models and ensembles.
  */
 
 #include "geif/geif.h"
@@ -9,12 +9,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-geif_status_t geif_forest_save_json(const geif_forest_t *f, const char *path)
+struct json_object *geif_forest_to_json_object(const geif_forest_t *f);
+geif_status_t geif_forest_from_json_object(geif_forest_t **forest_out, struct json_object *root);
+
+struct json_object *geif_forest_to_json_object(const geif_forest_t *f)
 {
-    if (!f || !path) return GEIF_ERR_INVALID_ARG;
+    if (!f) return NULL;
 
     struct json_object *root = json_object_new_object();
-    if (!root) return GEIF_ERR_OUT_OF_MEMORY;
+    if (!root) return NULL;
 
     json_object_object_add(root, "format", json_object_new_string("GEIF-1.0"));
     json_object_object_add(root, "dimensions", json_object_new_int((int)f->dimensions));
@@ -36,12 +39,14 @@ geif_status_t geif_forest_save_json(const geif_forest_t *f, const char *path)
     json_object_object_add(root, "label_dims", json_object_new_string(f->label_dims_spec));
     json_object_object_add(root, "include_dims", json_object_new_string(f->include_dims_spec));
     json_object_object_add(root, "ignore_dims", json_object_new_string(f->ignore_dims_spec));
+    json_object_object_add(root, "category_dims", json_object_new_string(f->category_dims_spec));
 
     // Globals object for CEIF format compatibility
     struct json_object *globals = json_object_new_object();
     json_object_object_add(globals, "labelDims", json_object_new_string(f->label_dims_spec));
     json_object_object_add(globals, "includeDims", json_object_new_string(f->include_dims_spec));
     json_object_object_add(globals, "ignoreDims", json_object_new_string(f->ignore_dims_spec));
+    json_object_object_add(globals, "categoryDims", json_object_new_string(f->category_dims_spec));
     json_object_object_add(root, "globals", globals);
 
     // Save envelopes
@@ -104,44 +109,15 @@ geif_status_t geif_forest_save_json(const geif_forest_t *f, const char *path)
     }
     json_object_object_add(root, "trees", j_trees);
 
-    int ret;
-    if (strcmp(path, "-") == 0) {
-        const char *json_str = json_object_to_json_string_ext(root, JSON_C_TO_STRING_PRETTY);
-        ret = (json_str && fputs(json_str, stdout) >= 0 && fputc('\n', stdout) >= 0) ? 0 : -1;
-    } else {
-        ret = json_object_to_file_ext(path, root, JSON_C_TO_STRING_PRETTY);
-    }
-    json_object_put(root);
-
-    return (ret == 0) ? GEIF_OK : GEIF_ERR_IO;
+    return root;
 }
 
-geif_status_t geif_forest_load_json(geif_forest_t **forest_out, const char *path)
+geif_status_t geif_forest_from_json_object(geif_forest_t **forest_out, struct json_object *root)
 {
-    if (!forest_out || !path) return GEIF_ERR_INVALID_ARG;
-
-    struct json_object *root = NULL;
-    if (strcmp(path, "-") == 0) {
-        struct json_tokener *tok = json_tokener_new();
-        if (!tok) return GEIF_ERR_OUT_OF_MEMORY;
-        char buffer[4096];
-        size_t bytes_read;
-        enum json_tokener_error jerr = json_tokener_continue;
-        while ((bytes_read = fread(buffer, 1, sizeof(buffer), stdin)) > 0) {
-            root = json_tokener_parse_ex(tok, buffer, (int)bytes_read);
-            jerr = json_tokener_get_error(tok);
-            if (root || jerr != json_tokener_continue) break;
-        }
-        json_tokener_free(tok);
-        if (!root) return GEIF_ERR_FORMAT_CORRUPT;
-    } else {
-        root = json_object_from_file(path);
-        if (!root) return GEIF_ERR_IO;
-    }
+    if (!forest_out || !root) return GEIF_ERR_INVALID_ARG;
 
     struct json_object *j_val;
     if (!json_object_object_get_ex(root, "dimensions", &j_val)) {
-        json_object_put(root);
         return GEIF_ERR_FORMAT_CORRUPT;
     }
     uint32_t dimensions = (uint32_t)json_object_get_int(j_val);
@@ -156,7 +132,6 @@ geif_status_t geif_forest_load_json(geif_forest_t **forest_out, const char *path
     geif_forest_t *f = NULL;
     geif_status_t status = geif_forest_create(&f, dimensions, &cfg);
     if (status != GEIF_OK) {
-        json_object_put(root);
         return status;
     }
 
@@ -185,6 +160,10 @@ geif_status_t geif_forest_load_json(geif_forest_t **forest_out, const char *path
         strncpy(f->ignore_dims_spec, json_object_get_string(j_val), sizeof(f->ignore_dims_spec) - 1);
         f->ignore_dims_spec[sizeof(f->ignore_dims_spec) - 1] = '\0';
     }
+    if (json_object_object_get_ex(root, "category_dims", &j_val)) {
+        strncpy(f->category_dims_spec, json_object_get_string(j_val), sizeof(f->category_dims_spec) - 1);
+        f->category_dims_spec[sizeof(f->category_dims_spec) - 1] = '\0';
+    }
 
     // Globals fallback for CEIF models
     struct json_object *globals = NULL;
@@ -200,6 +179,10 @@ geif_status_t geif_forest_load_json(geif_forest_t **forest_out, const char *path
         if (f->ignore_dims_spec[0] == '\0' && json_object_object_get_ex(globals, "ignoreDims", &j_val)) {
             strncpy(f->ignore_dims_spec, json_object_get_string(j_val), sizeof(f->ignore_dims_spec) - 1);
             f->ignore_dims_spec[sizeof(f->ignore_dims_spec) - 1] = '\0';
+        }
+        if (f->category_dims_spec[0] == '\0' && json_object_object_get_ex(globals, "categoryDims", &j_val)) {
+            strncpy(f->category_dims_spec, json_object_get_string(j_val), sizeof(f->category_dims_spec) - 1);
+            f->category_dims_spec[sizeof(f->category_dims_spec) - 1] = '\0';
         }
     }
 
@@ -279,7 +262,234 @@ geif_status_t geif_forest_load_json(geif_forest_t **forest_out, const char *path
         }
     }
 
-    json_object_put(root);
     *forest_out = f;
+    return GEIF_OK;
+}
+
+geif_status_t geif_forest_save_json(const geif_forest_t *f, const char *path)
+{
+    if (!f || !path) return GEIF_ERR_INVALID_ARG;
+
+    struct json_object *root = geif_forest_to_json_object(f);
+    if (!root) return GEIF_ERR_OUT_OF_MEMORY;
+
+    int ret;
+    if (strcmp(path, "-") == 0) {
+        const char *json_str = json_object_to_json_string_ext(root, JSON_C_TO_STRING_PRETTY);
+        ret = (json_str && fputs(json_str, stdout) >= 0 && fputc('\n', stdout) >= 0) ? 0 : -1;
+    } else {
+        ret = json_object_to_file_ext(path, root, JSON_C_TO_STRING_PRETTY);
+    }
+    json_object_put(root);
+
+    return (ret == 0) ? GEIF_OK : GEIF_ERR_IO;
+}
+
+geif_status_t geif_ensemble_save_json(const geif_ensemble_t *ens, const char *path)
+{
+    if (!ens || !path) return GEIF_ERR_INVALID_ARG;
+
+    struct json_object *root = json_object_new_object();
+    if (!root) return GEIF_ERR_OUT_OF_MEMORY;
+
+    json_object_object_add(root, "format", json_object_new_string("GEIF-1.0"));
+    json_object_object_add(root, "dimensions", json_object_new_int((int)ens->dimensions));
+    json_object_object_add(root, "total_input_cols", json_object_new_int((int)ens->total_input_cols));
+    json_object_object_add(root, "subforest_count", json_object_new_int((int)ens->count));
+    json_object_object_add(root, "label_dims", json_object_new_string(ens->label_dims_spec));
+    json_object_object_add(root, "include_dims", json_object_new_string(ens->include_dims_spec));
+    json_object_object_add(root, "ignore_dims", json_object_new_string(ens->ignore_dims_spec));
+    json_object_object_add(root, "category_dims", json_object_new_string(ens->category_dims_spec));
+
+    // Globals object for CEIF compatibility
+    struct json_object *globals = json_object_new_object();
+    json_object_object_add(globals, "labelDims", json_object_new_string(ens->label_dims_spec));
+    json_object_object_add(globals, "includeDims", json_object_new_string(ens->include_dims_spec));
+    json_object_object_add(globals, "ignoreDims", json_object_new_string(ens->ignore_dims_spec));
+    json_object_object_add(globals, "categoryDims", json_object_new_string(ens->category_dims_spec));
+    json_object_object_add(root, "globals", globals);
+
+    // Save sub-forests array
+    struct json_object *j_forests = json_object_new_array();
+    for (size_t i = 0; i < ens->count; i++) {
+        if (ens->entries[i].forest) {
+            struct json_object *jf = geif_forest_to_json_object(ens->entries[i].forest);
+            if (jf) {
+                json_object_object_add(jf, "category", json_object_new_string(ens->entries[i].category));
+                json_object_object_add(jf, "last_updated", json_object_new_int64((int64_t)ens->entries[i].last_updated));
+                json_object_object_add(jf, "total_rows", json_object_new_int64((int64_t)ens->entries[i].total_rows));
+                json_object_array_add(j_forests, jf);
+            }
+        }
+    }
+    json_object_object_add(root, "forests", j_forests);
+
+    int ret;
+    if (strcmp(path, "-") == 0) {
+        const char *json_str = json_object_to_json_string_ext(root, JSON_C_TO_STRING_PRETTY);
+        ret = (json_str && fputs(json_str, stdout) >= 0 && fputc('\n', stdout) >= 0) ? 0 : -1;
+    } else {
+        ret = json_object_to_file_ext(path, root, JSON_C_TO_STRING_PRETTY);
+    }
+    json_object_put(root);
+
+    return (ret == 0) ? GEIF_OK : GEIF_ERR_IO;
+}
+
+geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char *path)
+{
+    if (!ensemble_out || !path) return GEIF_ERR_INVALID_ARG;
+
+    struct json_object *root = NULL;
+    if (strcmp(path, "-") == 0) {
+        struct json_tokener *tok = json_tokener_new();
+        if (!tok) return GEIF_ERR_OUT_OF_MEMORY;
+        char buffer[4096];
+        size_t bytes_read;
+        enum json_tokener_error jerr = json_tokener_continue;
+        while ((bytes_read = fread(buffer, 1, sizeof(buffer), stdin)) > 0) {
+            root = json_tokener_parse_ex(tok, buffer, (int)bytes_read);
+            jerr = json_tokener_get_error(tok);
+            if (root || jerr != json_tokener_continue) break;
+        }
+        json_tokener_free(tok);
+        if (!root) return GEIF_ERR_FORMAT_CORRUPT;
+    } else {
+        root = json_object_from_file(path);
+        if (!root) return GEIF_ERR_IO;
+    }
+
+    struct json_object *j_val;
+    uint32_t dimensions = 0;
+    if (json_object_object_get_ex(root, "dimensions", &j_val)) {
+        dimensions = (uint32_t)json_object_get_int(j_val);
+    }
+
+    geif_config_t cfg = geif_config_default();
+    if (json_object_object_get_ex(root, "tree_count", &j_val)) cfg.tree_count = (uint32_t)json_object_get_int(j_val);
+    if (json_object_object_get_ex(root, "samples_per_tree", &j_val)) cfg.samples_per_tree = (uint32_t)json_object_get_int(j_val);
+    if (json_object_object_get_ex(root, "max_depth", &j_val)) cfg.max_depth = (uint32_t)json_object_get_int(j_val);
+    if (json_object_object_get_ex(root, "kappa", &j_val)) cfg.kappa = json_object_get_double(j_val);
+    if (json_object_object_get_ex(root, "alpha", &j_val)) cfg.alpha = json_object_get_double(j_val);
+
+    struct json_object *j_forests = NULL;
+    bool has_forests = json_object_object_get_ex(root, "forests", &j_forests);
+    if (dimensions == 0 && has_forests && json_object_array_length(j_forests) > 0) {
+        struct json_object *first_f = json_object_array_get_idx(j_forests, 0);
+        if (json_object_object_get_ex(first_f, "dimensions", &j_val)) {
+            dimensions = (uint32_t)json_object_get_int(j_val);
+        }
+    }
+
+    if (dimensions == 0) {
+        json_object_put(root);
+        return GEIF_ERR_FORMAT_CORRUPT;
+    }
+
+    geif_ensemble_t *ens = NULL;
+    geif_status_t status = geif_ensemble_create(&ens, dimensions, &cfg);
+    if (status != GEIF_OK) {
+        json_object_put(root);
+        return status;
+    }
+
+    if (json_object_object_get_ex(root, "total_input_cols", &j_val)) ens->total_input_cols = (uint32_t)json_object_get_int(j_val);
+    if (json_object_object_get_ex(root, "label_dims", &j_val)) {
+        strncpy(ens->label_dims_spec, json_object_get_string(j_val), sizeof(ens->label_dims_spec) - 1);
+    }
+    if (json_object_object_get_ex(root, "include_dims", &j_val)) {
+        strncpy(ens->include_dims_spec, json_object_get_string(j_val), sizeof(ens->include_dims_spec) - 1);
+    }
+    if (json_object_object_get_ex(root, "ignore_dims", &j_val)) {
+        strncpy(ens->ignore_dims_spec, json_object_get_string(j_val), sizeof(ens->ignore_dims_spec) - 1);
+    }
+    if (json_object_object_get_ex(root, "category_dims", &j_val)) {
+        strncpy(ens->category_dims_spec, json_object_get_string(j_val), sizeof(ens->category_dims_spec) - 1);
+    }
+
+    struct json_object *globals = NULL;
+    if (json_object_object_get_ex(root, "globals", &globals)) {
+        if (ens->label_dims_spec[0] == '\0' && json_object_object_get_ex(globals, "labelDims", &j_val)) {
+            strncpy(ens->label_dims_spec, json_object_get_string(j_val), sizeof(ens->label_dims_spec) - 1);
+        }
+        if (ens->include_dims_spec[0] == '\0' && json_object_object_get_ex(globals, "includeDims", &j_val)) {
+            strncpy(ens->include_dims_spec, json_object_get_string(j_val), sizeof(ens->include_dims_spec) - 1);
+        }
+        if (ens->ignore_dims_spec[0] == '\0' && json_object_object_get_ex(globals, "ignoreDims", &j_val)) {
+            strncpy(ens->ignore_dims_spec, json_object_get_string(j_val), sizeof(ens->ignore_dims_spec) - 1);
+        }
+        if (ens->category_dims_spec[0] == '\0' && json_object_object_get_ex(globals, "categoryDims", &j_val)) {
+            strncpy(ens->category_dims_spec, json_object_get_string(j_val), sizeof(ens->category_dims_spec) - 1);
+        }
+    }
+
+    if (has_forests) {
+        int f_count = json_object_array_length(j_forests);
+        for (int i = 0; i < f_count; i++) {
+            struct json_object *jf = json_object_array_get_idx(j_forests, i);
+            geif_forest_t *sub = NULL;
+            if (geif_forest_from_json_object(&sub, jf) == GEIF_OK && sub) {
+                const char *cat_str = sub->category;
+                geif_forest_t *target = geif_ensemble_get_or_create(ens, cat_str);
+                if (target) {
+                    for (size_t e = 0; e < ens->count; e++) {
+                        if (ens->entries[e].forest == target) {
+                            geif_forest_destroy(target);
+                            ens->entries[e].forest = sub;
+                            if (json_object_object_get_ex(jf, "last_updated", &j_val)) {
+                                ens->entries[e].last_updated = (time_t)json_object_get_int64(j_val);
+                            }
+                            if (json_object_object_get_ex(jf, "total_rows", &j_val)) {
+                                ens->entries[e].total_rows = (uint64_t)json_object_get_int64(j_val);
+                            } else {
+                                ens->entries[e].total_rows = sub->total_rows_seen;
+                            }
+                            break;
+                        }
+                    }
+                } else {
+                    geif_forest_destroy(sub);
+                }
+            }
+        }
+    } else {
+        // Single-forest fallback
+        geif_forest_t *sub = NULL;
+        if (geif_forest_from_json_object(&sub, root) == GEIF_OK && sub) {
+            const char *cat_str = sub->category;
+            geif_forest_t *target = geif_ensemble_get_or_create(ens, cat_str);
+            if (target) {
+                for (size_t e = 0; e < ens->count; e++) {
+                    if (ens->entries[e].forest == target) {
+                        geif_forest_destroy(target);
+                        ens->entries[e].forest = sub;
+                        ens->entries[e].total_rows = sub->total_rows_seen;
+                        break;
+                    }
+                }
+            } else {
+                geif_forest_destroy(sub);
+            }
+        }
+    }
+
+    json_object_put(root);
+    *ensemble_out = ens;
+    return GEIF_OK;
+}
+
+geif_status_t geif_forest_load_json(geif_forest_t **forest_out, const char *path)
+{
+    geif_ensemble_t *ens = NULL;
+    geif_status_t status = geif_ensemble_load_json(&ens, path);
+    if (status != GEIF_OK || !ens) return status;
+    if (ens->count == 0 || !ens->entries[0].forest) {
+        geif_ensemble_destroy(ens);
+        return GEIF_ERR_FORMAT_CORRUPT;
+    }
+
+    *forest_out = ens->entries[0].forest;
+    ens->entries[0].forest = NULL;
+    geif_ensemble_destroy(ens);
     return GEIF_OK;
 }

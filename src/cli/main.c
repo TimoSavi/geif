@@ -108,6 +108,8 @@ int main(int argc, char *argv[])
     bool query_mode          = false;
     bool verbose             = false;
 
+    char category_sep        = ';';
+
     geif_config_t config = geif_config_default();
 
     int opt;
@@ -145,41 +147,31 @@ int main(int argc, char *argv[])
         }
     }
 
-    geif_forest_t *forest = NULL;
+    geif_ensemble_t *ensemble = NULL;
 
     // Mode: Load existing model
     if (load_file) {
-        geif_status_t status = geif_forest_load_json(&forest, load_file);
+        geif_status_t status = geif_ensemble_load_json(&ensemble, load_file);
         if (status != GEIF_OK) {
             fprintf(stderr, "Error loading model from '%s': %s\n", load_file, geif_status_str(status));
             return 1;
         }
-        if (verbose) printf("Loaded model from '%s' (%u trees, %u dimensions)\n",
-                            load_file, forest->tree_count, forest->dimensions);
+        if (verbose) {
+            printf("Loaded model from '%s' (%zu sub-forests, %u dimensions)\n",
+                   load_file, ensemble->count, ensemble->dimensions);
+        }
     }
 
     // Mode: Model info query (-q)
     if (query_mode) {
-        if (!forest) {
+        if (!ensemble) {
             fprintf(stderr, "Error: -q requires a loaded model via -r <model.json>\n");
             return 1;
         }
-        char summary[1024];
-        geif_forest_summary(forest, summary, sizeof(summary));
+        char summary[4096];
+        geif_ensemble_summary(ensemble, summary, sizeof(summary));
         printf("%s", summary);
-        if (forest->total_input_cols > 0) {
-            printf("  Input Columns:       %u\n", forest->total_input_cols);
-        }
-        if (forest->label_dims_spec[0] != '\0') {
-            printf("  Label Columns (-L):  %s\n", forest->label_dims_spec);
-        }
-        if (forest->include_dims_spec[0] != '\0') {
-            printf("  Include Columns (-U): %s\n", forest->include_dims_spec);
-        }
-        if (forest->ignore_dims_spec[0] != '\0') {
-            printf("  Ignore Columns (-I):  %s\n", forest->ignore_dims_spec);
-        }
-        geif_forest_destroy(forest);
+        geif_ensemble_destroy(ensemble);
         return 0;
     }
 
@@ -187,7 +179,7 @@ int main(int argc, char *argv[])
     if (learn_file) {
         FILE *fp = xfopen(learn_file, "r");
         if (!fp) {
-            if (forest) geif_forest_destroy(forest);
+            if (ensemble) geif_ensemble_destroy(ensemble);
             return 1;
         }
 
@@ -209,49 +201,51 @@ int main(int argc, char *argv[])
         if (total_cols == 0) {
             fprintf(stderr, "Error: could not detect columns in '%s'\n", learn_file);
             xfclose(fp);
-            if (forest) geif_forest_destroy(forest);
+            if (ensemble) geif_ensemble_destroy(ensemble);
             return 1;
         }
 
         geif_column_config_t col_cfg;
         geif_column_config_init(&col_cfg, ignore_spec, include_spec, label_spec, category_spec);
         if (!geif_column_config_resolve(&col_cfg, total_cols)) {
-            fprintf(stderr, "geif: error: no active feature dimensions remaining after applying column masks (-I, -U, -L)\n");
+            fprintf(stderr, "geif: error: no active feature dimensions remaining after applying column masks (-I, -U, -L, -C)\n");
             xfclose(fp);
             geif_column_config_free(&col_cfg);
-            if (forest) geif_forest_destroy(forest);
+            if (ensemble) geif_ensemble_destroy(ensemble);
             return 1;
         }
 
         uint32_t dims = col_cfg.feature_dim_count;
 
-        if (!forest) {
-            geif_status_t status = geif_forest_create(&forest, dims, &config);
+        if (!ensemble) {
+            geif_status_t status = geif_ensemble_create(&ensemble, dims, &config);
             if (status != GEIF_OK) {
-                fprintf(stderr, "Error initializing forest: %s\n", geif_status_str(status));
+                fprintf(stderr, "Error initializing ensemble: %s\n", geif_status_str(status));
                 xfclose(fp);
                 geif_column_config_free(&col_cfg);
                 return 1;
             }
         }
 
-        // Save column metadata into forest
-        forest->total_input_cols = total_cols;
-        if (ignore_spec) strncpy(forest->ignore_dims_spec, ignore_spec, sizeof(forest->ignore_dims_spec) - 1);
-        if (include_spec) strncpy(forest->include_dims_spec, include_spec, sizeof(forest->include_dims_spec) - 1);
-        if (label_spec) strncpy(forest->label_dims_spec, label_spec, sizeof(forest->label_dims_spec) - 1);
-        if (category_spec) strncpy(forest->category, category_spec, sizeof(forest->category) - 1);
+        // Save column metadata into ensemble
+        ensemble->total_input_cols = total_cols;
+        if (ignore_spec) strncpy(ensemble->ignore_dims_spec, ignore_spec, sizeof(ensemble->ignore_dims_spec) - 1);
+        if (include_spec) strncpy(ensemble->include_dims_spec, include_spec, sizeof(ensemble->include_dims_spec) - 1);
+        if (label_spec) strncpy(ensemble->label_dims_spec, label_spec, sizeof(ensemble->label_dims_spec) - 1);
+        if (category_spec) strncpy(ensemble->category_dims_spec, category_spec, sizeof(ensemble->category_dims_spec) - 1);
 
         if (!skip_header) {
             first_line_is_data = true;
         }
 
         double *vec = (double *)xmalloc(dims * sizeof(double));
+        char cat_buf[256];
         uint64_t rows = 0;
 
         if (first_line_is_data) {
+            geif_extract_category(&col_cfg, tokens, total_cols, category_sep, cat_buf, sizeof(cat_buf));
             if (geif_extract_features(&col_cfg, tokens, total_cols, vec)) {
-                geif_forest_feed(forest, vec);
+                geif_ensemble_feed(ensemble, cat_buf, vec);
                 rows++;
             }
         }
@@ -261,33 +255,37 @@ int main(int argc, char *argv[])
             strncpy(line_copy, line, sizeof(line_copy) - 1);
             line_copy[sizeof(line_copy) - 1] = '\0';
             uint32_t n_tok = tokenize_line(line_copy, delimiter, tokens, 1024);
-            if (n_tok >= total_cols && geif_extract_features(&col_cfg, tokens, n_tok, vec)) {
-                geif_forest_feed(forest, vec);
-                rows++;
+            if (n_tok >= total_cols) {
+                geif_extract_category(&col_cfg, tokens, n_tok, category_sep, cat_buf, sizeof(cat_buf));
+                if (geif_extract_features(&col_cfg, tokens, n_tok, vec)) {
+                    geif_ensemble_feed(ensemble, cat_buf, vec);
+                    rows++;
+                }
             }
         }
         xfree(vec);
         xfclose(fp);
         geif_column_config_free(&col_cfg);
 
-        if (verbose) printf("Ingested %llu rows from '%s' (%u feature dimensions). Training forest...\n",
-                            (unsigned long long)rows, learn_file, dims);
+        if (verbose) {
+            printf("Ingested %llu rows from '%s' (%u feature dimensions, %zu categories). Training ensemble...\n",
+                   (unsigned long long)rows, learn_file, dims, ensemble->count);
+        }
 
-        geif_status_t status = geif_forest_train(forest);
+        geif_status_t status = geif_ensemble_train(ensemble);
         if (status != GEIF_OK) {
-            fprintf(stderr, "Error training forest: %s\n", geif_status_str(status));
-            geif_forest_destroy(forest);
+            fprintf(stderr, "Error training ensemble: %s\n", geif_status_str(status));
+            geif_ensemble_destroy(ensemble);
             return 1;
         }
 
         if (verbose) {
-            printf("Training complete. Universal scale H_max = %.6f, Nominal Spacing = %.6f\n",
-                   forest->H_max, forest->delta_nominal);
+            printf("Training complete across %zu sub-forests.\n", ensemble->count);
         }
 
         // Save trained model if requested
         if (save_file) {
-            status = geif_forest_save_json(forest, save_file);
+            status = geif_ensemble_save_json(ensemble, save_file);
             if (status != GEIF_OK) {
                 fprintf(stderr, "Error saving model to '%s': %s\n", save_file, geif_status_str(status));
             } else if (verbose && strcmp(save_file, "-") != 0) {
@@ -300,14 +298,14 @@ int main(int argc, char *argv[])
 
     // Mode: Analyze / Score (-a)
     if (analyze_file) {
-        if (!forest) {
+        if (!ensemble) {
             fprintf(stderr, "Error: Analysis requires a model. Train with -l or load with -r.\n");
             return 1;
         }
 
         FILE *in_fp = xfopen(analyze_file, "r");
         if (!in_fp) {
-            geif_forest_destroy(forest);
+            geif_ensemble_destroy(ensemble);
             return 1;
         }
 
@@ -315,15 +313,15 @@ int main(int argc, char *argv[])
         FILE *out_fp = xfopen(out_target, "w");
         if (!out_fp) {
             xfclose(in_fp);
-            geif_forest_destroy(forest);
+            geif_ensemble_destroy(ensemble);
             return 1;
         }
 
         // Column configuration: CLI flags override loaded model metadata
-        const char *active_ignore = ignore_spec ? ignore_spec : (forest->ignore_dims_spec[0] ? forest->ignore_dims_spec : NULL);
-        const char *active_include = include_spec ? include_spec : (forest->include_dims_spec[0] ? forest->include_dims_spec : NULL);
-        const char *active_label = label_spec ? label_spec : (forest->label_dims_spec[0] ? forest->label_dims_spec : NULL);
-        const char *active_category = category_spec ? category_spec : (forest->category[0] ? forest->category : NULL);
+        const char *active_ignore = ignore_spec ? ignore_spec : (ensemble->ignore_dims_spec[0] ? ensemble->ignore_dims_spec : NULL);
+        const char *active_include = include_spec ? include_spec : (ensemble->include_dims_spec[0] ? ensemble->include_dims_spec : NULL);
+        const char *active_label = label_spec ? label_spec : (ensemble->label_dims_spec[0] ? ensemble->label_dims_spec : NULL);
+        const char *active_category = category_spec ? category_spec : (ensemble->category_dims_spec[0] ? ensemble->category_dims_spec : NULL);
 
         char line[8192];
         char line_copy[8192];
@@ -343,7 +341,7 @@ int main(int argc, char *argv[])
         if (total_cols == 0) {
             xfclose(in_fp);
             xfclose(out_fp);
-            geif_forest_destroy(forest);
+            geif_ensemble_destroy(ensemble);
             return 0;
         }
 
@@ -354,17 +352,17 @@ int main(int argc, char *argv[])
             xfclose(in_fp);
             xfclose(out_fp);
             geif_column_config_free(&col_cfg);
-            geif_forest_destroy(forest);
+            geif_ensemble_destroy(ensemble);
             return 1;
         }
 
-        if (col_cfg.feature_dim_count != forest->dimensions) {
+        if (col_cfg.feature_dim_count != ensemble->dimensions) {
             fprintf(stderr, "geif: error: input '%s' has %u active feature dimensions, but model expects %u\n",
-                    analyze_file, col_cfg.feature_dim_count, forest->dimensions);
+                    analyze_file, col_cfg.feature_dim_count, ensemble->dimensions);
             xfclose(in_fp);
             xfclose(out_fp);
             geif_column_config_free(&col_cfg);
-            geif_forest_destroy(forest);
+            geif_ensemble_destroy(ensemble);
             return 1;
         }
 
@@ -372,8 +370,9 @@ int main(int argc, char *argv[])
             first_line_is_data = true;
         }
 
-        uint32_t dims = forest->dimensions;
+        uint32_t dims = ensemble->dimensions;
         double *vec = (double *)xmalloc(dims * sizeof(double));
+        char cat_buf[256];
         uint64_t analyzed = 0;
 
         if (first_line_is_data) {
@@ -382,9 +381,10 @@ int main(int argc, char *argv[])
             orig_line[sizeof(orig_line) - 1] = '\0';
             orig_line[strcspn(orig_line, "\r\n")] = 0;
 
+            geif_extract_category(&col_cfg, tokens, total_cols, category_sep, cat_buf, sizeof(cat_buf));
             if (geif_extract_features(&col_cfg, tokens, total_cols, vec)) {
                 double score = 0.0, H_metric = 0.0, d_out = 0.0;
-                geif_forest_score_detailed(forest, vec, &score, &H_metric, &d_out);
+                geif_ensemble_score_detailed(ensemble, cat_buf, vec, &score, &H_metric, &d_out);
 
                 analyzed++;
                 bool is_outlier = (score >= threshold);
@@ -409,17 +409,20 @@ int main(int argc, char *argv[])
             line_copy[sizeof(line_copy) - 1] = '\0';
 
             uint32_t n_tok = tokenize_line(line_copy, delimiter, tokens, 1024);
-            if (n_tok >= total_cols && geif_extract_features(&col_cfg, tokens, n_tok, vec)) {
-                double score = 0.0, H_metric = 0.0, d_out = 0.0;
-                geif_forest_score_detailed(forest, vec, &score, &H_metric, &d_out);
+            if (n_tok >= total_cols) {
+                geif_extract_category(&col_cfg, tokens, n_tok, category_sep, cat_buf, sizeof(cat_buf));
+                if (geif_extract_features(&col_cfg, tokens, n_tok, vec)) {
+                    double score = 0.0, H_metric = 0.0, d_out = 0.0;
+                    geif_ensemble_score_detailed(ensemble, cat_buf, vec, &score, &H_metric, &d_out);
 
-                analyzed++;
-                bool is_outlier = (score >= threshold);
-                if (is_outlier) total_outliers++;
+                    analyzed++;
+                    bool is_outlier = (score >= threshold);
+                    if (is_outlier) total_outliers++;
 
-                fprintf(out_fp, "%s%c%.6f%c%d%c%.6f%c%.6f\n",
-                        orig_line, list_separator, score, list_separator,
-                        is_outlier ? 1 : 0, list_separator, H_metric, list_separator, d_out);
+                    fprintf(out_fp, "%s%c%.6f%c%d%c%.6f%c%.6f\n",
+                            orig_line, list_separator, score, list_separator,
+                            is_outlier ? 1 : 0, list_separator, H_metric, list_separator, d_out);
+                }
             }
         }
 
@@ -436,7 +439,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (forest) geif_forest_destroy(forest);
+    if (ensemble) geif_ensemble_destroy(ensemble);
 
     // Return 2 if outliers detected during analysis, 0 if clean success
     return (total_outliers > 0) ? 2 : 0;

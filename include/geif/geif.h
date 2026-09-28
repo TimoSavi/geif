@@ -127,6 +127,69 @@ geif_status_t geif_forest_load_json(geif_forest_t **forest_out, const char *path
  */
 void geif_forest_summary(const geif_forest_t *forest, char *buffer, size_t buffer_size);
 
+/* ========================================================================= */
+/* Multi-Category Ensemble Management API                                     */
+/* ========================================================================= */
+
+/**
+ * @brief Allocates and initializes a multi-category forest ensemble.
+ */
+geif_status_t geif_ensemble_create(geif_ensemble_t **ensemble_out,
+                                   uint32_t dimensions,
+                                   const geif_config_t *config);
+
+/**
+ * @brief Frees all resources associated with an ensemble and its sub-forests.
+ */
+void geif_ensemble_destroy(geif_ensemble_t *ensemble);
+
+/**
+ * @brief Finds a sub-forest by category string. Returns NULL if not found.
+ */
+geif_forest_t *geif_ensemble_find(const geif_ensemble_t *ensemble, const char *category);
+
+/**
+ * @brief Finds or dynamically creates a sub-forest for a category string.
+ */
+geif_forest_t *geif_ensemble_get_or_create(geif_ensemble_t *ensemble, const char *category);
+
+/**
+ * @brief Feeds an observation vector into the sub-forest for category.
+ */
+geif_status_t geif_ensemble_feed(geif_ensemble_t *ensemble,
+                                 const char *category,
+                                 const double *point);
+
+/**
+ * @brief Trains all category sub-forests in the ensemble.
+ */
+geif_status_t geif_ensemble_train(geif_ensemble_t *ensemble);
+
+/**
+ * @brief Scores an observation against its category's sub-forest.
+ */
+geif_status_t geif_ensemble_score_detailed(const geif_ensemble_t *ensemble,
+                                           const char *category,
+                                           const double *point,
+                                           double *score_out,
+                                           double *metric_depth_out,
+                                           double *d_out_out);
+
+/**
+ * @brief Serializes a multi-category ensemble to JSON.
+ */
+geif_status_t geif_ensemble_save_json(const geif_ensemble_t *ensemble, const char *path);
+
+/**
+ * @brief Deserializes a multi-category ensemble from JSON.
+ */
+geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char *path);
+
+/**
+ * @brief Formats a diagnostic summary of the ensemble and all sub-forests.
+ */
+void geif_ensemble_summary(const geif_ensemble_t *ensemble, char *buffer, size_t buffer_size);
+
 #ifdef __cplusplus
 }
 #endif

@@ -231,3 +231,40 @@ void geif_extract_label(const geif_column_config_t *cfg,
         }
     }
 }
+
+void geif_extract_category(const geif_column_config_t *cfg,
+                            char **tokens,
+                            uint32_t total_cols,
+                            char sep,
+                            char *out_buf,
+                            size_t max_len)
+{
+    if (!out_buf || max_len == 0) return;
+    out_buf[0] = '\0';
+
+    if (!cfg || cfg->category_count == 0 || !tokens) return;
+
+    size_t written = 0;
+    for (uint32_t i = 0; i < cfg->category_count; i++) {
+        uint32_t col = cfg->category_indices[i];
+        const char *val = (col < total_cols && tokens[col]) ? tokens[col] : "";
+
+        if (i > 0 && written + 1 < max_len) {
+            out_buf[written++] = sep;
+            out_buf[written] = '\0';
+        }
+
+        size_t vlen = strlen(val);
+        if (written + vlen < max_len) {
+            memcpy(out_buf + written, val, vlen);
+            written += vlen;
+            out_buf[written] = '\0';
+        } else {
+            size_t rem = max_len - written - 1;
+            memcpy(out_buf + written, val, rem);
+            written += rem;
+            out_buf[written] = '\0';
+            break;
+        }
+    }
+}
