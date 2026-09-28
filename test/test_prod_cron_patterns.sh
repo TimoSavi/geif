@@ -192,19 +192,19 @@ echo "----------------------------------------------------------------------"
 echo "Part 3: CEIF to GEIF Full Migration Pipeline (ceif2geif)"
 echo "----------------------------------------------------------------------"
 
-# Convert a CEIF-format model to GEIF, then score paddy data against it
+# Convert a model to GEIF with custom tree parameters, then score wine data against it
 echo "Test 14: Migrating model and executing production query..."
-PADDY_MIGRATED="$TEST_DIR/paddy_migrated.json"
-"$CEIF2GEIF" -v -t 50 -s 64 "$PADDY_CONF" "$PADDY_MIGRATED" 2> /dev/null
+WINE_MIGRATED="$TEST_DIR/wine_migrated.json"
+"$CEIF2GEIF" -v -t 30 -s 64 "$WINE_CONF" "$WINE_MIGRATED" 2> /dev/null
 
 MIG_OUT="$TEST_DIR/mig_out.txt"
-( "$GEIF" -r "$PADDY_MIGRATED" -a "$PADDY_CSV" -H -e, -S -p "%s;%C;%o" || [ $? -eq 2 ] ) | head -n 30 > "$MIG_OUT"
+( "$GEIF" -r "$WINE_MIGRATED" -a "$WINE_CSV" -H -e ';' -S -p "%s;%C;%o" || [ $? -eq 2 ] ) > "$MIG_OUT"
 
 if [ ! -s "$MIG_OUT" ]; then
     echo "ERROR: Migrated scoring output is empty"
     exit 1
 fi
-echo "  [PASS] Migrated model scored 30 rows cleanly. Sample: $(head -n 1 "$MIG_OUT")"
+echo "  [PASS] Migrated model scored $(wc -l < "$MIG_OUT") rows cleanly. Sample: $(head -n 1 "$MIG_OUT")"
 
 echo ""
 echo "======================================================================"
