@@ -37,10 +37,11 @@ LIB_DIR = lib
 STATIC_LIB = $(LIB_DIR)/libgeif.a
 SHARED_LIB = $(LIB_DIR)/libgeif.so
 CLI_BIN    = $(BIN_DIR)/geif
+MIGRATE_BIN = $(BIN_DIR)/ceif2geif
 
 .PHONY: all clean test dirs
 
-all: dirs $(STATIC_LIB) $(SHARED_LIB) $(CLI_BIN)
+all: dirs $(STATIC_LIB) $(SHARED_LIB) $(CLI_BIN) $(MIGRATE_BIN)
 
 dirs:
 	@mkdir -p $(BIN_DIR) $(LIB_DIR)
@@ -58,6 +59,9 @@ $(SHARED_LIB): $(LIB_OBJS) | dirs
 	$(CC) -shared $(OPTFLAGS) -o $@ $^ $(LIBS)
 
 $(CLI_BIN): $(CLI_OBJS) $(STATIC_LIB) | dirs
+	$(CC) $(CFLAGS) $(OPTFLAGS) $^ $(LIBS) -o $@
+
+$(MIGRATE_BIN): src/cli/ceif2geif.o $(STATIC_LIB) | dirs
 	$(CC) $(CFLAGS) $(OPTFLAGS) $^ $(LIBS) -o $@
 
 test: $(STATIC_LIB) $(CLI_BIN)
@@ -89,6 +93,8 @@ test: $(STATIC_LIB) $(CLI_BIN)
 	@./test/test_cli_rcfile.sh
 	@echo "--- Running Feature 9: Population Drift & Test Grid Generation Test ---"
 	@./test/test_cli_grid.sh
+	@echo "--- Running Feature 10: CEIF to GEIF Model Migration Tool (ceif2geif) Test ---"
+	@./test/test_cli_ceif2geif.sh
 	@echo "All unit tests passed successfully!"
 
 clean:

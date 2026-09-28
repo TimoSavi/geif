@@ -399,8 +399,18 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
     if (json_object_object_get_ex(root, "kappa", &j_val)) cfg.kappa = json_object_get_double(j_val);
     if (json_object_object_get_ex(root, "alpha", &j_val)) cfg.alpha = json_object_get_double(j_val);
 
+    struct json_object *globals = NULL;
+    json_object_object_get_ex(root, "globals", &globals);
+
     struct json_object *j_forests = NULL;
     bool has_forests = json_object_object_get_ex(root, "forests", &j_forests);
+
+    if (dimensions == 0 && globals) {
+        if (json_object_object_get_ex(globals, "dimensions", &j_val)) {
+            dimensions = (uint32_t)json_object_get_int(j_val);
+        }
+    }
+
     if (dimensions == 0 && has_forests && json_object_array_length(j_forests) > 0) {
         struct json_object *first_f = json_object_array_get_idx(j_forests, 0);
         if (json_object_object_get_ex(first_f, "dimensions", &j_val)) {
@@ -411,6 +421,15 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
     if (dimensions == 0) {
         json_object_put(root);
         return GEIF_ERR_FORMAT_CORRUPT;
+    }
+
+    if (globals) {
+        if (json_object_object_get_ex(globals, "treeCount", &j_val)) {
+            cfg.tree_count = (uint32_t)json_object_get_int(j_val);
+        }
+        if (json_object_object_get_ex(globals, "samplesMax", &j_val)) {
+            cfg.samples_per_tree = (uint32_t)json_object_get_int(j_val);
+        }
     }
 
     geif_ensemble_t *ens = NULL;
@@ -437,8 +456,7 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
         strncpy(ens->outlier_score_spec, json_object_get_string(j_val), sizeof(ens->outlier_score_spec) - 1);
     }
 
-    struct json_object *globals = NULL;
-    if (json_object_object_get_ex(root, "globals", &globals)) {
+    if (globals) {
         if (ens->label_dims_spec[0] == '\0' && json_object_object_get_ex(globals, "labelDims", &j_val)) {
             strncpy(ens->label_dims_spec, json_object_get_string(j_val), sizeof(ens->label_dims_spec) - 1);
         }
@@ -461,7 +479,37 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
         for (int i = 0; i < f_count; i++) {
             struct json_object *jf = json_object_array_get_idx(j_forests, i);
             geif_forest_t *sub = NULL;
+            struct json_object *j_samples = NULL;
             if (geif_forest_from_json_object(&sub, jf) == GEIF_OK && sub) {
+                // Native GEIF format
+            } else if (json_object_object_get_ex(jf, "samples", &j_samples)) {
+                // CEIF format sub-forest with raw samples
+                geif_status_t fstat = geif_forest_create(&sub, dimensions, &cfg);
+                if (fstat == GEIF_OK && sub) {
+                    if (json_object_object_get_ex(jf, "category", &j_val)) {
+                        strncpy(sub->category, json_object_get_string(j_val), sizeof(sub->category) - 1);
+                    }
+                    int s_count = json_object_array_length(j_samples);
+                    double *pt = (double *)calloc(dimensions, sizeof(double));
+                    if (pt) {
+                        for (int s = 0; s < s_count; s++) {
+                            struct json_object *js = json_object_array_get_idx(j_samples, s);
+                            int d_cnt = json_object_array_length(js);
+                            for (uint32_t d = 0; d < dimensions; d++) {
+                                pt[d] = (d < (uint32_t)d_cnt) ? json_object_get_double(json_object_array_get_idx(js, d)) : 0.0;
+                            }
+                            geif_forest_feed(sub, pt);
+                        }
+                        free(pt);
+                    }
+                    if (json_object_object_get_ex(jf, "extraRows", &j_val)) {
+                        sub->total_rows_seen += (uint64_t)json_object_get_int64(j_val);
+                    }
+                    geif_forest_train(sub);
+                }
+            }
+
+            if (sub) {
                 const char *cat_str = sub->category;
                 geif_forest_t *target = geif_ensemble_get_or_create(ens, cat_str);
                 if (target) {
@@ -470,6 +518,8 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
                             geif_forest_destroy(target);
                             ens->entries[e].forest = sub;
                             if (json_object_object_get_ex(jf, "last_updated", &j_val)) {
+                                ens->entries[e].last_updated = (time_t)json_object_get_int64(j_val);
+                            } else if (json_object_object_get_ex(jf, "lastUpdated", &j_val)) {
                                 ens->entries[e].last_updated = (time_t)json_object_get_int64(j_val);
                             }
                             if (json_object_object_get_ex(jf, "total_rows", &j_val)) {
