@@ -1,5 +1,10 @@
 # GEIF — Geometric Extended Isolation Forest
 
+**Author / Maintainer:** Timo Savinen (AI-assisted)
+
+> [!NOTE]
+> **AI-Assisted Development:** GEIF was designed and implemented by Timo Savinen with AI pair-programming assistance (Google Antigravity / Gemini). The mathematical specifications, C17 core library, CLI Unix pipelines, test suite, and architectural documentation were developed collaboratively under human engineering oversight.
+
 **GEIF** (Geometric Extended Isolation Forest) is a high-performance C17 implementation of a geometric, scale-invariant anomaly detection algorithm. Building upon and refining the concepts of Isolation Forest (iForest) and Extended Isolation Forest (EIF / CEIF), GEIF introduces data-adaptive Voronoi bisector hyperplanes, continuous Euclidean envelope distance ("Stadium" metric), and universal scale calibration.
 
 ---
@@ -170,6 +175,11 @@ int main(void) {
     return 0;
 }
 ```
+
+---
+
+## Development & Attribution
+**GEIF** is an AI-assisted systems engineering project developed by Timo Savinen in pair-programming collaboration with Google Antigravity (Gemini).
 
 ---
 

@@ -1,5 +1,7 @@
 # GEIF: Tree Depth Control, Split Balance & Ensemble Diversity
 
+**Author / Maintainer:** Timo Savinen (AI-assisted)
+
 ## 1. The Anatomy of Issue 5: Asymmetric Splits & Tree Imbalance
 
 In standard binary search trees, the ideal split is balanced (50% / 50%). 

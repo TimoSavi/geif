@@ -1,5 +1,7 @@
 # GEIF: Geometric Extended Isolation Forest — Algorithmic Specification
 
+**Author / Maintainer:** Timo Savinen (AI-assisted)
+
 ## 1. Introduction & Theoretical Motivation
 
 ### 1.1 The Lineage of Isolation-Based Anomaly Detection

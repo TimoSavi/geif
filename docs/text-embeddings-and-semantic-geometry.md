@@ -1,5 +1,7 @@
 # GEIF: Handling Text & Categorical Data via Semantic AI Embeddings
 
+**Author / Maintainer:** Timo Savinen (AI-assisted)
+
 ## 1. The Core Dilemma: Arbitrary Text Encodings
 
 When real-world telemetry or tabular data contains categorical strings (e.g., `dog`, `cat`, `spoon`, `fork` or HTTP error strings, device models, user-agents), traditional numeric conversions fail geometrically:

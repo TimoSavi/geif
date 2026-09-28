@@ -1,5 +1,7 @@
 # GEIF: Duplicate Samples & Inseparable Node Leaves
 
+**Author / Maintainer:** Timo Savinen (AI-assisted)
+
 ## 1. The Anatomy of Issue 2: Why Duplicates Break Bisectors
 
 In real telemetry streams and discrete datasets, multiple rows often share the **exact same coordinate vector**:

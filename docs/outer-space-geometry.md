@@ -1,5 +1,7 @@
 # GEIF: Geometry of the Outer Space Border
 
+**Author / Maintainer:** Timo Savinen (AI-assisted)
+
 ## 1. The Core Questions
 
 1. **What shape is the outer border? Is it a rectangle?**

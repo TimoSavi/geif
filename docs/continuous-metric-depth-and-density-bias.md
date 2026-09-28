@@ -1,5 +1,7 @@
 # GEIF: Continuous Metric Depth & Eliminating Density Bias
 
+**Author / Maintainer:** Timo Savinen (AI-assisted)
+
 ## 1. The Anatomy of Issue 4: The Classic "Density Bias"
 
 In classic Isolation Forest (Liu et al., 2008) and Extended Isolation Forest (Hariri et al., 2019), tree traversal depth is measured purely as a **discrete count of integer edge hops**:

@@ -1,5 +1,7 @@
 # GEIF: Deep Dive into Zero-Variance Dimensions & Constant Features
 
+**Author / Maintainer:** Timo Savinen (AI-assisted)
+
 ## 1. The Anatomy of Issue 1
 
 In real-world telemetry, production logs, and IoT sensor streams, features are frequently **constant (zero variance)** during baseline training:

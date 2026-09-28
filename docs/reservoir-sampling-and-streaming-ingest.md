@@ -1,5 +1,7 @@
 # GEIF: Reservoir Sampling, Sorted Data Immunity & High-Throughput Streaming Ingest
 
+**Author / Maintainer:** Timo Savinen (AI-assisted)
+
 ## 1. The Core Strength: Why Reservoir Sampling Conquers Sorted Data
 
 In enterprise telemetry, server monitoring, and database dumps, input streams are **almost never randomly shuffled**:

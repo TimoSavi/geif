@@ -1,5 +1,7 @@
 # GEIF: Empirical Heatmaps, Topological Tuning & CEIF Comparison
 
+**Author / Maintainer:** Timo Savinen (AI-assisted)
+
 This document provides visual anomaly score heatmaps for **GEIF (Geometric Extended Isolation Forest)** across a diverse suite of 2D synthetic topologies, mirroring the benchmark investigations established in `ceif/docs/tweaking.md`.
 
 Visualizing the decision manifold in 2D illustrates how GEIF's algorithmic design choices—**Voronoi hyperplane bisectors**, **Cauchy-Lorentz residual cell damping**, **Euclidean stadium outer space decay**, and **Zero Kelvin scale calibration**—govern model inference across challenging geometries.

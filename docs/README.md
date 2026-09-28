@@ -1,5 +1,7 @@
 # GEIF Documentation & Architecture Index
 
+**Author / Maintainer:** Timo Savinen (AI-assisted)
+
 This directory contains the mathematical specifications, engineering design documents, and algorithmic edge-case resolutions established for **GEIF (Geometric Extended Isolation Forest)**.
 
 ---

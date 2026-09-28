@@ -1,5 +1,7 @@
 # GEIF: Topological Cavities & The Non-Convex Void Problem (The Donut Hole)
 
+**Author / Maintainer:** Timo Savinen (AI-assisted)
+
 ## 1. The Anatomy of Issue 3: Non-Convex Geometries
 
 In anomaly detection benchmarks (such as `complex2d.csv`) and real multi-sensor correlation systems, data frequently forms **non-convex manifolds**:

@@ -1,5 +1,7 @@
 # GEIF: Algorithmic Challenges, Edge Cases & Solutions
 
+**Author / Maintainer:** Timo Savinen (AI-assisted)
+
 This document identifies and resolves the five core algorithmic subtleties and mathematical edge cases in the **GEIF (Geometric Extended Isolation Forest)** architecture.
 
 ---

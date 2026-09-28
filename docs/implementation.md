@@ -1,5 +1,7 @@
 # GEIF: Implementation Architecture & Modern C CLI Engineering Guide
 
+**Author / Maintainer:** Timo Savinen (AI-assisted)
+
 ## 1. Engineering Philosophy: Modern C CLI Best Practices
 
 While GEIF builds upon the proven domain concepts of `ceif` (streaming CSV, online reservoir updates, vector anomaly scoring), its codebase is designed from the ground up following **modern C standards and CLI best practices**, rather than inheriting legacy C89/C99 idioms or monolithic tool structures.

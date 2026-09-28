@@ -1,5 +1,7 @@
 # GEIF: Handling Disparate Feature Scales & Aspect Ratios
 
+**Author / Maintainer:** Timo Savinen (AI-assisted)
+
 ## 1. The Disparate Scale Problem
 
 In real-world anomaly detection (and specifically in benchmarks like `complex2d.csv`), features have completely different physical units, variances, and numerical ranges:

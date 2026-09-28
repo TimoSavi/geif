@@ -1,5 +1,7 @@
 # Compatibility Matrix: GEIF vs. CEIF
 
+**Author / Maintainer:** Timo Savinen (AI-assisted)
+
 This document analyzes the compatibility between **GEIF (Geometric Extended Isolation Forest)** and **CEIF (Categorized Extended Isolation Forest)** across CLI options, configuration files (`rcfile`), and serialized tree/model data.
 
 ---
