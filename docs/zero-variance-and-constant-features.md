@@ -39,7 +39,7 @@ The bisector between $A$ and $B$ has no basis to partition space along dimension
 During dataset ingest (single pass $O(N)$):
 1. Compute $\min_j$, $\max_j$, and $\text{span}_j = \max_j - \min_j$.
 2. Compare against a stability threshold $\epsilon_{\text{span}} = 10^{-9}$:
-   $$\text{is\_active}_j = \begin{cases} \text{true} & \text{if } \text{span}_j \ge \epsilon_{\text{span}} \\ \text{false} & \text{if } \text{span}_j < \epsilon_{\text{span}} \end{cases}$$
+   $$\text{active}_j = \begin{cases} \text{true} & \text{if } \text{span}_j \ge \epsilon_{\text{span}} \\ \text{false} & \text{if } \text{span}_j < \epsilon_{\text{span}} \end{cases}$$
 3. For inactive dimensions:
    $$n_j = 0.000000 \quad \text{always}$$
 
@@ -77,13 +77,13 @@ How should GEIF penalize this?
 #### Design Option 2: The Regularized Adaptive Span (Recommended)
 Instead of dividing by $0$, GEIF assigns an **imputed effective span** for inactive dimensions:
 
-$$\text{effective\_span}_j = \max\left(\text{span}_j,\; \alpha \cdot |\mu_j| + \beta \cdot \overline{\text{span}}_{\text{active}}\right)$$
+$$\text{span}_{\text{eff}, j} = \max\left(\text{span}_j,\; \alpha \cdot |\mu_j| + \beta \cdot \overline{\text{span}}_{\text{active}}\right)$$
 
 Where:
 * $\alpha = 0.01$ (1% relative tolerance to the nominal value).
 * $\beta \cdot \overline{\text{span}}_{\text{active}}$ scales relative to other features if $\mu_j = 0$.
 
-$$\Delta d_{\text{out}, j} = \frac{|x_j - c_j|}{\text{effective\_span}_j}$$
+$$\Delta d_{\text{out}, j} = \frac{|x_j - c_j|}{\text{span}_{\text{eff}, j}}$$
 
 #### How This Behaves in Practice:
 1. **Tiny Measurement Drift ($230.001\,\text{V}$ vs $230.0\,\text{V}$):**
@@ -98,7 +98,7 @@ $$\Delta d_{\text{out}, j} = \frac{|x_j - c_j|}{\text{effective\_span}_j}$$
 ## 4. Edge Case: What If ALL Dimensions Are Constant?
 
 Suppose the dataset consists of identical rows (or a single sample):
-* Every dimension is inactive ($\text{is\_active}_j = \text{false} \; \forall j$).
+* Every dimension is inactive ($\text{active}_j = \text{false} \; \forall j$).
 * No splits are possible $\implies$ Each tree is a single root leaf node.
 * **Inference Rule:**
   - If a query point exactly equals the constant vector ($x == c$): $\text{Score} = \mathbf{0.000000}$ (or baseline nominal).

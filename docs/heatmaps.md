@@ -104,7 +104,7 @@ Because $A$ and $B$ are drawn directly from the sample distribution, the splitti
 A known weakness of tree-based partitioning in unbounded Euclidean space is that distant points outside the training bounding box receive arbitrary scores based on whatever leaf hyperplanes happen to extend outwards, often causing starburst rays or wedge artifacts.
 
 GEIF calculates the exact Euclidean distance $d_{\text{out}}$ to the training envelope bounding box:
-$$d_{\text{out}}(x) = \sqrt{\sum_{j=1}^D \left(\max\left(0, \text{env\_min}_j - x_j, x_j - \text{env\_max}_j\right) / \text{span}_j\right)^2}$$
+$$d_{\text{out}}(x) = \sqrt{\sum_{j=1}^D \left(\frac{\max\left(0, \min_j - x_j, x_j - \max_j\right)}{\text{span}_j}\right)^2}$$
 
 As $d_{\text{out}} > 0$, the depth decays exponentially:
 $$H_{\text{final}}(x) = H_{\text{tree}}(x) \cdot \exp(-d_{\text{out}}(x))$$
@@ -129,7 +129,7 @@ This creates rounded, continuous "stadium" equi-distance shells:
 | **Aspect Ratio Robustness** | Requires explicit min-max normalization (`AUTO_SCALE`) | **Natively scale-invariant** without artificial feature normalization |
 | **Cavity / Void Detection** | Post-evaluation nearest-neighbor check (`NEAREST 1`) | **In-tree Cauchy-Lorentz residual cell damping** |
 | **Outer Space Geometry** | Distance decay from envelope | **Continuous Euclidean Stadium metric** with rounded corners |
-| **Score Scale Calibration** | Ad-hoc post-scaling (`-O 0.5s`) or percentiles (`-O 97%`) | **Calibrated Zero Kelvin Universal Scale** ($H_{\text{max}} = \kappa H_{\text{train\_max}}$) |
+| **Score Scale Calibration** | Ad-hoc post-scaling (`-O 0.5s`) or percentiles (`-O 97%`) | **Calibrated Zero Kelvin Universal Scale** ($H_{\text{max}} = \kappa H_{\text{train,max}}$) |
 | **Zero-Variance Columns** | Handled via threshold logic | **Dimension health masking** with zero weight and regularized spans |
 | **Ensemble Ingestion** | Reservoir sampling with automatic ceiling factor | **Algorithm R streaming reservoir pool** ($N_{\text{pool}} = T \times \psi$) |
 | **Persistence Format** | Binary proprietary format (`.ceif`) | **Standard JSON format** (`json-c`) readable across all platforms |
