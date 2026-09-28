@@ -125,7 +125,7 @@ Standard AI embeddings are often high-dimensional (e.g. 768 or 1536 dimensions).
 ### 5.1 Matryoshka Embeddings (Truncation to 32D or 64D)
 Modern embedding models (like Google's Gemini `text-embedding-004` and OpenAI `text-embedding-3`) are trained with **Matryoshka Representation Learning (MRL)**:
 * You can take only the **first 32 or 64 dimensions** of the vector!
-* The first 64 dimensions retain $\mathbf{97\%+}$ of the full semantic clustering accuracy.
+* The first 64 dimensions retain over **97%** of the full semantic clustering accuracy.
 * Evaluating a 32D or 64D vector in GEIF is blazing fast (takes 1–2 AVX2 SIMD instructions per node).
 
 ### 5.2 Auto-Balancing with Numerical Features

@@ -2,7 +2,7 @@
 
 ## 1. The Anatomy of Issue 5: Asymmetric Splits & Tree Imbalance
 
-In standard binary search trees, the ideal split is balanced ($50\% / 50\%$). 
+In standard binary search trees, the ideal split is balanced (50% / 50%). 
 
 However, in isolation-based anomaly detection, **asymmetric splits are often desirable**:
 * If a node contains $255$ nominal inliers and $1$ extreme outlier, the perfect split is **$1$ vs $255$** (isolating the anomaly in a single cut at depth $1$).
@@ -60,7 +60,7 @@ When selecting generator points $A, B \in S_v$:
    - Does it produce a completely empty split ($0$ points on one side)?
    - If so, reject and try a second candidate pair (up to $K=3$ trials).
 2. If $|S_v| \le 3$, simply pick the pair with the largest separation $\delta = \|B - A\|$ to ensure maximum geometric partition.
-3. This simple check eliminates over **$80\%$ of accidental degenerate splits** with virtually zero CPU overhead.
+3. This simple check eliminates over **80% of accidental degenerate splits** with virtually zero CPU overhead.
 
 ---
 

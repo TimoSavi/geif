@@ -95,5 +95,5 @@ The same dimension-relative metric applies to the outer space distance $d_{\text
 
 $$d_{\text{out}}^2(x) = \sum_{j=1}^D \left( \frac{\max(0,\; \min_j - x_j) + \max(0,\; x_j - \max_j)}{\text{span}_j} \right)^2$$
 
-* **Effect:** Distance is measured in **units of cluster span** (e.g. $0.1 = 10\%$ outside).
-* **Geometry:** The outer boundary naturally conforms to the 5000:1 aspect ratio. It forms a rounded stadium elongated along $X$ and compressed along $Y$, treating a $10\%$ departure in $Y$ with the exact same anomaly penalty as a $10\%$ departure in $X$.
+* **Effect:** Distance is measured in **units of cluster span** (e.g. 0.1 = 10% outside).
+* **Geometry:** The outer boundary naturally conforms to the 5000:1 aspect ratio. It forms a rounded stadium elongated along $X$ and compressed along $Y$, treating a 10% departure in $Y$ with the exact same anomaly penalty as a 10% departure in $X$.

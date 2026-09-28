@@ -24,7 +24,7 @@ When a tree node $v$ contains duplicate samples, it falls into one of two distin
 
 ### Scenario A: Mixed Duplicates (Node Contains Duplicates + Other Points)
 * **Example:** Node has $50$ samples: $45$ copies of point $P_1 = (10, 20)$ and $5$ copies of point $P_2 = (15, 30)$.
-* **The Hazard:** Naive random sampling $A, B \in S_v$ has an $\approx 81\%$ probability of picking $(P_1, P_1)$, causing $4$ out of $5$ split attempts to fail!
+* **The Hazard:** Naive random sampling $A, B \in S_v$ has an $\approx 81$% probability of picking $(P_1, P_1)$, causing $4$ out of $5$ split attempts to fail!
 * **The Solution:** 
   1. Select candidate $A$ randomly.
   2. Attempt up to $K$ trials (default: $K=5$) to pick $B$ such that $\|B - A\| > \epsilon$.

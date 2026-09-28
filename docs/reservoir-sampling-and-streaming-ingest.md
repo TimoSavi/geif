@@ -73,5 +73,5 @@ $$N_{\text{eff}} = \min\left(N,\; (\text{CEILING-FACTOR} + 1) \cdot S\right)$$
 
 * With $\text{CEILING-FACTOR} = 3$ and $S = 256$, $N_{\text{eff}}$ is capped at $4 \times 256 = 1024$.
 * The minimum acceptance probability for incoming telemetry is guaranteed at:
-  $$P_{\min} = \frac{256}{1024} = \mathbf{25\%}$$
-* **Result:** As new traffic patterns emerge, approximately 1 in 4 new rows rolls into the reservoir, gracefully rolling the Voronoi trees forward while retaining resilience against transient noise spikes.
+  $$P_{\min} = \frac{256}{1024} = \mathbf{0.25}$$
+* **Result:** The minimum acceptance rate is guaranteed at **25%** (approximately 1 in 4 new rows). As new traffic patterns emerge, new rows roll into the reservoir, gracefully rolling the Voronoi trees forward while retaining resilience against transient noise spikes.
