@@ -101,6 +101,7 @@ typedef struct {
     geif_forest_t *forest;
     time_t         last_updated;
     uint64_t       total_rows;
+    bool           seen_in_analysis;  /**< Ephemeral tracking flag for missed category detection (-M) */
 } geif_category_entry_t;
 
 typedef struct geif_cat_hash_node {

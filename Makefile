@@ -23,7 +23,8 @@ LIB_SRCS = src/lib/error.c \
 
 CLI_SRCS = src/cli/main.c \
            src/cli/xmalloc.c \
-           src/cli/columns.c
+           src/cli/columns.c \
+           src/cli/template.c
 
 LIB_OBJS = $(LIB_SRCS:.c=.o)
 CLI_OBJS = $(CLI_SRCS:.c=.o)
@@ -74,6 +75,8 @@ test: $(STATIC_LIB) $(CLI_BIN)
 	@./test/test_cli_columns.sh
 	@echo "--- Running Feature 3: Multi-Category Sub-Forest Engine Test ---"
 	@./test/test_cli_categories.sh
+	@echo "--- Running Feature 4: Category Filtering, Lifecycle & Templating Test ---"
+	@./test/test_cli_lifecycle.sh
 	@echo "All unit tests passed successfully!"
 
 clean:

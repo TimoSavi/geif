@@ -213,6 +213,52 @@ geif_status_t geif_ensemble_feed(geif_ensemble_t *ens,
     return geif_forest_feed(forest, point);
 }
 
+geif_status_t geif_ensemble_prune_categories(geif_ensemble_t *ens, uint64_t min_rows)
+{
+    if (!ens) return GEIF_ERR_INVALID_ARG;
+    if (min_rows == 0 || ens->count == 0) return GEIF_OK;
+
+    size_t new_count = 0;
+    for (size_t i = 0; i < ens->count; i++) {
+        if (ens->entries[i].total_rows < min_rows) {
+            if (ens->entries[i].forest) {
+                geif_forest_destroy(ens->entries[i].forest);
+                ens->entries[i].forest = NULL;
+            }
+        } else {
+            if (new_count != i) {
+                ens->entries[new_count] = ens->entries[i];
+            }
+            new_count++;
+        }
+    }
+    ens->count = new_count;
+
+    // Clear and rebuild hash table
+    for (size_t b = 0; b < ens->hash_size; b++) {
+        geif_cat_hash_node_t *node = ens->hash_buckets[b];
+        while (node) {
+            geif_cat_hash_node_t *next = node->next;
+            free(node);
+            node = next;
+        }
+        ens->hash_buckets[b] = NULL;
+    }
+
+    for (size_t i = 0; i < ens->count; i++) {
+        uint32_t h = ensemble_hash(ens->entries[i].category);
+        size_t b = (size_t)(h % ens->hash_size);
+        geif_cat_hash_node_t *node = (geif_cat_hash_node_t *)malloc(sizeof(geif_cat_hash_node_t));
+        if (node) {
+            node->entry_idx = (uint32_t)i;
+            node->next = ens->hash_buckets[b];
+            ens->hash_buckets[b] = node;
+        }
+    }
+
+    return GEIF_OK;
+}
+
 geif_status_t geif_ensemble_train(geif_ensemble_t *ens)
 {
     if (!ens || ens->count == 0) return GEIF_ERR_EMPTY_DATASET;
@@ -240,7 +286,21 @@ geif_status_t geif_ensemble_score_detailed(const geif_ensemble_t *ens,
     if (!ens || !point || !score_out) return GEIF_ERR_INVALID_ARG;
 
     const char *cat_key = (category && category[0] != '\0') ? category : "";
-    geif_forest_t *forest = geif_ensemble_find(ens, cat_key);
+    geif_forest_t *forest = NULL;
+
+    uint32_t h = ensemble_hash(cat_key);
+    size_t b = (size_t)(h % ens->hash_size);
+    geif_cat_hash_node_t *node = ens->hash_buckets[b];
+    while (node) {
+        uint32_t idx = node->entry_idx;
+        if (strcmp(ens->entries[idx].category, cat_key) == 0) {
+            forest = ens->entries[idx].forest;
+            ((geif_ensemble_t *)ens)->entries[idx].seen_in_analysis = true;
+            break;
+        }
+        node = node->next;
+    }
+
     if (!forest) {
         // Unknown category unseen during training: maximum outlier
         *score_out = 1.0;

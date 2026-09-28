@@ -161,6 +161,11 @@ geif_status_t geif_ensemble_feed(geif_ensemble_t *ensemble,
                                  const double *point);
 
 /**
+ * @brief Prunes any sub-forest that has accumulated fewer than min_rows samples.
+ */
+geif_status_t geif_ensemble_prune_categories(geif_ensemble_t *ensemble, uint64_t min_rows);
+
+/**
  * @brief Trains all category sub-forests in the ensemble.
  */
 geif_status_t geif_ensemble_train(geif_ensemble_t *ensemble);
