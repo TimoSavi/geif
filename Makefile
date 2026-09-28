@@ -20,7 +20,8 @@ LIB_SRCS = src/lib/error.c \
            src/lib/evaluate.c \
            src/lib/json_io.c
 
-CLI_SRCS = src/cli/main.c
+CLI_SRCS = src/cli/main.c \
+           src/cli/xmalloc.c
 
 LIB_OBJS = $(LIB_SRCS:.c=.o)
 CLI_OBJS = $(CLI_SRCS:.c=.o)
@@ -54,14 +55,19 @@ $(SHARED_LIB): $(LIB_OBJS) | dirs
 $(CLI_BIN): $(CLI_OBJS) $(STATIC_LIB) | dirs
 	$(CC) $(CFLAGS) $(OPTFLAGS) $^ $(LIBS) -o $@
 
-test: $(STATIC_LIB)
+test: $(STATIC_LIB) $(CLI_BIN)
 	@mkdir -p test/bin
 	$(CC) $(CFLAGS) $(INCLUDES) test/test_voronoi.c $(STATIC_LIB) $(LIBS) -o test/bin/test_voronoi
 	$(CC) $(CFLAGS) $(INCLUDES) test/test_stadium.c $(STATIC_LIB) $(LIBS) -o test/bin/test_stadium
+	$(CC) $(CFLAGS) $(INCLUDES) test/test_negative.c $(STATIC_LIB) $(LIBS) -o test/bin/test_negative
 	@echo "--- Running Voronoi Bisector Test ---"
 	@./test/bin/test_voronoi
 	@echo "--- Running Stadium Outer Space Test ---"
 	@./test/bin/test_stadium
+	@echo "--- Running Negative Values & Translation Invariance Test ---"
+	@./test/bin/test_negative
+	@echo "--- Running Feature 1: CSV Delimiters & Pipe Streaming Test ---"
+	@./test/test_cli_csv.sh
 	@echo "All unit tests passed successfully!"
 
 clean:

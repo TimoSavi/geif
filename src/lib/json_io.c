@@ -88,7 +88,13 @@ geif_status_t geif_forest_save_json(const geif_forest_t *f, const char *path)
     }
     json_object_object_add(root, "trees", j_trees);
 
-    int ret = json_object_to_file_ext(path, root, JSON_C_TO_STRING_PRETTY);
+    int ret;
+    if (strcmp(path, "-") == 0) {
+        const char *json_str = json_object_to_json_string_ext(root, JSON_C_TO_STRING_PRETTY);
+        ret = (json_str && fputs(json_str, stdout) >= 0 && fputc('\n', stdout) >= 0) ? 0 : -1;
+    } else {
+        ret = json_object_to_file_ext(path, root, JSON_C_TO_STRING_PRETTY);
+    }
     json_object_put(root);
 
     return (ret == 0) ? GEIF_OK : GEIF_ERR_IO;
@@ -98,8 +104,24 @@ geif_status_t geif_forest_load_json(geif_forest_t **forest_out, const char *path
 {
     if (!forest_out || !path) return GEIF_ERR_INVALID_ARG;
 
-    struct json_object *root = json_object_from_file(path);
-    if (!root) return GEIF_ERR_IO;
+    struct json_object *root = NULL;
+    if (strcmp(path, "-") == 0) {
+        struct json_tokener *tok = json_tokener_new();
+        if (!tok) return GEIF_ERR_OUT_OF_MEMORY;
+        char buffer[4096];
+        size_t bytes_read;
+        enum json_tokener_error jerr = json_tokener_continue;
+        while ((bytes_read = fread(buffer, 1, sizeof(buffer), stdin)) > 0) {
+            root = json_tokener_parse_ex(tok, buffer, (int)bytes_read);
+            jerr = json_tokener_get_error(tok);
+            if (root || jerr != json_tokener_continue) break;
+        }
+        json_tokener_free(tok);
+        if (!root) return GEIF_ERR_FORMAT_CORRUPT;
+    } else {
+        root = json_object_from_file(path);
+        if (!root) return GEIF_ERR_IO;
+    }
 
     struct json_object *j_val;
     if (!json_object_object_get_ex(root, "dimensions", &j_val)) {

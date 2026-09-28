@@ -99,3 +99,37 @@ $$d_{\text{out}}^2(x) = \sum_{j=1}^D \left( \frac{\max(0,\; \min_j - x_j) + \max
 
 * **Effect:** Distance is measured in **units of cluster span** (e.g. 0.1 = 10% outside).
 * **Geometry:** The outer boundary naturally conforms to the 5000:1 aspect ratio. It forms a rounded stadium elongated along $X$ and compressed along $Y$, treating a 10% departure in $Y$ with the exact same anomaly penalty as a 10% departure in $X$.
+
+---
+
+## 6. Negative Coordinates & Translation Invariance
+
+A crucial mathematical requirement for production telemetry (e.g. temperature anomalies in Celsius, latitude/longitude, or normalized centered features with negative means) is that dimension scaling must operate identically regardless of whether values are positive, negative, or cross zero.
+
+### 6.1 Strictly Positive Spans Across All Real Quadrants
+For any real coordinate distribution:
+$$\text{span}_j = \max_{x \in X} x_j - \min_{x \in X} x_j \ge 0$$
+
+* In purely negative space (e.g. $x_j \in [-100.0, -20.0]$):
+  $$\text{span}_j = (-20.0) - (-100.0) = +80.0 > 0$$
+* In zero-crossing space (e.g. $x_j \in [-50.0, +50.0]$):
+  $$\text{span}_j = (+50.0) - (-50.0) = +100.0 > 0$$
+
+Because $\text{span}_j$ is strictly positive and non-zero for all active dimensions, division by $\text{span}_j$ and $\text{span}_j^2$ is unconditionally safe.
+
+### 6.2 Exact Translation Invariance
+If an arbitrary constant shift $C \in \mathbb{R}^D$ is added to the coordinate system ($x' = x + C$):
+1. **Generator Differences:** $B' - A' = (B + C) - (A + C) = B - A$ (identical).
+2. **Hyperplane Normals:** $n_j' = \frac{B_j' - A_j'}{\text{span}_j^2} = \frac{B_j - A_j}{\text{span}_j^2} = n_j$ (identical).
+3. **Hyperplane Decision Sign:**
+   $$(x' \cdot n) - p_{\text{scalar}}' = \left((x + C) - \left(\frac{A + B}{2} + C\right)\right) \cdot n = \left(x - \frac{A + B}{2}\right) \cdot n$$
+   The sign of the hyperplane decision is 100% invariant under coordinate shifts.
+4. **Stadium Outer Distance:**
+   $$d_{\text{low}}' = \min_j' - x_j' = (\min_j + C_j) - (x_j + C_j) = \min_j - x_j = d_{\text{low}}$$
+   $$d_{\text{high}}' = x_j' - \max_j' = (x_j + C_j) - (\max_j + C_j) = x_j - \max_j = d_{\text{high}}$$
+
+### 6.3 Automated Verification
+This behavior is continuously verified by `test/test_negative.c`:
+* Evaluates Voronoi bisectors with purely negative coordinates ($X \in [-9000, -1000]$, $Y \in [-1.8, -0.2]$).
+* Validates shift invariance under a $-100,000$ offset (normal vectors and decision boundaries identical to $< 10^{-12}$).
+* Validates outer space stadium excursions and full forest anomaly scoring on negative Gaussian clusters.
