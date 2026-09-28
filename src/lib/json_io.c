@@ -28,6 +28,22 @@ geif_status_t geif_forest_save_json(const geif_forest_t *f, const char *path)
     json_object_object_add(root, "delta_nominal", json_object_new_double(f->delta_nominal));
     json_object_object_add(root, "total_rows_seen", json_object_new_int64((int64_t)f->total_rows_seen));
 
+    // Metadata & Column Configuration
+    if (f->category[0] != '\0') {
+        json_object_object_add(root, "category", json_object_new_string(f->category));
+    }
+    json_object_object_add(root, "total_input_cols", json_object_new_int((int)f->total_input_cols));
+    json_object_object_add(root, "label_dims", json_object_new_string(f->label_dims_spec));
+    json_object_object_add(root, "include_dims", json_object_new_string(f->include_dims_spec));
+    json_object_object_add(root, "ignore_dims", json_object_new_string(f->ignore_dims_spec));
+
+    // Globals object for CEIF format compatibility
+    struct json_object *globals = json_object_new_object();
+    json_object_object_add(globals, "labelDims", json_object_new_string(f->label_dims_spec));
+    json_object_object_add(globals, "includeDims", json_object_new_string(f->include_dims_spec));
+    json_object_object_add(globals, "ignoreDims", json_object_new_string(f->ignore_dims_spec));
+    json_object_object_add(root, "globals", globals);
+
     // Save envelopes
     struct json_object *j_min = json_object_new_array();
     struct json_object *j_max = json_object_new_array();
@@ -148,6 +164,44 @@ geif_status_t geif_forest_load_json(geif_forest_t **forest_out, const char *path
     if (json_object_object_get_ex(root, "H_max", &j_val)) f->H_max = json_object_get_double(j_val);
     if (json_object_object_get_ex(root, "delta_nominal", &j_val)) f->delta_nominal = json_object_get_double(j_val);
     if (json_object_object_get_ex(root, "total_rows_seen", &j_val)) f->total_rows_seen = (uint64_t)json_object_get_int64(j_val);
+
+    // Metadata & Column Configuration
+    if (json_object_object_get_ex(root, "category", &j_val)) {
+        strncpy(f->category, json_object_get_string(j_val), sizeof(f->category) - 1);
+        f->category[sizeof(f->category) - 1] = '\0';
+    }
+    if (json_object_object_get_ex(root, "total_input_cols", &j_val)) {
+        f->total_input_cols = (uint32_t)json_object_get_int(j_val);
+    }
+    if (json_object_object_get_ex(root, "label_dims", &j_val)) {
+        strncpy(f->label_dims_spec, json_object_get_string(j_val), sizeof(f->label_dims_spec) - 1);
+        f->label_dims_spec[sizeof(f->label_dims_spec) - 1] = '\0';
+    }
+    if (json_object_object_get_ex(root, "include_dims", &j_val)) {
+        strncpy(f->include_dims_spec, json_object_get_string(j_val), sizeof(f->include_dims_spec) - 1);
+        f->include_dims_spec[sizeof(f->include_dims_spec) - 1] = '\0';
+    }
+    if (json_object_object_get_ex(root, "ignore_dims", &j_val)) {
+        strncpy(f->ignore_dims_spec, json_object_get_string(j_val), sizeof(f->ignore_dims_spec) - 1);
+        f->ignore_dims_spec[sizeof(f->ignore_dims_spec) - 1] = '\0';
+    }
+
+    // Globals fallback for CEIF models
+    struct json_object *globals = NULL;
+    if (json_object_object_get_ex(root, "globals", &globals)) {
+        if (f->label_dims_spec[0] == '\0' && json_object_object_get_ex(globals, "labelDims", &j_val)) {
+            strncpy(f->label_dims_spec, json_object_get_string(j_val), sizeof(f->label_dims_spec) - 1);
+            f->label_dims_spec[sizeof(f->label_dims_spec) - 1] = '\0';
+        }
+        if (f->include_dims_spec[0] == '\0' && json_object_object_get_ex(globals, "includeDims", &j_val)) {
+            strncpy(f->include_dims_spec, json_object_get_string(j_val), sizeof(f->include_dims_spec) - 1);
+            f->include_dims_spec[sizeof(f->include_dims_spec) - 1] = '\0';
+        }
+        if (f->ignore_dims_spec[0] == '\0' && json_object_object_get_ex(globals, "ignoreDims", &j_val)) {
+            strncpy(f->ignore_dims_spec, json_object_get_string(j_val), sizeof(f->ignore_dims_spec) - 1);
+            f->ignore_dims_spec[sizeof(f->ignore_dims_spec) - 1] = '\0';
+        }
+    }
 
     // Load envelopes
     struct json_object *j_arr;

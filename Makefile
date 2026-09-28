@@ -5,7 +5,7 @@ CC ?= gcc
 AR ?= ar
 PREFIX ?= /usr/local
 
-CFLAGS ?= -std=c17 -O3 -Wall -Wextra -Wpedantic -Wstrict-prototypes -Wmissing-prototypes -D_GNU_SOURCE
+CFLAGS ?= -std=c17 -O3 -Wall -Wextra -Wpedantic -Wstrict-prototypes -Wmissing-prototypes -D_GNU_SOURCE -MMD -MP
 OPTFLAGS = -march=native -mavx2 -flto
 
 INCLUDES = -Iinclude -Isrc/lib
@@ -21,7 +21,8 @@ LIB_SRCS = src/lib/error.c \
            src/lib/json_io.c
 
 CLI_SRCS = src/cli/main.c \
-           src/cli/xmalloc.c
+           src/cli/xmalloc.c \
+           src/cli/columns.c
 
 LIB_OBJS = $(LIB_SRCS:.c=.o)
 CLI_OBJS = $(CLI_SRCS:.c=.o)
@@ -68,7 +69,11 @@ test: $(STATIC_LIB) $(CLI_BIN)
 	@./test/bin/test_negative
 	@echo "--- Running Feature 1: CSV Delimiters & Pipe Streaming Test ---"
 	@./test/test_cli_csv.sh
+	@echo "--- Running Feature 2: Column Selection & Filtering Test ---"
+	@./test/test_cli_columns.sh
 	@echo "All unit tests passed successfully!"
 
 clean:
-	rm -rf $(LIB_OBJS) $(CLI_OBJS) $(BIN_DIR) $(LIB_DIR) test/bin
+	rm -rf $(LIB_OBJS) $(CLI_OBJS) $(LIB_OBJS:.o=.d) $(CLI_OBJS:.o=.d) $(BIN_DIR) $(LIB_DIR) test/bin
+
+-include $(LIB_OBJS:.o=.d) $(CLI_OBJS:.o=.d)

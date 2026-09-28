@@ -88,7 +88,11 @@ typedef struct geif_forest {
     uint64_t      total_rows_seen; /**< Total rows streamed through the reservoir */
 
     // Metadata
-    char          category[64];    /**< Optional category name for multi-tenant isolation */
+    char          category[64];           /**< Optional category name for multi-tenant isolation */
+    uint32_t      total_input_cols;       /**< Total raw columns in tabular input */
+    char          label_dims_spec[128];   /**< Label columns spec (e.g. "1") */
+    char          include_dims_spec[128]; /**< Included feature columns spec (e.g. "2-10") */
+    char          ignore_dims_spec[128];  /**< Ignored columns spec (e.g. "12") */
 } geif_forest_t;
 
 #ifdef __cplusplus
