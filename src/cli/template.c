@@ -1,11 +1,48 @@
 /**
  * @file template.c
- * @brief Template string formatter implementation for GEIF CLI.
+ * @brief Full-featured output templating and attribution engine for GEIF CLI.
  */
 
 #include "template.h"
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
+
+static uint32_t score_to_rgb(double score, uint32_t low_rgb, uint32_t high_rgb)
+{
+    if (score <= 0.0) return low_rgb;
+    if (score >= 1.0) return high_rgb;
+
+    double r0 = (double)((low_rgb >> 16) & 0xFF);
+    double g0 = (double)((low_rgb >> 8) & 0xFF);
+    double b0 = (double)(low_rgb & 0xFF);
+
+    double r1 = (double)((high_rgb >> 16) & 0xFF);
+    double g1 = (double)((high_rgb >> 8) & 0xFF);
+    double b1 = (double)(high_rgb & 0xFF);
+
+    double r = r0 + (r1 - r0) * score;
+    double g = g0 + (g1 - g0) * score;
+    double b = b0 + (b1 - b0) * score;
+
+    uint32_t ir = (uint32_t)(r < 0.0 ? 0 : (r > 255.0 ? 255 : r));
+    uint32_t ig = (uint32_t)(g < 0.0 ? 0 : (g > 255.0 ? 255 : g));
+    uint32_t ib = (uint32_t)(b < 0.0 ? 0 : (b > 255.0 ? 255 : b));
+
+    return (ir << 16) | (ig << 8) | ib;
+}
+
+static int format_double(char *buf, size_t buf_sz, double val, int decimals, const char *fmt)
+{
+    if (!buf || buf_sz == 0) return 0;
+    if (fmt && fmt[0] != '\0') {
+        return snprintf(buf, buf_sz, fmt, val);
+    }
+    if (decimals >= 0) {
+        return snprintf(buf, buf_sz, "%.*f", decimals, val);
+    }
+    return snprintf(buf, buf_sz, "%g", val);
+}
 
 size_t geif_format_template(char *out,
                             size_t out_size,
@@ -20,6 +57,10 @@ size_t geif_format_template(char *out,
 
     size_t w = 0;
     const char *p = tmpl;
+    char sep = (ctx && ctx->list_separator) ? ctx->list_separator : ';';
+    int dec = (ctx && ctx->decimals >= 0) ? ctx->decimals : 6;
+    uint32_t low_c = (ctx && ctx->low_rgb != 0) ? ctx->low_rgb : 0x20FF20;
+    uint32_t high_c = (ctx && ctx->high_rgb != 0) ? ctx->high_rgb : 0xFF0000;
 
     while (*p != '\0' && w + 1 < out_size) {
         if (*p != '%') {
@@ -27,8 +68,7 @@ size_t geif_format_template(char *out,
             continue;
         }
 
-        // Hit '%'
-        p++;
+        p++; // skip '%'
         if (*p == '\0') {
             out[w++] = '%';
             break;
@@ -43,12 +83,12 @@ size_t geif_format_template(char *out,
             break;
 
         case 's': // Score
-            n = snprintf(out + w, out_size - w, "%.6f", ctx ? ctx->score : 0.0);
+            n = format_double(out + w, out_size - w, ctx ? ctx->score : 0.0, dec, NULL);
             if (n > 0) w += (size_t)n;
             break;
 
         case 'S': // Score percentage
-            n = snprintf(out + w, out_size - w, "%.2f%%", ctx ? (ctx->score * 100.0) : 0.0);
+            n = snprintf(out + w, out_size - w, "%.*f%%", dec > 0 ? (dec <= 2 ? dec : 2) : 2, ctx ? (ctx->score * 100.0) : 0.0);
             if (n > 0) w += (size_t)n;
             break;
 
@@ -67,18 +107,131 @@ size_t geif_format_template(char *out,
             }
             break;
 
-        case 'm': // Metric depth
-            n = snprintf(out + w, out_size - w, "%.6f", ctx ? ctx->metric_depth : 0.0);
+        case 'm': // Metric depth or dimension expansion (-j)
+            if (ctx && ctx->print_dimension && ctx->print_dimension[0] != '\0' &&
+                ctx->vector && ctx->vector_dim > 0) {
+                for (uint32_t i = 0; i < ctx->vector_dim && w + 1 < out_size; i++) {
+                    if (i > 0 && sep != '\0') {
+                        out[w++] = sep;
+                        if (w + 1 >= out_size) break;
+                    }
+
+                    const char *d = ctx->print_dimension;
+                    while (*d != '\0' && w + 1 < out_size) {
+                        if (*d != '%') {
+                            out[w++] = *d++;
+                            continue;
+                        }
+                        d++; // skip '%'
+                        if (*d == '\0') {
+                            out[w++] = '%';
+                            break;
+                        }
+                        char dspec = *d++;
+                        int dn = 0;
+                        switch (dspec) {
+                        case 'd':
+                            dn = format_double(out + w, out_size - w, ctx->vector[i], dec, ctx->printf_format);
+                            if (dn > 0) w += (size_t)dn;
+                            break;
+                        case 'a':
+                            dn = format_double(out + w, out_size - w, ctx->averages ? ctx->averages[i] : 0.0, dec, ctx->printf_format);
+                            if (dn > 0) w += (size_t)dn;
+                            break;
+                        case 'e':
+                            dn = format_double(out + w, out_size - w, ctx->attr_scores ? ctx->attr_scores[i] : 0.0, dec, NULL);
+                            if (dn > 0) w += (size_t)dn;
+                            break;
+                        case 'i':
+                            dn = snprintf(out + w, out_size - w, "%u", i + 1);
+                            if (dn > 0) w += (size_t)dn;
+                            break;
+                        case '%':
+                            out[w++] = '%';
+                            break;
+                        default:
+                            if (w + 2 < out_size) {
+                                out[w++] = '%';
+                                out[w++] = dspec;
+                            }
+                            break;
+                        }
+                    }
+                }
+            } else {
+                n = format_double(out + w, out_size - w, ctx ? ctx->metric_depth : 0.0, dec, NULL);
+                if (n > 0) w += (size_t)n;
+            }
+            break;
+
+        case 'd': // Dimension vector list (joined by sep) or outer distance
+            if (ctx && ctx->vector && ctx->vector_dim > 0) {
+                for (uint32_t i = 0; i < ctx->vector_dim && w + 1 < out_size; i++) {
+                    if (i > 0 && sep != '\0') {
+                        out[w++] = sep;
+                        if (w + 1 >= out_size) break;
+                    }
+                    int dn = format_double(out + w, out_size - w, ctx->vector[i], dec, ctx->printf_format);
+                    if (dn > 0) w += (size_t)dn;
+                }
+            } else {
+                n = format_double(out + w, out_size - w, ctx ? ctx->d_out : 0.0, dec, NULL);
+                if (n > 0) w += (size_t)n;
+            }
+            break;
+
+        case 'e': // Single-dimension impact / attribution scores list (joined by sep)
+            if (ctx && ctx->attr_scores && ctx->vector_dim > 0) {
+                for (uint32_t i = 0; i < ctx->vector_dim && w + 1 < out_size; i++) {
+                    if (i > 0 && sep != '\0') {
+                        out[w++] = sep;
+                        if (w + 1 >= out_size) break;
+                    }
+                    int dn = format_double(out + w, out_size - w, ctx->attr_scores[i], dec, NULL);
+                    if (dn > 0) w += (size_t)dn;
+                }
+            }
+            break;
+
+        case 'a': // Category dimension averages list (joined by sep) or orig_line
+            if (ctx && ctx->averages && ctx->vector_dim > 0) {
+                for (uint32_t i = 0; i < ctx->vector_dim && w + 1 < out_size; i++) {
+                    if (i > 0 && sep != '\0') {
+                        out[w++] = sep;
+                        if (w + 1 >= out_size) break;
+                    }
+                    int dn = format_double(out + w, out_size - w, ctx->averages[i], dec, ctx->printf_format);
+                    if (dn > 0) w += (size_t)dn;
+                }
+            } else if (ctx && ctx->orig_line && ctx->orig_line[0] != '\0') {
+                n = snprintf(out + w, out_size - w, "%s", ctx->orig_line);
+                if (n > 0) w += (size_t)n;
+            }
+            break;
+
+        case 'v': // Raw input tokens joined by sep, or feature vector
+            if (ctx && ctx->raw_values && ctx->raw_value_count > 0) {
+                for (uint32_t i = 0; i < ctx->raw_value_count && w + 1 < out_size; i++) {
+                    if (i > 0 && sep != '\0') {
+                        out[w++] = sep;
+                        if (w + 1 >= out_size) break;
+                    }
+                    n = snprintf(out + w, out_size - w, "%s", ctx->raw_values[i]);
+                    if (n > 0) w += (size_t)n;
+                }
+            } else if (ctx && ctx->orig_line && ctx->orig_line[0] != '\0') {
+                n = snprintf(out + w, out_size - w, "%s", ctx->orig_line);
+                if (n > 0) w += (size_t)n;
+            }
+            break;
+
+        case 'x': // 6-hex RGB color
+            n = snprintf(out + w, out_size - w, "%06X", score_to_rgb(ctx ? ctx->score : 0.0, low_c, high_c));
             if (n > 0) w += (size_t)n;
             break;
 
-        case 'd': // Outer distance
-            n = snprintf(out + w, out_size - w, "%.6f", ctx ? ctx->d_out : 0.0);
-            if (n > 0) w += (size_t)n;
-            break;
-
-        case 'h': // H_max
-            n = snprintf(out + w, out_size - w, "%.6f", ctx ? ctx->H_max : 0.0);
+        case 'h': // H_max universal scale
+            n = format_double(out + w, out_size - w, ctx ? ctx->H_max : 0.0, dec, NULL);
             if (n > 0) w += (size_t)n;
             break;
 
@@ -87,29 +240,17 @@ size_t geif_format_template(char *out,
             if (n > 0) w += (size_t)n;
             break;
 
+        case 'n': // Total training rows
+            n = snprintf(out + w, out_size - w, "%llu", (unsigned long long)(ctx ? ctx->total_rows : 0));
+            if (n > 0) w += (size_t)n;
+            break;
+
         case 't': // Timestamp
             n = snprintf(out + w, out_size - w, "%ld", (long)(ctx ? ctx->timestamp : time(NULL)));
             if (n > 0) w += (size_t)n;
             break;
 
-        case 'a': // Entire raw line
-            if (ctx && ctx->orig_line && ctx->orig_line[0] != '\0') {
-                n = snprintf(out + w, out_size - w, "%s", ctx->orig_line);
-                if (n > 0) w += (size_t)n;
-            }
-            break;
-
-        case 'v': // Feature vector
-            if (ctx && ctx->vector && ctx->vector_dim > 0) {
-                for (uint32_t j = 0; j < ctx->vector_dim && w + 24 < out_size; j++) {
-                    n = snprintf(out + w, out_size - w, "%s%.6f", (j > 0 ? "," : ""), ctx->vector[j]);
-                    if (n > 0) w += (size_t)n;
-                }
-            }
-            break;
-
         default:
-            // Unknown specifier: pass through % and specifier literally
             if (w + 2 < out_size) {
                 out[w++] = '%';
                 out[w++] = spec;

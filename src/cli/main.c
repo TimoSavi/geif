@@ -71,10 +71,10 @@ static void print_usage(const char *prog)
     printf("  -w <file>      Save trained model to JSON file (use '-' for stdout)\n");
     printf("  -r <file>      Load trained model from JSON file (use '-' for stdin)\n");
     printf("  -o <file>      Output file for scores (default: stdout, '-' for stdout)\n");
-    printf("  -T, -O <float> Outlier decision threshold in [0.0, 1.0] (default: 0.5)\n");
+    printf("  -T, -O <thresh>Outlier threshold: float [0..1], 'average', or percentage (e.g. '80%%')\n");
     printf("  -t, -i <int>   Number of trees in forest (default: 100)\n");
     printf("  -s <int>       Number of samples per tree (default: 256)\n");
-    printf("  -m <int>       Maximum tree depth cap (default: 16)\n");
+    printf("  -m <fmt|int>   Dimension format string (e.g. \"%%'.0f\") or max depth cap\n");
     printf("  -f <char>      Input field delimiter (default: ',')\n");
     printf("  -e <char>      List separator for output / field delimiter fallback\n");
     printf("  -H             Skip header line in input CSV\n");
@@ -87,10 +87,14 @@ static void print_usage(const char *prog)
     printf("  -D <interval>  Drop / prune categories older than interval (e.g. '30d', '7d', '24h', '3600s')\n");
     printf("  -N <tmpl>      Output template for NEW / unseen categories during analysis\n");
     printf("  -M <tmpl>      Output template for MISSED categories (trained but absent in test data)\n");
-    printf("  -p <tmpl>      Output template for scored rows (%%s=score, %%l=label, %%c=cat, %%m=metric, %%d=dist, %%a=all)\n");
+    printf("  -p <tmpl>      Output template for scored rows (%%s=score, %%l=label, %%c=cat, %%m=metric/dims, %%d=vector, %%e=attrib, %%a=avg)\n");
+    printf("  -v [tmpl]      Output template for inlier/average rows, or verbose flag\n");
+    printf("  -d <int>       Floating point decimal precision (default: 6)\n");
+    printf("  -j <tmpl>      Per-dimension expansion template for %%m (%%d=val, %%a=avg, %%e=attrib, %%i=index)\n");
+    printf("  -W             Enable metric auto-scaling (accepted for backward compatibility)\n");
+    printf("  -A             Aggregate ensemble processing (accepted for backward compatibility)\n");
     printf("  -S             Silent / outliers only (suppress inliers from output)\n");
     printf("  -q             Print model summary / diagnostics and exit\n");
-    printf("  -v             Verbose output\n");
     printf("  -h             Show this help message and exit\n");
 }
 
@@ -194,9 +198,16 @@ static void process_scoring_row(geif_ensemble_t *ensemble,
                                 char list_sep,
                                 char cat_sep,
                                 double threshold,
+                                bool threshold_is_average,
                                 bool silent_outliers,
                                 const char *point_tmpl,
+                                const char *average_tmpl,
                                 const char *new_cat_tmpl,
+                                int decimals,
+                                const char *printf_format,
+                                const char *print_dimension,
+                                uint32_t low_rgb,
+                                uint32_t high_rgb,
                                 double *vec,
                                 uint32_t dims,
                                 FILE *out_fp,
@@ -221,25 +232,37 @@ static void process_scoring_row(geif_ensemble_t *ensemble,
 
         if (new_cat_tmpl) {
             geif_template_context_t ctx = {
-                .orig_line    = orig_line,
-                .label        = label_buf,
-                .category     = cat_buf,
-                .score        = 1.0,
-                .metric_depth = 0.0,
-                .d_out        = 999.0,
-                .H_max        = 0.0,
-                .is_outlier   = 1,
-                .timestamp    = time(NULL),
-                .vector       = NULL,
-                .vector_dim   = 0
+                .orig_line        = orig_line,
+                .label            = label_buf,
+                .category         = cat_buf,
+                .score            = 1.0,
+                .metric_depth     = 0.0,
+                .d_out            = 999.0,
+                .H_max            = 0.0,
+                .is_outlier       = 1,
+                .timestamp        = time(NULL),
+                .total_rows       = 0,
+                .analyzed_rows    = *analyzed,
+                .vector           = NULL,
+                .averages         = NULL,
+                .attr_scores      = NULL,
+                .vector_dim       = 0,
+                .raw_values       = tokens,
+                .raw_value_count  = n_tok,
+                .list_separator   = list_sep,
+                .decimals         = decimals,
+                .printf_format    = printf_format,
+                .print_dimension  = print_dimension,
+                .low_rgb          = low_rgb,
+                .high_rgb         = high_rgb
             };
             char out_buf[8192];
             geif_format_template(out_buf, sizeof(out_buf), new_cat_tmpl, &ctx);
             fprintf(out_fp, "%s\n", out_buf);
         } else {
-            fprintf(out_fp, "%s%c%.6f%c%d%c%.6f%c%.6f\n",
-                    orig_line, list_sep, 1.0, list_sep,
-                    1, list_sep, 0.0, list_sep, 999.0);
+            fprintf(out_fp, "%s%c%.*f%c%d%c%.*f%c%.*f\n",
+                    orig_line, list_sep, decimals, 1.0, list_sep,
+                    1, list_sep, decimals, 0.0, list_sep, decimals, 999.0);
         }
         return;
     }
@@ -249,34 +272,71 @@ static void process_scoring_row(geif_ensemble_t *ensemble,
         double score = 0.0, H_metric = 0.0, d_out = 0.0;
         geif_ensemble_score_detailed(ensemble, cat_buf, vec, &score, &H_metric, &d_out);
 
+        double eff_threshold = threshold_is_average ?
+            ((sub_forest->average_score > 0.0) ? sub_forest->average_score : 0.5) : threshold;
+
         (*analyzed)++;
-        bool is_outlier = (score >= threshold);
+        bool is_outlier = (score >= eff_threshold);
         if (is_outlier) (*total_outliers)++;
 
-        if (!silent_outliers || is_outlier) {
-            if (point_tmpl) {
-                geif_template_context_t ctx = {
-                    .orig_line    = orig_line,
-                    .label        = label_buf,
-                    .category     = cat_buf,
-                    .score        = score,
-                    .metric_depth = H_metric,
-                    .d_out        = d_out,
-                    .H_max        = sub_forest ? sub_forest->H_max : 0.0,
-                    .is_outlier   = is_outlier ? 1 : 0,
-                    .timestamp    = time(NULL),
-                    .vector       = vec,
-                    .vector_dim   = dims
-                };
-                char out_buf[8192];
-                geif_format_template(out_buf, sizeof(out_buf), point_tmpl, &ctx);
-                fprintf(out_fp, "%s\n", out_buf);
-            } else {
-                fprintf(out_fp, "%s%c%.6f%c%d%c%.6f%c%.6f\n",
-                        orig_line, list_sep, score, list_sep,
-                        is_outlier ? 1 : 0, list_sep, H_metric, list_sep, d_out);
+        double *averages = NULL;
+        double *attr_scores = NULL;
+        if (dims > 0) {
+            averages = (double *)malloc(dims * sizeof(double));
+            attr_scores = (double *)malloc(dims * sizeof(double));
+            if (averages) geif_forest_get_averages(sub_forest, averages);
+            if (attr_scores) geif_forest_dimension_attribution(sub_forest, vec, attr_scores);
+        }
+
+        geif_template_context_t ctx = {
+            .orig_line        = orig_line,
+            .label            = label_buf,
+            .category         = cat_buf,
+            .score            = score,
+            .metric_depth     = H_metric,
+            .d_out            = d_out,
+            .H_max            = sub_forest ? sub_forest->H_max : 0.0,
+            .is_outlier       = is_outlier ? 1 : 0,
+            .timestamp        = time(NULL),
+            .total_rows       = sub_forest ? sub_forest->total_rows_seen : 0,
+            .analyzed_rows    = *analyzed,
+            .vector           = vec,
+            .averages         = averages,
+            .attr_scores      = attr_scores,
+            .vector_dim       = dims,
+            .raw_values       = tokens,
+            .raw_value_count  = n_tok,
+            .list_separator   = list_sep,
+            .decimals         = decimals,
+            .printf_format    = printf_format,
+            .print_dimension  = print_dimension,
+            .low_rgb          = low_rgb,
+            .high_rgb         = high_rgb
+        };
+
+        const char *tmpl_to_use = NULL;
+        if (is_outlier) {
+            tmpl_to_use = point_tmpl;
+        } else {
+            if (average_tmpl) {
+                tmpl_to_use = average_tmpl;
+            } else if (!silent_outliers) {
+                tmpl_to_use = point_tmpl;
             }
         }
+
+        if (tmpl_to_use) {
+            char out_buf[8192];
+            geif_format_template(out_buf, sizeof(out_buf), tmpl_to_use, &ctx);
+            fprintf(out_fp, "%s\n", out_buf);
+        } else if (!silent_outliers || is_outlier) {
+            fprintf(out_fp, "%s%c%.*f%c%d%c%.*f%c%.*f\n",
+                    orig_line, list_sep, decimals, score, list_sep,
+                    is_outlier ? 1 : 0, list_sep, decimals, H_metric, list_sep, decimals, d_out);
+        }
+
+        if (averages) free(averages);
+        if (attr_scores) free(attr_scores);
     }
 }
 
@@ -304,15 +364,22 @@ int main(int argc, char *argv[])
     bool field_sep_explicit  = false;
     bool skip_header         = false;
     double threshold         = 0.5;
+    bool threshold_is_average = false;
     bool query_mode          = false;
     bool verbose             = false;
+    int  decimals            = 6;
+    const char *printf_format = NULL;
+    const char *print_dimension = NULL;
+    const char *average_tmpl  = NULL;
+    uint32_t low_rgb         = 0x20FF20;
+    uint32_t high_rgb        = 0xFF0000;
 
     char category_sep        = ';';
 
     geif_config_t config = geif_config_default();
 
     int opt;
-    while ((opt = getopt(argc, argv, "l:a:w:r:o:T:O:t:i:s:m:f:e:HqvhI:U:L:C:F:R:N:M:p:SD:")) != -1) {
+    while ((opt = getopt(argc, argv, "l:a:w:r:o:T:O:t:i:s:m:f:e:HqvhI:U:L:C:F:R:N:M:p:SD:d:j:v::WA")) != -1) {
         switch (opt) {
         case 'l': learn_file = optarg; break;
         case 'a': analyze_file = optarg; break;
@@ -320,11 +387,36 @@ int main(int argc, char *argv[])
         case 'r': load_file = optarg; break;
         case 'o': output_file = optarg; break;
         case 'T':
-        case 'O': threshold = atof(optarg); break;
+        case 'O':
+            if (strcmp(optarg, "average") == 0) {
+                threshold_is_average = true;
+            } else {
+                size_t olen = strlen(optarg);
+                if (olen > 0 && optarg[olen - 1] == '%') {
+                    threshold = atof(optarg) / 100.0;
+                } else if (olen > 0 && optarg[olen - 1] == 's') {
+                    threshold = atof(optarg);
+                } else {
+                    threshold = atof(optarg);
+                }
+            }
+            break;
         case 't':
         case 'i': config.tree_count = (uint32_t)atoi(optarg); break;
         case 's': config.samples_per_tree = (uint32_t)atoi(optarg); break;
-        case 'm': config.max_depth = (uint32_t)atoi(optarg); break;
+        case 'm':
+            if (strchr(optarg, '%') != NULL) {
+                printf_format = optarg;
+            } else {
+                config.max_depth = (uint32_t)atoi(optarg);
+            }
+            break;
+        case 'd':
+            decimals = atoi(optarg);
+            break;
+        case 'j':
+            print_dimension = optarg;
+            break;
         case 'f':
             delimiter = optarg[0];
             field_sep_explicit = true;
@@ -368,8 +460,22 @@ int main(int argc, char *argv[])
         case 'S':
             silent_outliers = true;
             break;
+        case 'W':
+            // Geometric auto-scaling (enabled by default in GEIF, accepted for CEIF compatibility)
+            break;
+        case 'A':
+            // Ensemble aggregate processing (accepted for CEIF compatibility)
+            break;
         case 'q': query_mode = true; break;
-        case 'v': verbose = true; break;
+        case 'v':
+            if (optarg != NULL) {
+                average_tmpl = optarg;
+            } else if (optind < argc && argv[optind][0] != '-') {
+                average_tmpl = argv[optind++];
+            } else {
+                verbose = true;
+            }
+            break;
         case 'h': print_usage(argv[0]); return 0;
         default:  print_usage(argv[0]); return 1;
         }
@@ -667,7 +773,9 @@ int main(int argc, char *argv[])
 
             process_scoring_row(ensemble, &col_cfg, &cat_filter, tokens, total_cols,
                                 orig_line, list_separator, category_sep, threshold,
-                                silent_outliers, point_tmpl, new_cat_tmpl, vec, dims,
+                                threshold_is_average, silent_outliers, point_tmpl, average_tmpl,
+                                new_cat_tmpl, decimals, printf_format, print_dimension,
+                                low_rgb, high_rgb, vec, dims,
                                 out_fp, &analyzed, &total_outliers);
         }
 
@@ -686,7 +794,9 @@ int main(int argc, char *argv[])
             if (n_tok >= total_cols) {
                 process_scoring_row(ensemble, &col_cfg, &cat_filter, tokens, n_tok,
                                     orig_line, list_separator, category_sep, threshold,
-                                    silent_outliers, point_tmpl, new_cat_tmpl, vec, dims,
+                                    threshold_is_average, silent_outliers, point_tmpl, average_tmpl,
+                                    new_cat_tmpl, decimals, printf_format, print_dimension,
+                                    low_rgb, high_rgb, vec, dims,
                                     out_fp, &analyzed, &total_outliers);
             }
         }
@@ -701,17 +811,29 @@ int main(int argc, char *argv[])
                 if (!ensemble->entries[i].seen_in_analysis) {
                     total_outliers++;
                     geif_template_context_t ctx = {
-                        .orig_line    = cat_name,
-                        .label        = "",
-                        .category     = cat_name,
-                        .score        = 1.0,
-                        .metric_depth = 0.0,
-                        .d_out        = 0.0,
-                        .H_max        = ensemble->entries[i].forest ? ensemble->entries[i].forest->H_max : 0.0,
-                        .is_outlier   = 1,
-                        .timestamp    = time(NULL),
-                        .vector       = NULL,
-                        .vector_dim   = 0
+                        .orig_line        = cat_name,
+                        .label            = "",
+                        .category         = cat_name,
+                        .score            = 1.0,
+                        .metric_depth     = 0.0,
+                        .d_out            = 0.0,
+                        .H_max            = ensemble->entries[i].forest ? ensemble->entries[i].forest->H_max : 0.0,
+                        .is_outlier       = 1,
+                        .timestamp        = time(NULL),
+                        .total_rows       = ensemble->entries[i].total_rows,
+                        .analyzed_rows    = analyzed,
+                        .vector           = NULL,
+                        .averages         = NULL,
+                        .attr_scores      = NULL,
+                        .vector_dim       = 0,
+                        .raw_values       = NULL,
+                        .raw_value_count  = 0,
+                        .list_separator   = list_separator,
+                        .decimals         = decimals,
+                        .printf_format    = printf_format,
+                        .print_dimension  = print_dimension,
+                        .low_rgb          = low_rgb,
+                        .high_rgb         = high_rgb
                     };
                     char out_buf[8192];
                     geif_format_template(out_buf, sizeof(out_buf), missed_cat_tmpl, &ctx);

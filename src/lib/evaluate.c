@@ -5,6 +5,8 @@
 
 #include "geif/geif.h"
 #include "geometry.h"
+#include <stdlib.h>
+#include <string.h>
 #include <math.h>
 
 static double evaluate_tree(const geif_forest_t *f,
@@ -125,3 +127,76 @@ geif_status_t geif_forest_score(const geif_forest_t *f,
 {
     return geif_forest_score_detailed(f, point, score_out, NULL, NULL);
 }
+
+geif_status_t geif_forest_get_averages(const geif_forest_t *forest,
+                                      double *averages_out)
+{
+    if (!forest || !averages_out) return GEIF_ERR_INVALID_ARG;
+    uint32_t d = forest->dimensions;
+    if (d == 0) return GEIF_OK;
+
+    if (forest->averages) {
+        for (uint32_t j = 0; j < d; j++) {
+            averages_out[j] = forest->averages[j];
+        }
+        return GEIF_OK;
+    }
+
+    if (forest->pool_count > 0 && forest->sample_pool) {
+        for (uint32_t j = 0; j < d; j++) averages_out[j] = 0.0;
+        for (size_t i = 0; i < forest->pool_count; i++) {
+            const double *sp = &forest->sample_pool[i * d];
+            for (uint32_t j = 0; j < d; j++) averages_out[j] += sp[j];
+        }
+        for (uint32_t j = 0; j < d; j++) averages_out[j] /= (double)forest->pool_count;
+        return GEIF_OK;
+    }
+
+    if (forest->envelope_min && forest->envelope_max) {
+        for (uint32_t j = 0; j < d; j++) {
+            averages_out[j] = 0.5 * (forest->envelope_min[j] + forest->envelope_max[j]);
+        }
+        return GEIF_OK;
+    }
+
+    for (uint32_t j = 0; j < d; j++) averages_out[j] = 0.0;
+    return GEIF_OK;
+}
+
+geif_status_t geif_forest_dimension_attribution(const geif_forest_t *forest,
+                                               const double *point,
+                                               double *attr_scores_out)
+{
+    if (!forest || !point || !attr_scores_out) return GEIF_ERR_INVALID_ARG;
+    uint32_t d = forest->dimensions;
+    if (d == 0) return GEIF_OK;
+
+    double *baseline = (double *)malloc(d * sizeof(double));
+    if (!baseline) return GEIF_ERR_OUT_OF_MEMORY;
+
+    geif_status_t st = geif_forest_get_averages(forest, baseline);
+    if (st != GEIF_OK) {
+        free(baseline);
+        return st;
+    }
+
+    double *test = (double *)malloc(d * sizeof(double));
+    if (!test) {
+        free(baseline);
+        return GEIF_ERR_OUT_OF_MEMORY;
+    }
+    memcpy(test, baseline, d * sizeof(double));
+
+    for (uint32_t j = 0; j < d; j++) {
+        test[j] = point[j];
+        double s = 0.0;
+        geif_forest_score(forest, test, &s);
+        attr_scores_out[j] = s;
+        test[j] = baseline[j]; // restore to baseline coordinate
+    }
+
+    free(test);
+    free(baseline);
+    return GEIF_OK;
+}
+

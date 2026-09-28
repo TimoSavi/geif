@@ -81,6 +81,8 @@ typedef struct geif_forest {
     double        delta_nominal;   /**< Mean generator spacing across the ensemble */
     double        H_train_max;     /**< Deepest metric depth observed in training data */
     double        H_max;           /**< Calibrated universal scale: kappa * H_train_max */
+    double        average_score;   /**< Mean anomaly score across training pool */
+    double       *averages;        /**< Running or calculated feature averages [dimensions] */
 
     // Reservoir Sample Pool
     double       *sample_pool;     /**< Contiguous sample matrix [pool_capacity * dimensions] */

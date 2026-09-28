@@ -40,6 +40,7 @@ struct json_object *geif_forest_to_json_object(const geif_forest_t *f)
     json_object_object_add(root, "include_dims", json_object_new_string(f->include_dims_spec));
     json_object_object_add(root, "ignore_dims", json_object_new_string(f->ignore_dims_spec));
     json_object_object_add(root, "category_dims", json_object_new_string(f->category_dims_spec));
+    json_object_object_add(root, "average_score", json_object_new_double(f->average_score));
 
     // Globals object for CEIF format compatibility
     struct json_object *globals = json_object_new_object();
@@ -65,6 +66,15 @@ struct json_object *geif_forest_to_json_object(const geif_forest_t *f)
     json_object_object_add(root, "envelope_max", j_max);
     json_object_object_add(root, "effective_span", j_eff);
     json_object_object_add(root, "dim_active", j_act);
+
+    // Save dimension averages
+    if (f->averages) {
+        struct json_object *j_avg = json_object_new_array();
+        for (uint32_t j = 0; j < f->dimensions; j++) {
+            json_object_array_add(j_avg, json_object_new_double(f->averages[j]));
+        }
+        json_object_object_add(root, "averages", j_avg);
+    }
 
     // Save sample pool
     struct json_object *j_pool = json_object_new_array();
@@ -99,9 +109,11 @@ struct json_object *geif_forest_to_json_object(const geif_forest_t *f)
         json_object_object_add(j_tree, "nodes", j_nodes);
 
         struct json_object *j_normals = json_object_new_array();
-        size_t total_normals = tree->node_count * f->dimensions;
-        for (size_t k = 0; k < total_normals; k++) {
-            json_object_array_add(j_normals, json_object_new_double(tree->normals_pool[k]));
+        if (tree->normals_pool && tree->node_count > 0) {
+            size_t total_normals = tree->node_count * f->dimensions;
+            for (size_t k = 0; k < total_normals; k++) {
+                json_object_array_add(j_normals, json_object_new_double(tree->normals_pool[k]));
+            }
         }
         json_object_object_add(j_tree, "normals", j_normals);
 
@@ -137,6 +149,7 @@ geif_status_t geif_forest_from_json_object(geif_forest_t **forest_out, struct js
 
     if (json_object_object_get_ex(root, "H_train_max", &j_val)) f->H_train_max = json_object_get_double(j_val);
     if (json_object_object_get_ex(root, "H_max", &j_val)) f->H_max = json_object_get_double(j_val);
+    if (json_object_object_get_ex(root, "average_score", &j_val)) f->average_score = json_object_get_double(j_val);
     if (json_object_object_get_ex(root, "delta_nominal", &j_val)) f->delta_nominal = json_object_get_double(j_val);
     if (json_object_object_get_ex(root, "total_rows_seen", &j_val)) f->total_rows_seen = (uint64_t)json_object_get_int64(j_val);
 
@@ -210,6 +223,13 @@ geif_status_t geif_forest_from_json_object(geif_forest_t **forest_out, struct js
         }
     }
 
+    // Load dimension averages
+    if (json_object_object_get_ex(root, "averages", &j_arr) && f->averages) {
+        for (uint32_t j = 0; j < dimensions && j < (uint32_t)json_object_array_length(j_arr); j++) {
+            f->averages[j] = json_object_get_double(json_object_array_get_idx(j_arr, j));
+        }
+    }
+
     // Load sample pool
     if (json_object_object_get_ex(root, "pool_count", &j_val)) f->pool_count = (size_t)json_object_get_int(j_val);
     if (json_object_object_get_ex(root, "sample_pool", &j_arr)) {
@@ -254,9 +274,13 @@ geif_status_t geif_forest_from_json_object(geif_forest_t **forest_out, struct js
             if (json_object_object_get_ex(j_tree, "normals", &j_normals)) {
                 size_t norm_len = (size_t)json_object_array_length(j_normals);
                 tree->normals_capacity = norm_len;
-                tree->normals_pool = (double *)malloc(norm_len * sizeof(double));
-                for (size_t k = 0; k < norm_len; k++) {
-                    tree->normals_pool[k] = json_object_get_double(json_object_array_get_idx(j_normals, k));
+                if (norm_len > 0) {
+                    tree->normals_pool = (double *)malloc(norm_len * sizeof(double));
+                    for (size_t k = 0; k < norm_len; k++) {
+                        tree->normals_pool[k] = json_object_get_double(json_object_array_get_idx(j_normals, k));
+                    }
+                } else {
+                    tree->normals_pool = NULL;
                 }
             }
         }

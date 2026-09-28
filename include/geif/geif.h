@@ -101,6 +101,31 @@ geif_status_t geif_forest_score_detailed(const geif_forest_t *forest,
                                         double *d_out_out);
 
 /**
+ * @brief Computes or retrieves category dimension averages.
+ *
+ * @param[in]  forest       Trained forest instance.
+ * @param[out] averages_out Destination array of size dimensions.
+ * @return GEIF_OK on success, or an error code.
+ */
+geif_status_t geif_forest_get_averages(const geif_forest_t *forest,
+                                      double *averages_out);
+
+/**
+ * @brief Computes single-dimension attribution / impact scores (%e) for each feature.
+ *
+ * For each dimension j in [0, dimensions-1], evaluates the anomaly score of a synthetic
+ * vector with coordinate j taken from point and all other coordinates at category mean baseline.
+ *
+ * @param[in]  forest          Trained forest instance.
+ * @param[in]  point           Query vector of length dimensions.
+ * @param[out] attr_scores_out Destination array of size dimensions in [0.0, 1.0].
+ * @return GEIF_OK on success, or an error code.
+ */
+geif_status_t geif_forest_dimension_attribution(const geif_forest_t *forest,
+                                               const double *point,
+                                               double *attr_scores_out);
+
+/**
  * @brief Serializes a trained GEIF forest to a JSON model file.
  *
  * @param forest Forest to save.

@@ -57,11 +57,14 @@ geif_status_t geif_forest_create(geif_forest_t **forest_out,
     // Allocate contiguous reservoir sample pool: [pool_capacity * dimensions]
     f->sample_pool    = (double *)malloc(f->pool_capacity * dimensions * sizeof(double));
 
+    // Allocate dimension averages [dimensions]
+    f->averages       = (double *)calloc(dimensions, sizeof(double));
+
     // Allocate tree headers
     f->trees          = (geif_tree_t *)calloc(f->tree_count, sizeof(geif_tree_t));
 
     if (!f->envelope_min || !f->envelope_max || !f->envelope_span ||
-        !f->effective_span || !f->dim_active || !f->sample_pool || !f->trees) {
+        !f->effective_span || !f->dim_active || !f->sample_pool || !f->averages || !f->trees) {
         geif_forest_destroy(f);
         return GEIF_ERR_OUT_OF_MEMORY;
     }
@@ -107,6 +110,7 @@ void geif_forest_destroy(geif_forest_t *f)
     if (f->effective_span) free(f->effective_span);
     if (f->dim_active)     free(f->dim_active);
     if (f->sample_pool)    free(f->sample_pool);
+    if (f->averages)       free(f->averages);
 
     free(f);
 }

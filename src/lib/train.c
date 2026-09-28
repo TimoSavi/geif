@@ -241,11 +241,13 @@ geif_status_t geif_forest_train(geif_forest_t *f)
 
     free(subsample);
 
-    // Calibrate universal scale H_train_max and H_max across the training pool
+    // Calibrate universal scale H_train_max, H_max, and average_score across the training pool
     double max_H = 0.0;
+    double sum_H = 0.0;
     for (size_t i = 0; i < f->pool_count; i++) {
         const double *pt = &f->sample_pool[i * f->dimensions];
         double H_metric = geif_forest_evaluate_metric_depth(f, pt, NULL);
+        sum_H += H_metric;
         if (H_metric > max_H) {
             max_H = H_metric;
         }
@@ -254,6 +256,29 @@ geif_status_t geif_forest_train(geif_forest_t *f)
     if (max_H < 1.0) max_H = 1.0;
     f->H_train_max = max_H;
     f->H_max = f->config.kappa * f->H_train_max;
+    if (f->pool_count > 0 && f->H_max > 0.0) {
+        double mean_H = sum_H / (double)f->pool_count;
+        double avg_s = 1.0 - (mean_H / f->H_max);
+        if (avg_s < 0.0) avg_s = 0.0;
+        if (avg_s > 1.0) avg_s = 1.0;
+        f->average_score = avg_s;
+    } else {
+        f->average_score = 0.5;
+    }
+
+    // Compute feature dimension averages
+    if (f->averages && f->pool_count > 0 && f->sample_pool) {
+        for (uint32_t j = 0; j < f->dimensions; j++) f->averages[j] = 0.0;
+        for (size_t i = 0; i < f->pool_count; i++) {
+            const double *pt = &f->sample_pool[i * f->dimensions];
+            for (uint32_t j = 0; j < f->dimensions; j++) {
+                f->averages[j] += pt[j];
+            }
+        }
+        for (uint32_t j = 0; j < f->dimensions; j++) {
+            f->averages[j] /= (double)f->pool_count;
+        }
+    }
 
     return GEIF_OK;
 }
