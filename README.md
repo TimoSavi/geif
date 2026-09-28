@@ -29,7 +29,7 @@ Anomaly scores in GEIF are normalized in the range $[0.0, 1.0]$ with intuitive s
 
 ### 4. Streaming Reservoir Sampling
 The training pool maintains a fixed maximum capacity:
-$$N_{\text{pool}} = \text{tree\_count} \times \text{samples\_per\_tree} \quad (\text{e.g., } 100 \times 256 = 25,600)$$
+$$N_{\text{pool}} = N_{\text{trees}} \times N_{\text{samples}} \quad (\text{e.g., } 100 \times 256 = 25{,}600)$$
 Any streaming input of arbitrary length is ingested via Algorithm R reservoir sampling, guaranteeing an unbiased uniform sample even if the input stream is sorted or clustered.
 
 ---
