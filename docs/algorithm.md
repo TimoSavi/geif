@@ -40,7 +40,7 @@ Rather than generating an artificial normal $n \sim \mathcal{N}(0, I)$ and an in
 $$\text{Select } A, B \in S_v \quad (A \ne B)$$
 
 The splitting boundary is the **perpendicular bisector (Voronoi facet)** separating $A$ and $B$:
-$$\text{Boundary } H(A, B) = \left\{ x \in \mathbb{R}^D \;\middle|\; \|x - A\|^2 = \|x - B\|^2 \right\}$$
+$$\text{Boundary } H(A, B): \quad \|x - A\|^2 = \|x - B\|^2 \quad (x \in \mathbb{R}^D)$$
 
 #### 2.1.1 Algebraic Reduction to a Single Dot Product
 The Euclidean distance condition expands as:
