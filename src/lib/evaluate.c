@@ -200,3 +200,40 @@ geif_status_t geif_forest_dimension_attribution(const geif_forest_t *forest,
     return GEIF_OK;
 }
 
+static int pscore_cmp(const void *a, const void *b)
+{
+    double da = *(const double *)a;
+    double db = *(const double *)b;
+    if (da < db) return -1;
+    if (da > db) return 1;
+    return 0;
+}
+
+double geif_forest_calculate_percentile_score(const geif_forest_t *forest, double percentile)
+{
+    if (!forest || forest->pool_count == 0 || !forest->sample_pool) {
+        return (forest && forest->average_score > 0.0) ? forest->average_score : 0.5;
+    }
+    if (percentile < 0.0) percentile = 0.0;
+    if (percentile > 100.0) percentile = 100.0;
+
+    double *scores = (double *)malloc(forest->pool_count * sizeof(double));
+    if (!scores) {
+        return (forest->average_score > 0.0) ? forest->average_score : 0.5;
+    }
+
+    for (size_t i = 0; i < forest->pool_count; i++) {
+        const double *sample = &forest->sample_pool[i * forest->dimensions];
+        geif_forest_score(forest, sample, &scores[i]);
+    }
+
+    qsort(scores, forest->pool_count, sizeof(double), pscore_cmp);
+
+    size_t idx = (size_t)((double)(forest->pool_count - 1) * (percentile / 100.0));
+    if (idx >= forest->pool_count) idx = forest->pool_count - 1;
+    double score = scores[idx];
+    free(scores);
+
+    return score;
+}
+

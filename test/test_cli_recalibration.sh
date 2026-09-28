@@ -142,4 +142,15 @@ if [ "$SAMPLE_COUNT_INLINE" -ne 6 ]; then
 fi
 echo "  [PASS] In-line pruning during analysis produced clean model with pool_count 6."
 
+# Test 8: Explicit Percentile Threshold (-O 95%)
+echo "Test 8: Percentage-based percentile threshold (-O 95%)..."
+SCORES_PCT="$TEST_DIR/scores_pct.txt"
+run_geif_score -r "$MODEL_CLEAN1" -a "$TEST_CSV" -L 1 -C 5 -O "95%" -v -p "%l;score=%s;o=%o" -o "$SCORES_PCT" 2>&1 | tee "$TEST_DIR/pct_log.txt"
+
+if ! grep -q "Percentage score for 'catA':" "$TEST_DIR/pct_log.txt"; then
+    echo "ERROR: -O 95% did not compute or log percentage score"
+    exit 1
+fi
+echo "  [PASS] -O 95% computed dynamic percentile score successfully."
+
 echo "=== All GEIF Recalibration & Threshold Integration Tests Passed! ==="

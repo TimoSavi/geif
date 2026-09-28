@@ -29,6 +29,7 @@ void geif_generate_test_grid(const geif_ensemble_t *ens,
                              const cat_filter_t *filter,
                              double threshold,
                              bool threshold_is_average,
+                             bool threshold_is_percentage,
                              const char *point_tmpl,
                              int decimals,
                              char list_sep,
@@ -69,7 +70,12 @@ void geif_generate_test_grid(const geif_ensemble_t *ens,
             if (intervals < 2) intervals = 2;
         }
 
-        double cutoff = threshold_is_average ? f->average_score : threshold;
+        double cutoff = threshold;
+        if (threshold_is_average) {
+            cutoff = f->average_score;
+        } else if (threshold_is_percentage) {
+            cutoff = (f->percentage_score > 0.0) ? f->percentage_score : 0.5;
+        }
 
         // Odometer traversal across all dimension combinations
         while (sidx[0] <= intervals) {
@@ -91,7 +97,7 @@ void geif_generate_test_grid(const geif_ensemble_t *ens,
             geif_forest_score_detailed(f, test_dimension, &score, &H_metric, &d_out);
 
             if (score > cutoff) {
-                bool is_outlier = (score >= threshold);
+                bool is_outlier = (score >= cutoff);
                 geif_template_context_t ctx = {
                     .score           = score,
                     .metric_depth    = H_metric,

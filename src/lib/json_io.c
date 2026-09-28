@@ -41,6 +41,7 @@ struct json_object *geif_forest_to_json_object(const geif_forest_t *f)
     json_object_object_add(root, "ignore_dims", json_object_new_string(f->ignore_dims_spec));
     json_object_object_add(root, "category_dims", json_object_new_string(f->category_dims_spec));
     json_object_object_add(root, "average_score", json_object_new_double(f->average_score));
+    json_object_object_add(root, "percentage_score", json_object_new_double(f->percentage_score));
 
     // Globals object for CEIF format compatibility
     struct json_object *globals = json_object_new_object();
@@ -150,6 +151,7 @@ geif_status_t geif_forest_from_json_object(geif_forest_t **forest_out, struct js
     if (json_object_object_get_ex(root, "H_train_max", &j_val)) f->H_train_max = json_object_get_double(j_val);
     if (json_object_object_get_ex(root, "H_max", &j_val)) f->H_max = json_object_get_double(j_val);
     if (json_object_object_get_ex(root, "average_score", &j_val)) f->average_score = json_object_get_double(j_val);
+    if (json_object_object_get_ex(root, "percentage_score", &j_val)) f->percentage_score = json_object_get_double(j_val);
     if (json_object_object_get_ex(root, "delta_nominal", &j_val)) f->delta_nominal = json_object_get_double(j_val);
     if (json_object_object_get_ex(root, "total_rows_seen", &j_val)) f->total_rows_seen = (uint64_t)json_object_get_int64(j_val);
 

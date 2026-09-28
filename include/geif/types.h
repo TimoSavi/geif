@@ -82,6 +82,7 @@ typedef struct geif_forest {
     double        H_train_max;     /**< Deepest metric depth observed in training data */
     double        H_max;           /**< Calibrated universal scale: kappa * H_train_max */
     double        average_score;   /**< Mean anomaly score across training pool */
+    double        percentage_score;/**< Percentile threshold score based on training sample distribution */
     double       *averages;        /**< Running or calculated feature averages [dimensions] */
 
     // Reservoir Sample Pool

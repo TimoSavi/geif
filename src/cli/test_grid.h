@@ -31,8 +31,8 @@ typedef struct {
  * @param test_extension_factor Factor to extend grid beyond bounding box (e.g. 0.1)
  * @param test_sample_interval Number of grid subdivisions per dimension (default 256)
  * @param filter Optional category filter regex
- * @param threshold Outlier threshold cutoff
  * @param threshold_is_average If true, filter grid points using forest average score
+ * @param threshold_is_percentage If true, filter grid points using forest percentage score
  * @param point_tmpl Template for formatting points (e.g. "%d,0x%x")
  * @param decimals Decimal precision
  * @param list_sep Separator for list elements (e.g. ',')
@@ -48,6 +48,7 @@ void geif_generate_test_grid(const geif_ensemble_t *ens,
                              const cat_filter_t *filter,
                              double threshold,
                              bool threshold_is_average,
+                             bool threshold_is_percentage,
                              const char *point_tmpl,
                              int decimals,
                              char list_sep,

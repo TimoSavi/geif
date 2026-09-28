@@ -199,6 +199,7 @@ static void process_scoring_row(geif_ensemble_t *ensemble,
                                 char cat_sep,
                                 double threshold,
                                 bool threshold_is_average,
+                                bool threshold_is_percentage,
                                 bool silent_outliers,
                                 const char *point_tmpl,
                                 const char *average_tmpl,
@@ -272,8 +273,12 @@ static void process_scoring_row(geif_ensemble_t *ensemble,
         double score = 0.0, H_metric = 0.0, d_out = 0.0;
         geif_ensemble_score_detailed(ensemble, cat_buf, vec, &score, &H_metric, &d_out);
 
-        double eff_threshold = threshold_is_average ?
-            ((sub_forest->average_score > 0.0) ? sub_forest->average_score : 0.5) : threshold;
+        double eff_threshold = threshold;
+        if (threshold_is_average) {
+            eff_threshold = (sub_forest->average_score > 0.0) ? sub_forest->average_score : 0.5;
+        } else if (threshold_is_percentage) {
+            eff_threshold = (sub_forest->percentage_score > 0.0) ? sub_forest->percentage_score : 0.5;
+        }
 
         (*analyzed)++;
         bool is_outlier = (score >= eff_threshold);
@@ -340,6 +345,22 @@ static void process_scoring_row(geif_ensemble_t *ensemble,
     }
 }
 
+static void update_ensemble_percentage_scores(geif_ensemble_t *ens, double pct, bool verbose)
+{
+    if (!ens) return;
+    for (size_t c = 0; c < ens->count; c++) {
+        geif_forest_t *sf = ens->entries[c].forest;
+        if (sf) {
+            sf->percentage_score = geif_forest_calculate_percentile_score(sf, pct);
+            if (verbose) {
+                printf("Percentage score for '%s': %.6f (%.2f%% of samples have lower score)\n",
+                       ens->entries[c].category[0] ? ens->entries[c].category : "(default)",
+                       sf->percentage_score, pct);
+            }
+        }
+    }
+}
+
 int main(int argc, char *argv[])
 {
     const char *learn_file   = NULL;
@@ -365,6 +386,8 @@ int main(int argc, char *argv[])
     bool skip_header         = false;
     double threshold         = 0.5;
     bool threshold_is_average = false;
+    bool threshold_is_percentage = false;
+    double outlier_percentage = 0.0;
     bool query_mode          = false;
     bool verbose             = false;
     int  decimals            = 6;
@@ -417,14 +440,18 @@ int main(int argc, char *argv[])
             strncpy(cli_outlier_score_spec, optarg, sizeof(cli_outlier_score_spec) - 1);
             if (strcmp(optarg, "average") == 0) {
                 threshold_is_average = true;
+                threshold_is_percentage = false;
             } else {
                 threshold_is_average = false;
                 size_t olen = strlen(optarg);
                 if (olen > 0 && optarg[olen - 1] == '%') {
-                    threshold = atof(optarg) / 100.0;
+                    threshold_is_percentage = true;
+                    outlier_percentage = atof(optarg);
                 } else if (olen > 0 && optarg[olen - 1] == 's') {
+                    threshold_is_percentage = false;
                     threshold = atof(optarg);
                 } else {
+                    threshold_is_percentage = false;
                     threshold = atof(optarg);
                 }
             }
@@ -554,14 +581,18 @@ int main(int argc, char *argv[])
         strncpy(cli_outlier_score_spec, rc_cfg.outlier_score_spec, sizeof(cli_outlier_score_spec) - 1);
         if (strcmp(rc_cfg.outlier_score_spec, "average") == 0) {
             threshold_is_average = true;
+            threshold_is_percentage = false;
         } else {
             threshold_is_average = false;
             size_t olen = strlen(rc_cfg.outlier_score_spec);
             if (olen > 0 && rc_cfg.outlier_score_spec[olen - 1] == '%') {
-                threshold = atof(rc_cfg.outlier_score_spec) / 100.0;
+                threshold_is_percentage = true;
+                outlier_percentage = atof(rc_cfg.outlier_score_spec);
             } else if (olen > 0 && rc_cfg.outlier_score_spec[olen - 1] == 's') {
+                threshold_is_percentage = false;
                 threshold = atof(rc_cfg.outlier_score_spec);
             } else {
+                threshold_is_percentage = false;
                 threshold = atof(rc_cfg.outlier_score_spec);
             }
         }
@@ -571,6 +602,7 @@ int main(int argc, char *argv[])
     if (analyze_file && run_test_grid && !cli_outlier_score_given) {
         threshold = test_extension_factor;
         threshold_is_average = false;
+        threshold_is_percentage = false;
         cli_outlier_score_given = true;
         snprintf(cli_outlier_score_spec, sizeof(cli_outlier_score_spec), "%g", test_extension_factor);
         run_test_grid = false;
@@ -594,17 +626,24 @@ int main(int argc, char *argv[])
         } else if (ensemble->outlier_score_spec[0] != '\0') {
             if (strcmp(ensemble->outlier_score_spec, "average") == 0) {
                 threshold_is_average = true;
+                threshold_is_percentage = false;
             } else {
                 threshold_is_average = false;
                 size_t olen = strlen(ensemble->outlier_score_spec);
                 if (olen > 0 && ensemble->outlier_score_spec[olen - 1] == '%') {
-                    threshold = atof(ensemble->outlier_score_spec) / 100.0;
+                    threshold_is_percentage = true;
+                    outlier_percentage = atof(ensemble->outlier_score_spec);
                 } else if (olen > 0 && ensemble->outlier_score_spec[olen - 1] == 's') {
+                    threshold_is_percentage = false;
                     threshold = atof(ensemble->outlier_score_spec);
                 } else {
+                    threshold_is_percentage = false;
                     threshold = atof(ensemble->outlier_score_spec);
                 }
             }
+        }
+        if (threshold_is_percentage) {
+            update_ensemble_percentage_scores(ensemble, outlier_percentage, verbose);
         }
     }
 
@@ -645,6 +684,9 @@ int main(int argc, char *argv[])
                 geif_ensemble_destroy(ensemble);
                 return 1;
             }
+            if (threshold_is_percentage) {
+                update_ensemble_percentage_scores(ensemble, outlier_percentage, verbose);
+            }
         }
         if (save_file) {
             geif_status_t status = geif_ensemble_save_json(ensemble, save_file);
@@ -681,6 +723,7 @@ int main(int argc, char *argv[])
                                 &cat_filter,
                                 threshold,
                                 threshold_is_average,
+                                threshold_is_percentage,
                                 point_tmpl,
                                 decimals,
                                 list_separator,
@@ -842,6 +885,10 @@ int main(int argc, char *argv[])
             }
         }
 
+        if (threshold_is_percentage) {
+            update_ensemble_percentage_scores(ensemble, outlier_percentage, verbose);
+        }
+
         // Save trained model if requested
         if (save_file) {
             status = geif_ensemble_save_json(ensemble, save_file);
@@ -880,6 +927,9 @@ int main(int argc, char *argv[])
                 fprintf(stderr, "Error during outlier pruning (-k): %s\n", geif_status_str(status));
                 geif_ensemble_destroy(ensemble);
                 return 1;
+            }
+            if (threshold_is_percentage) {
+                update_ensemble_percentage_scores(ensemble, outlier_percentage, verbose);
             }
         }
 
@@ -962,7 +1012,7 @@ int main(int argc, char *argv[])
 
             process_scoring_row(ensemble, &col_cfg, &cat_filter, tokens, total_cols,
                                 orig_line, list_separator, category_sep, threshold,
-                                threshold_is_average, silent_outliers, point_tmpl, average_tmpl,
+                                threshold_is_average, threshold_is_percentage, silent_outliers, point_tmpl, average_tmpl,
                                 new_cat_tmpl, decimals, printf_format, print_dimension,
                                 low_rgb, high_rgb, vec, dims,
                                 out_fp, &analyzed, &total_outliers);
@@ -983,7 +1033,7 @@ int main(int argc, char *argv[])
             if (n_tok >= total_cols) {
                 process_scoring_row(ensemble, &col_cfg, &cat_filter, tokens, n_tok,
                                     orig_line, list_separator, category_sep, threshold,
-                                    threshold_is_average, silent_outliers, point_tmpl, average_tmpl,
+                                    threshold_is_average, threshold_is_percentage, silent_outliers, point_tmpl, average_tmpl,
                                     new_cat_tmpl, decimals, printf_format, print_dimension,
                                     low_rgb, high_rgb, vec, dims,
                                     out_fp, &analyzed, &total_outliers);
