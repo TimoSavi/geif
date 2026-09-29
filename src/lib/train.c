@@ -290,6 +290,37 @@ static int32_t build_tree_node(geif_forest_t *f,
     return node_idx;
 }
 
+static void tree_find_max_height(const geif_forest_t *f, const geif_tree_t *t, int32_t node_idx, double depth, double *max_h)
+{
+    if (node_idx < 0 || node_idx >= (int32_t)t->node_count) return;
+    const geif_node_t *node = &t->nodes[node_idx];
+
+    // Leaf node: both children are -1
+    if (node->left_child == -1 && node->right_child == -1) {
+        double leaf_c = 0.0;
+        if (f->avg_sample_dist > 0.0 && node->sample_count > 0 && t->leaf_samples) {
+            // Under Zero Kelvin (deepest density point), distance to nearest sample is minimal (rel_dist = MIN_REL_DIST = 0.05)
+            double rel_dist = 0.05;
+            double adjusted_n = (double)node->sample_count / rel_dist;
+            leaf_c = geif_c(adjusted_n);
+        } else if (node->sample_count > 1) {
+            leaf_c = geif_c((double)node->sample_count);
+        }
+        double h = depth + leaf_c;
+        if (h > *max_h) {
+            *max_h = h;
+        }
+        return;
+    }
+
+    if (node->left_child != -1) {
+        tree_find_max_height(f, t, node->left_child, depth + 1.0, max_h);
+    }
+    if (node->right_child != -1) {
+        tree_find_max_height(f, t, node->right_child, depth + 1.0, max_h);
+    }
+}
+
 geif_status_t geif_forest_train(geif_forest_t *f)
 {
     if (!f || f->pool_count == 0) {
@@ -340,34 +371,30 @@ geif_status_t geif_forest_train(geif_forest_t *f)
 
     free(subsample);
 
-    // Calibrate min_score and average_score
+    // Calibrate min_score and H_max using structural "Zero Kelvin" deepest leaf traversal
     f->min_score = 0.0;
     f->max_score = 1.0;
 
-    double min_raw = 1.0;
-    double max_H = 0.0;
-    double sum_H = 0.0;
-
-    for (size_t i = 0; i < f->pool_count; i++) {
-        const double *pt = &f->sample_pool[i * f->dimensions];
-        double d_out = 0.0;
-        double H = geif_forest_evaluate_metric_depth(f, pt, &d_out);
-        sum_H += H;
-        if (H > max_H) max_H = H;
-
-        double psi_d = (f->config.samples_per_tree > 0) ? (double)f->config.samples_per_tree : 256.0;
-        double c_psi = (f->c_factor > 0.0) ? f->c_factor : geif_c(psi_d);
-        if (c_psi <= 0.0) c_psi = 1.0;
-        double s_raw = pow(2.0, -H / c_psi);
-        if (s_raw < min_raw) {
-            min_raw = s_raw;
-        }
+    double sum_max_h = 0.0;
+    for (uint32_t t = 0; t < f->tree_count; t++) {
+        double max_h = 0.0;
+        tree_find_max_height(f, &f->trees[t], 0, 0.0, &max_h);
+        sum_max_h += max_h;
     }
 
-    f->min_score = min_raw;
+    double avg_max_h = (f->tree_count > 0) ? (sum_max_h / (double)f->tree_count) : 0.0;
+    if (avg_max_h < 1.0) avg_max_h = 1.0;
+
+    double psi_d = (f->config.samples_per_tree > 0) ? (double)f->config.samples_per_tree : 256.0;
+    double c_psi = (f->c_factor > 0.0) ? f->c_factor : geif_c(psi_d);
+    if (c_psi <= 0.0) c_psi = 1.0;
+
+    f->H_train_max = avg_max_h;
+    f->H_max = avg_max_h;
+    f->min_score = pow(2.0, -avg_max_h / c_psi);
+    if (f->min_score < 0.0) f->min_score = 0.0;
+    if (f->min_score > 1.0) f->min_score = 1.0;
     f->max_score = 1.0;
-    f->H_train_max = (max_H < 1.0) ? 1.0 : max_H;
-    f->H_max = f->config.kappa * f->H_train_max;
 
     // Compute average score across training pool
     double sum_score = 0.0;
