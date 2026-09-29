@@ -59,6 +59,7 @@ geif_status_t geif_ensemble_create(geif_ensemble_t **ensemble_out,
 
     ens->dimensions = dimensions;
     ens->config = config ? *config : geif_config_default();
+    ens->decimals = 6;
 
     ens->capacity = GEIF_ENS_INIT_CAPACITY;
     ens->entries = (geif_category_entry_t *)calloc(ens->capacity, sizeof(geif_category_entry_t));
@@ -166,6 +167,7 @@ geif_forest_t *geif_ensemble_get_or_create(geif_ensemble_t *ens, const char *cat
     strncpy(forest->include_dims_spec, ens->include_dims_spec, sizeof(forest->include_dims_spec) - 1);
     strncpy(forest->ignore_dims_spec, ens->ignore_dims_spec, sizeof(forest->ignore_dims_spec) - 1);
     strncpy(forest->category_dims_spec, ens->category_dims_spec, sizeof(forest->category_dims_spec) - 1);
+    forest->decimals = ens->decimals;
 
     uint32_t entry_idx = (uint32_t)ens->count++;
     geif_category_entry_t *entry = &ens->entries[entry_idx];

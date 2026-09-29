@@ -78,6 +78,8 @@ geif_status_t geif_forest_create(geif_forest_t **forest_out,
         f->dim_active[j]     = 1;
     }
 
+    f->decimals = 6;
+
     if (f->config.seed == 0) {
         srand((unsigned int)(time(NULL) ^ 0x5DEECE66DULL));
     } else {

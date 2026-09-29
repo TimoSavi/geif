@@ -145,6 +145,12 @@ int main(int argc, char *argv[])
         }
     }
 
+    for (size_t i = 0; i < ens->count; i++) {
+        if (ens->entries[i].forest && ens->decimals > 0) {
+            ens->entries[i].forest->decimals = ens->decimals;
+        }
+    }
+
     status = geif_ensemble_save_json(ens, output_file);
     if (status != GEIF_OK) {
         fprintf(stderr, "ceif2geif: error: failed to save GEIF model to '%s': %s\n",

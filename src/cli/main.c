@@ -645,6 +645,14 @@ int main(int argc, char *argv[])
         if (threshold_is_percentage) {
             update_ensemble_percentage_scores(ensemble, outlier_percentage, verbose);
         }
+        if (cli_decimals_given || rc_cfg.decimals_set) {
+            ensemble->decimals = decimals;
+            for (size_t i = 0; i < ensemble->count; i++) {
+                if (ensemble->entries[i].forest) ensemble->entries[i].forest->decimals = decimals;
+            }
+        } else if (ensemble->decimals > 0) {
+            decimals = ensemble->decimals;
+        }
     }
 
     // Mode: Model info query (-q)
@@ -689,6 +697,10 @@ int main(int argc, char *argv[])
             }
         }
         if (save_file) {
+            ensemble->decimals = decimals;
+            for (size_t i = 0; i < ensemble->count; i++) {
+                if (ensemble->entries[i].forest) ensemble->entries[i].forest->decimals = decimals;
+            }
             geif_status_t status = geif_ensemble_save_json(ensemble, save_file);
             if (status != GEIF_OK) {
                 fprintf(stderr, "Error saving ensemble model to '%s': %s\n",
@@ -797,6 +809,7 @@ int main(int argc, char *argv[])
 
         // Save column metadata into ensemble
         ensemble->total_input_cols = total_cols;
+        ensemble->decimals = decimals;
         if (active_ignore) strncpy(ensemble->ignore_dims_spec, active_ignore, sizeof(ensemble->ignore_dims_spec) - 1);
         if (active_include) strncpy(ensemble->include_dims_spec, active_include, sizeof(ensemble->include_dims_spec) - 1);
         if (active_label) strncpy(ensemble->label_dims_spec, active_label, sizeof(ensemble->label_dims_spec) - 1);
@@ -891,6 +904,10 @@ int main(int argc, char *argv[])
 
         // Save trained model if requested
         if (save_file) {
+            ensemble->decimals = decimals;
+            for (size_t i = 0; i < ensemble->count; i++) {
+                if (ensemble->entries[i].forest) ensemble->entries[i].forest->decimals = decimals;
+            }
             status = geif_ensemble_save_json(ensemble, save_file);
             if (status != GEIF_OK) {
                 fprintf(stderr, "Error saving model to '%s': %s\n", save_file, geif_status_str(status));
@@ -1094,6 +1111,10 @@ int main(int argc, char *argv[])
         }
 
         if (!learn_file && save_file) {
+            ensemble->decimals = decimals;
+            for (size_t i = 0; i < ensemble->count; i++) {
+                if (ensemble->entries[i].forest) ensemble->entries[i].forest->decimals = decimals;
+            }
             geif_status_t status = geif_ensemble_save_json(ensemble, save_file);
             if (status != GEIF_OK) {
                 fprintf(stderr, "Error saving model to '%s': %s\n", save_file, geif_status_str(status));

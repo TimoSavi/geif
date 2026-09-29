@@ -12,12 +12,32 @@
 struct json_object *geif_forest_to_json_object(const geif_forest_t *f);
 geif_status_t geif_forest_from_json_object(geif_forest_t **forest_out, struct json_object *root);
 
+static struct json_object *geif_clean_double_json(double val, int decimals)
+{
+    char buf[64];
+    int dec = (decimals >= 0) ? decimals : 6;
+    snprintf(buf, sizeof(buf), "%.*f", dec, val);
+    if (strchr(buf, '.')) {
+        char *p = buf + strlen(buf) - 1;
+        while (p > buf && *p == '0') {
+            *p-- = '\0';
+        }
+        if (*p == '.') *p = '\0';
+    }
+    if (strcmp(buf, "-0") == 0) {
+        strcpy(buf, "0");
+    }
+    return json_object_new_double_s(val, buf);
+}
+
 struct json_object *geif_forest_to_json_object(const geif_forest_t *f)
 {
     if (!f) return NULL;
 
     struct json_object *root = json_object_new_object();
     if (!root) return NULL;
+
+    int dec = (f->decimals >= 0) ? f->decimals : 6;
 
     json_object_object_add(root, "format", json_object_new_string("GEIF-1.0"));
     json_object_object_add(root, "dimensions", json_object_new_int((int)f->dimensions));
@@ -27,6 +47,7 @@ struct json_object *geif_forest_to_json_object(const geif_forest_t *f)
     json_object_object_add(root, "kappa", json_object_new_double(f->config.kappa));
     json_object_object_add(root, "alpha", json_object_new_double(f->config.alpha));
     json_object_object_add(root, "total_rows_seen", json_object_new_int64((int64_t)f->total_rows_seen));
+    json_object_object_add(root, "decimals", json_object_new_int(dec));
 
     // Metadata & Column Configuration
     if (f->category[0] != '\0') {
@@ -44,13 +65,14 @@ struct json_object *geif_forest_to_json_object(const geif_forest_t *f)
     json_object_object_add(globals, "includeDims", json_object_new_string(f->include_dims_spec));
     json_object_object_add(globals, "ignoreDims", json_object_new_string(f->ignore_dims_spec));
     json_object_object_add(globals, "categoryDims", json_object_new_string(f->category_dims_spec));
+    json_object_object_add(globals, "decimals", json_object_new_int(dec));
     json_object_object_add(root, "globals", globals);
 
-    // Save sample pool
+    // Save sample pool with clean decimal precision
     struct json_object *j_pool = json_object_new_array();
     size_t total_pool_coords = f->pool_count * f->dimensions;
     for (size_t i = 0; i < total_pool_coords; i++) {
-        json_object_array_add(j_pool, json_object_new_double(f->sample_pool[i]));
+        json_object_array_add(j_pool, geif_clean_double_json(f->sample_pool[i], dec));
     }
     json_object_object_add(root, "pool_count", json_object_new_int((int)f->pool_count));
     json_object_object_add(root, "sample_pool", j_pool);
@@ -132,6 +154,13 @@ geif_status_t geif_forest_from_json_object(geif_forest_t **forest_out, struct js
             strncpy(f->category_dims_spec, json_object_get_string(j_val), sizeof(f->category_dims_spec) - 1);
             f->category_dims_spec[sizeof(f->category_dims_spec) - 1] = '\0';
         }
+        if (json_object_object_get_ex(globals, "decimals", &j_val)) {
+            f->decimals = json_object_get_int(j_val);
+        }
+    }
+
+    if (json_object_object_get_ex(root, "decimals", &j_val)) {
+        f->decimals = json_object_get_int(j_val);
     }
 
     // Load envelopes
@@ -273,6 +302,8 @@ geif_status_t geif_ensemble_save_json(const geif_ensemble_t *ens, const char *pa
     json_object_object_add(root, "category_dims", json_object_new_string(ens->category_dims_spec));
     const char *outlier_spec = (ens->outlier_score_spec[0] != '\0') ? ens->outlier_score_spec : "0.500000";
     json_object_object_add(root, "outlier_score", json_object_new_string(outlier_spec));
+    int ens_dec = (ens->decimals >= 0) ? ens->decimals : 6;
+    json_object_object_add(root, "decimals", json_object_new_int(ens_dec));
 
     // Globals object for CEIF compatibility
     struct json_object *globals = json_object_new_object();
@@ -281,6 +312,7 @@ geif_status_t geif_ensemble_save_json(const geif_ensemble_t *ens, const char *pa
     json_object_object_add(globals, "ignoreDims", json_object_new_string(ens->ignore_dims_spec));
     json_object_object_add(globals, "categoryDims", json_object_new_string(ens->category_dims_spec));
     json_object_object_add(globals, "outlierScore", json_object_new_string(outlier_spec));
+    json_object_object_add(globals, "decimals", json_object_new_int(ens_dec));
     json_object_object_add(root, "globals", globals);
 
     // Save sub-forests array
@@ -419,6 +451,13 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
         if (ens->outlier_score_spec[0] == '\0' && json_object_object_get_ex(globals, "outlierScore", &j_val)) {
             strncpy(ens->outlier_score_spec, json_object_get_string(j_val), sizeof(ens->outlier_score_spec) - 1);
         }
+        if (json_object_object_get_ex(globals, "decimals", &j_val)) {
+            ens->decimals = json_object_get_int(j_val);
+        }
+    }
+
+    if (json_object_object_get_ex(root, "decimals", &j_val)) {
+        ens->decimals = json_object_get_int(j_val);
     }
 
     if (has_forests) {
@@ -429,10 +468,12 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
             struct json_object *j_samples = NULL;
             if (geif_forest_from_json_object(&sub, jf) == GEIF_OK && sub) {
                 // Native GEIF format
+                if (ens->decimals > 0 && sub->decimals <= 0) sub->decimals = ens->decimals;
             } else if (json_object_object_get_ex(jf, "samples", &j_samples)) {
                 // CEIF format sub-forest with raw samples
                 geif_status_t fstat = geif_forest_create(&sub, dimensions, &cfg);
                 if (fstat == GEIF_OK && sub) {
+                    if (ens->decimals > 0) sub->decimals = ens->decimals;
                     if (json_object_object_get_ex(jf, "category", &j_val)) {
                         strncpy(sub->category, json_object_get_string(j_val), sizeof(sub->category) - 1);
                     }
