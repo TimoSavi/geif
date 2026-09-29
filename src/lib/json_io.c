@@ -26,9 +26,6 @@ struct json_object *geif_forest_to_json_object(const geif_forest_t *f)
     json_object_object_add(root, "max_depth", json_object_new_int((int)f->config.max_depth));
     json_object_object_add(root, "kappa", json_object_new_double(f->config.kappa));
     json_object_object_add(root, "alpha", json_object_new_double(f->config.alpha));
-    json_object_object_add(root, "H_train_max", json_object_new_double(f->H_train_max));
-    json_object_object_add(root, "H_max", json_object_new_double(f->H_max));
-    json_object_object_add(root, "delta_nominal", json_object_new_double(f->delta_nominal));
     json_object_object_add(root, "total_rows_seen", json_object_new_int64((int64_t)f->total_rows_seen));
 
     // Metadata & Column Configuration
@@ -40,8 +37,6 @@ struct json_object *geif_forest_to_json_object(const geif_forest_t *f)
     json_object_object_add(root, "include_dims", json_object_new_string(f->include_dims_spec));
     json_object_object_add(root, "ignore_dims", json_object_new_string(f->ignore_dims_spec));
     json_object_object_add(root, "category_dims", json_object_new_string(f->category_dims_spec));
-    json_object_object_add(root, "average_score", json_object_new_double(f->average_score));
-    json_object_object_add(root, "percentage_score", json_object_new_double(f->percentage_score));
 
     // Globals object for CEIF format compatibility
     struct json_object *globals = json_object_new_object();
@@ -51,32 +46,6 @@ struct json_object *geif_forest_to_json_object(const geif_forest_t *f)
     json_object_object_add(globals, "categoryDims", json_object_new_string(f->category_dims_spec));
     json_object_object_add(root, "globals", globals);
 
-    // Save envelopes
-    struct json_object *j_min = json_object_new_array();
-    struct json_object *j_max = json_object_new_array();
-    struct json_object *j_eff = json_object_new_array();
-    struct json_object *j_act = json_object_new_array();
-
-    for (uint32_t j = 0; j < f->dimensions; j++) {
-        json_object_array_add(j_min, json_object_new_double(f->envelope_min[j]));
-        json_object_array_add(j_max, json_object_new_double(f->envelope_max[j]));
-        json_object_array_add(j_eff, json_object_new_double(f->effective_span[j]));
-        json_object_array_add(j_act, json_object_new_int((int)f->dim_active[j]));
-    }
-    json_object_object_add(root, "envelope_min", j_min);
-    json_object_object_add(root, "envelope_max", j_max);
-    json_object_object_add(root, "effective_span", j_eff);
-    json_object_object_add(root, "dim_active", j_act);
-
-    // Save dimension averages
-    if (f->averages) {
-        struct json_object *j_avg = json_object_new_array();
-        for (uint32_t j = 0; j < f->dimensions; j++) {
-            json_object_array_add(j_avg, json_object_new_double(f->averages[j]));
-        }
-        json_object_object_add(root, "averages", j_avg);
-    }
-
     // Save sample pool
     struct json_object *j_pool = json_object_new_array();
     size_t total_pool_coords = f->pool_count * f->dimensions;
@@ -85,13 +54,6 @@ struct json_object *geif_forest_to_json_object(const geif_forest_t *f)
     }
     json_object_object_add(root, "pool_count", json_object_new_int((int)f->pool_count));
     json_object_object_add(root, "sample_pool", j_pool);
-
-    // Save calibration metrics
-    json_object_object_add(root, "min_score", json_object_new_double(f->min_score));
-    json_object_object_add(root, "max_score", json_object_new_double(f->max_score));
-    json_object_object_add(root, "avg_sample_dist", json_object_new_double(f->avg_sample_dist));
-    json_object_object_add(root, "c_factor", json_object_new_double(f->c_factor));
-    json_object_object_add(root, "scale_range_idx", json_object_new_int(f->scale_range_idx));
 
     return root;
 }
@@ -221,17 +183,7 @@ geif_status_t geif_forest_from_json_object(geif_forest_t **forest_out, struct js
 
     // If sample pool is present, build trees dynamically in RAM (taking < 0.05s)
     if (f->pool_count > 0) {
-        double saved_min = f->min_score;
-        double saved_max = f->max_score;
-        double saved_avg = f->average_score;
-        double saved_pct = f->percentage_score;
-
         geif_forest_train(f);
-
-        if (saved_min > 0.0) f->min_score = saved_min;
-        if (saved_max > 0.0) f->max_score = saved_max;
-        if (saved_avg > 0.0) f->average_score = saved_avg;
-        if (saved_pct > 0.0) f->percentage_score = saved_pct;
     } else {
         // Fallback: Load legacy trees if present in older model files
         struct json_object *j_trees;
