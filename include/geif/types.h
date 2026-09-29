@@ -21,6 +21,10 @@ extern "C" {
 #define GEIF_DEFAULT_KAPPA             1.25     /**< Headroom for "Zero Kelvin" calibration */
 #define GEIF_DEFAULT_ALPHA             1.0      /**< Metric depth density sensitivity */
 #define GEIF_DEFAULT_CEILING_FACTOR    3        /**< Extra rows factor for reservoir ceiling */
+#define GEIF_MIN_REL_DIST              0.05     /**< Minimum relative distance for nearest neighbor */
+#define MIN_REL_DIST                   GEIF_MIN_REL_DIST
+#define GEIF_NODE_MIN_SAMPLE           3        /**< Minimum samples required to split a node */
+#define NODE_MIN_SAMPLE                GEIF_NODE_MIN_SAMPLE
 
 /**
  * @brief Configuration parameters for training and evaluating GEIF.

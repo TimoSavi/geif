@@ -139,8 +139,8 @@ static int32_t build_tree_node(geif_forest_t *f,
                               uint32_t depth,
                               uint32_t max_depth)
 {
-    // Base condition: leaf node reached (NODE_MIN_SAMPLE = 3 or depth limit reached)
-    if (count < 3 || depth >= max_depth) {
+    // Base condition: leaf node reached (NODE_MIN_SAMPLE or depth limit reached)
+    if (count < NODE_MIN_SAMPLE || depth >= max_depth) {
         if (depth == 0) {
             int32_t node_idx = allocate_node(tree);
             if (node_idx < 0) return -1;
@@ -299,8 +299,8 @@ static void tree_find_max_height(const geif_forest_t *f, const geif_tree_t *t, i
     if (node->left_child == -1 && node->right_child == -1) {
         double leaf_c = 0.0;
         if (f->avg_sample_dist > 0.0 && node->sample_count > 0 && t->leaf_samples) {
-            // Under Zero Kelvin (deepest density point), distance to nearest sample is minimal (rel_dist = MIN_REL_DIST = 0.05)
-            double rel_dist = 0.05;
+            // Under Zero Kelvin (deepest density point), distance to nearest sample is minimal (rel_dist = MIN_REL_DIST)
+            double rel_dist = MIN_REL_DIST;
             double adjusted_n = (double)node->sample_count / rel_dist;
             leaf_c = geif_c(adjusted_n);
         } else if (node->sample_count > 1) {

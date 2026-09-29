@@ -69,7 +69,7 @@ static double evaluate_tree(const geif_forest_t *f,
                         min_dist_sq = dist_sq;
                     }
                 }
-                double rel_dist = (sqrt(min_dist_sq) / f->avg_sample_dist) + 0.05;
+                double rel_dist = (sqrt(min_dist_sq) / f->avg_sample_dist) + MIN_REL_DIST;
                 double adjusted_n = (double)node->sample_count / rel_dist;
                 leaf_c = geif_c(adjusted_n);
             } else if (node->sample_count > 1) {
