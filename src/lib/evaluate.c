@@ -79,16 +79,17 @@ static double evaluate_tree(const geif_forest_t *f,
         }
 
         // Internal split node
-        depth += 1.0;
-
         const double *normal = &tree->normals_pool[node->normal_offset];
         double dot_val = geif_dot(scaled_point, normal, d);
 
         if (dot_val < node->pdotn) {
+            if (node->left_child == -1) return depth;
             curr = node->left_child;
         } else {
+            if (node->right_child == -1) return depth;
             curr = node->right_child;
         }
+        depth += 1.0;
     }
 
     return depth;

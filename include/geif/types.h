@@ -17,7 +17,7 @@ extern "C" {
 
 #define GEIF_DEFAULT_TREE_COUNT        100
 #define GEIF_DEFAULT_SAMPLES_PER_TREE  256
-#define GEIF_DEFAULT_MAX_DEPTH         16
+#define GEIF_DEFAULT_MAX_DEPTH         0
 #define GEIF_DEFAULT_KAPPA             1.25     /**< Headroom for "Zero Kelvin" calibration */
 #define GEIF_DEFAULT_ALPHA             1.0      /**< Metric depth density sensitivity */
 #define GEIF_DEFAULT_CEILING_FACTOR    3        /**< Extra rows factor for reservoir ceiling */

@@ -139,18 +139,31 @@ static int32_t build_tree_node(geif_forest_t *f,
                               uint32_t depth,
                               uint32_t max_depth)
 {
+    // Base condition: leaf node reached (NODE_MIN_SAMPLE = 3 or depth limit reached)
+    if (count < 3 || depth >= max_depth) {
+        if (depth == 0) {
+            int32_t node_idx = allocate_node(tree);
+            if (node_idx < 0) return -1;
+            geif_node_t *node = &tree->nodes[node_idx];
+            node->sample_count = (int32_t)count;
+            node->leaf_point_idx = (count > 0) ? indices[0] : 0;
+            node->left_child = -1;
+            node->right_child = -1;
+            node->leaf_sample_offset = append_leaf_samples(tree, indices, count);
+            return node_idx;
+        }
+        return -1;
+    }
+
     int32_t node_idx = allocate_node(tree);
     if (node_idx < 0) return -1;
 
     geif_node_t *node = &tree->nodes[node_idx];
     node->sample_count = (int32_t)count;
     node->leaf_point_idx = (count > 0) ? indices[0] : 0;
-
-    // Base condition: leaf node reached
-    if (count <= 1 || depth >= max_depth) {
-        node->leaf_sample_offset = append_leaf_samples(tree, indices, count);
-        return node_idx;
-    }
+    node->left_child = -1;
+    node->right_child = -1;
+    node->leaf_sample_offset = 0;
 
     uint32_t d = f->dimensions;
     double *p = (double *)malloc(d * sizeof(double));
@@ -238,6 +251,8 @@ static int32_t build_tree_node(geif_forest_t *f,
         free(left_indices);
         free(right_indices);
         node = &tree->nodes[node_idx];
+        node->left_child = -1;
+        node->right_child = -1;
         node->leaf_sample_offset = append_leaf_samples(tree, indices, count);
         return node_idx;
     }
@@ -251,14 +266,26 @@ static int32_t build_tree_node(geif_forest_t *f,
     node->pdotn = best_pdotn;
     node->step_weight = 1.0;
 
-    int32_t left_child = build_tree_node(f, tree, left_indices, left_count, depth + 1, max_depth);
-    int32_t right_child = build_tree_node(f, tree, right_indices, right_count, depth + 1, max_depth);
+    int32_t left_child = -1;
+    int32_t right_child = -1;
+
+    if (left_count > 1) {
+        left_child = build_tree_node(f, tree, left_indices, left_count, depth + 1, max_depth);
+    }
+    if (right_count > 1) {
+        right_child = build_tree_node(f, tree, right_indices, right_count, depth + 1, max_depth);
+    }
 
     free(left_indices);
     free(right_indices);
 
-    tree->nodes[node_idx].left_child = left_child;
-    tree->nodes[node_idx].right_child = right_child;
+    node = &tree->nodes[node_idx];
+    node->left_child = left_child;
+    node->right_child = right_child;
+
+    if (left_child == -1 && right_child == -1) {
+        node->leaf_sample_offset = append_leaf_samples(tree, indices, count);
+    }
 
     return node_idx;
 }
@@ -306,7 +333,9 @@ geif_status_t geif_forest_train(geif_forest_t *f)
             current_pool_idx = (current_pool_idx + psi) % f->pool_count;
         }
 
-        build_tree_node(f, tree, subsample, psi, 0, f->config.max_depth);
+        uint32_t tree_max_depth = (f->config.max_depth > 0) ? f->config.max_depth
+                                                            : (uint32_t)(ceil(log2(psi)) + 1);
+        build_tree_node(f, tree, subsample, psi, 0, tree_max_depth);
     }
 
     free(subsample);
