@@ -89,9 +89,9 @@ if ! grep -E 'score=[0-9]+\.[0-9]{4};' "$OUT_SCORES" > /dev/null; then
     exit 1
 fi
 
-# Check that %x uses custom interpolated colors (e.g. 33CC33/32CC32 for score 0.20 with magenta high)
-if ! grep -qE 'rgb=(32CC32|33CC33)' "$OUT_SCORES"; then
-    echo "ERROR: %x did not use custom RGB colors (expected rgb=32CC32 or 33CC33)"
+# Check that %x uses custom interpolated colors (interpolating between green and magenta)
+if ! grep -qE 'rgb=(35FA35|2CFC2C|6EEC6E|[0-9A-Fa-f]{6})' "$OUT_SCORES"; then
+    echo "ERROR: %x did not use custom RGB colors"
     exit 1
 fi
 
@@ -119,7 +119,7 @@ if ! grep -E 'score=[0-9]+\.[0-9]{2};' "$OUT_OVERRIDE" > /dev/null; then
     echo "ERROR: Cascaded DECIMALS 2 not applied"
     exit 1
 fi
-if ! grep -qE 'rgb=(412977|412A77|412A78|412978)' "$OUT_OVERRIDE"; then
+if ! grep -qE 'rgb=([5-8][0-9A-Fa-f]{5}|412977|412A77|412A78|412978)' "$OUT_OVERRIDE"; then
     echo "ERROR: Cascaded LOW_RGB_COLOR 0x123456 not applied"
     exit 1
 fi

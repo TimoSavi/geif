@@ -137,14 +137,20 @@ void geif_generate_test_grid(const geif_ensemble_t *ens,
                 }
             }
 
-            // Advance odometer
-            for (int i = (int)dims - 1; i >= 0; i--) {
-                if (i > 0 && sidx[i] == intervals) {
-                    sidx[i] = 0;
-                    sidx[i - 1]++;
+            // Advance odometer: add 1 to the lowest dimension and propagate carries
+            int carry = 1;
+            for (int i = (int)dims - 1; i >= 0 && carry > 0; i--) {
+                sidx[i] += carry;
+                if (sidx[i] > intervals) {
+                    if (i > 0) {
+                        sidx[i] = 0;
+                        carry = 1;
+                    } else {
+                        // sidx[0] exceeds intervals, loop will terminate
+                        carry = 0;
+                    }
                 } else {
-                    if (i == (int)dims - 1) sidx[i]++;
-                    break;
+                    carry = 0;
                 }
             }
         }

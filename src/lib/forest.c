@@ -100,6 +100,9 @@ void geif_forest_destroy(geif_forest_t *f)
             if (f->trees[t].normals_pool) {
                 free(f->trees[t].normals_pool);
             }
+            if (f->trees[t].leaf_samples) {
+                free(f->trees[t].leaf_samples);
+            }
         }
         free(f->trees);
     }
@@ -110,6 +113,7 @@ void geif_forest_destroy(geif_forest_t *f)
     if (f->effective_span) free(f->effective_span);
     if (f->dim_active)     free(f->dim_active);
     if (f->sample_pool)    free(f->sample_pool);
+    if (f->scaled_pool)    free(f->scaled_pool);
     if (f->averages)       free(f->averages);
 
     free(f);

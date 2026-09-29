@@ -8,10 +8,21 @@
 #include <string.h>
 #include <math.h>
 
+static inline void srgb_companding(double *color)
+{
+    for (int i = 0; i < 3; i++) {
+        double v = color[i] / 255.0;
+        if (v <= 0.0031308) v = 12.92 * v;
+        else v = 1.055 * pow(v, 1.0 / 2.4) - 0.055;
+        color[i] = v * 255.0;
+    }
+}
+
 static uint32_t score_to_rgb(double score, uint32_t low_rgb, uint32_t high_rgb)
 {
-    if (score <= 0.0) return low_rgb;
-    if (score >= 1.0) return high_rgb;
+    if (score == 0.0) return 0x000000;
+    if (score < 0.0) score = 0.0;
+    if (score > 1.0) score = 1.0;
 
     double r0 = (double)((low_rgb >> 16) & 0xFF);
     double g0 = (double)((low_rgb >> 8) & 0xFF);
@@ -21,13 +32,16 @@ static uint32_t score_to_rgb(double score, uint32_t low_rgb, uint32_t high_rgb)
     double g1 = (double)((high_rgb >> 8) & 0xFF);
     double b1 = (double)(high_rgb & 0xFF);
 
-    double r = r0 + (r1 - r0) * score;
-    double g = g0 + (g1 - g0) * score;
-    double b = b0 + (b1 - b0) * score;
+    double color[3];
+    color[0] = r0 + (r1 - r0) * score;
+    color[1] = g0 + (g1 - g0) * score;
+    color[2] = b0 + (b1 - b0) * score;
 
-    uint32_t ir = (uint32_t)(r < 0.0 ? 0 : (r > 255.0 ? 255 : r));
-    uint32_t ig = (uint32_t)(g < 0.0 ? 0 : (g > 255.0 ? 255 : g));
-    uint32_t ib = (uint32_t)(b < 0.0 ? 0 : (b > 255.0 ? 255 : b));
+    srgb_companding(color);
+
+    uint32_t ir = (uint32_t)(color[0] < 0.0 ? 0 : (color[0] > 255.0 ? 255 : color[0]));
+    uint32_t ig = (uint32_t)(color[1] < 0.0 ? 0 : (color[1] > 255.0 ? 255 : color[1]));
+    uint32_t ib = (uint32_t)(color[2] < 0.0 ? 0 : (color[2] > 255.0 ? 255 : color[2]));
 
     return (ir << 16) | (ig << 8) | ib;
 }
@@ -59,7 +73,7 @@ size_t geif_format_template(char *out,
     const char *p = tmpl;
     char sep = (ctx && ctx->list_separator) ? ctx->list_separator : ';';
     int dec = (ctx && ctx->decimals >= 0) ? ctx->decimals : 6;
-    uint32_t low_c = (ctx && ctx->low_rgb != 0) ? ctx->low_rgb : 0x20FF20;
+    uint32_t low_c = (ctx && ctx->low_rgb != 0) ? ctx->low_rgb : 0xFFFF00;
     uint32_t high_c = (ctx && ctx->high_rgb != 0) ? ctx->high_rgb : 0xFF0000;
 
     while (*p != '\0' && w + 1 < out_size) {

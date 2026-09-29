@@ -30,6 +30,7 @@ CLI_SRCS = src/cli/main.c \
 
 LIB_OBJS = $(LIB_SRCS:.c=.o)
 CLI_OBJS = $(CLI_SRCS:.c=.o)
+MIGRATE_OBJS = src/cli/ceif2geif.o
 
 BIN_DIR = bin
 LIB_DIR = lib
@@ -39,7 +40,7 @@ SHARED_LIB = $(LIB_DIR)/libgeif.so
 CLI_BIN    = $(BIN_DIR)/geif
 MIGRATE_BIN = $(BIN_DIR)/ceif2geif
 
-.PHONY: all clean test dirs
+.PHONY: all clean test test-prod test-all dirs
 
 all: dirs $(STATIC_LIB) $(SHARED_LIB) $(CLI_BIN) $(MIGRATE_BIN)
 
@@ -104,6 +105,6 @@ test-prod: $(STATIC_LIB) $(CLI_BIN) $(MIGRATE_BIN)
 test-all: test test-prod
 
 clean:
-	rm -rf $(LIB_OBJS) $(CLI_OBJS) $(LIB_OBJS:.o=.d) $(CLI_OBJS:.o=.d) $(BIN_DIR) $(LIB_DIR) test/bin
+	rm -rf $(LIB_OBJS) $(CLI_OBJS) $(MIGRATE_OBJS) $(LIB_OBJS:.o=.d) $(CLI_OBJS:.o=.d) $(MIGRATE_OBJS:.o=.d) $(BIN_DIR) $(LIB_DIR) test/bin
 
--include $(LIB_OBJS:.o=.d) $(CLI_OBJS:.o=.d)
+-include $(LIB_OBJS:.o=.d) $(CLI_OBJS:.o=.d) $(MIGRATE_OBJS:.o=.d)

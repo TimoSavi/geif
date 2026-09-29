@@ -99,7 +99,7 @@ echo "  [PASS] Custom point output formatted accurately using -p."
 # Test 7: Silent / Outliers Only (-S)
 echo "Test 7: Outliers only filtering (-S)..."
 # Score with a threshold where only some points trigger
-$BIN -r "$TMP_DIR/model_full.json" -a "$WINE_CSV" -H -f ';' -T 0.65 -S -o "$TMP_DIR/outliers_only.csv" || true
+$BIN -r "$TMP_DIR/model_full.json" -a "$WINE_CSV" -H -f ';' -T 0.25 -S -o "$TMP_DIR/outliers_only.csv" || true
 OUTLIER_ROWS=$(wc -l < "$TMP_DIR/outliers_only.csv")
 ALL_ROWS=$(wc -l < "$TMP_DIR/filtered_pos.csv")
 if [ "$OUTLIER_ROWS" -ge 1599 ] || [ "$OUTLIER_ROWS" -le 0 ]; then

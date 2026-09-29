@@ -8,11 +8,67 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdlib.h>
 #include <math.h>
 
-#ifdef __cplusplus
-extern "C" {
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
 #endif
+
+#define GEIF_DIST_AVG(d) ((d) / 1.5 + 1.0 / (2.4 * (d)) - 1.0 / 12.0)
+#define GEIF_FAST_C_SAMPLES 2048
+
+double geif_c(double n);
+void geif_init_c_cache(void);
+
+static inline double geif_scale_value(double value, double range, double scale_min, double min, double max)
+{
+    if (max == min) return scale_min;
+    return range * (value - min) / (max - min) + scale_min;
+}
+
+static inline double geif_dist_sq(const double * restrict a,
+                                  const double * restrict b,
+                                  uint32_t d)
+{
+    if (d == 2) {
+        double d0 = a[0] - b[0];
+        double d1 = a[1] - b[1];
+        return d0 * d0 + d1 * d1;
+    }
+    if (d == 3) {
+        double d0 = a[0] - b[0];
+        double d1 = a[1] - b[1];
+        double d2 = a[2] - b[2];
+        return d0 * d0 + d1 * d1 + d2 * d2;
+    }
+    double dist_sq = 0.0;
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC ivdep
+#endif
+    for (uint32_t i = 0; i < d; i++) {
+        double diff = a[i] - b[i];
+        dist_sq += diff * diff;
+    }
+    return dist_sq;
+}
+
+static inline double geif_gaussrand(void)
+{
+    static double U, V;
+    static int phase = 0;
+    double Z;
+
+    if (phase == 0) {
+        U = ((double)rand() + 1.0) / ((double)RAND_MAX + 2.0);
+        V = (double)rand() / ((double)RAND_MAX + 1.0);
+        Z = sqrt(-2.0 * log(U)) * sin(2.0 * M_PI * V);
+    } else {
+        Z = sqrt(-2.0 * log(U)) * cos(2.0 * M_PI * V);
+    }
+    phase = 1 - phase;
+    return Z;
+}
 
 /**
  * @brief Evaluates vector dot product sum(a[j] * b[j]) for j = 0..d-1.
@@ -22,6 +78,8 @@ static inline double geif_dot(const double * restrict a,
                               const double * restrict b,
                               uint32_t d)
 {
+    if (d == 2) return a[0] * b[0] + a[1] * b[1];
+    if (d == 3) return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
     double sum = 0.0;
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC ivdep

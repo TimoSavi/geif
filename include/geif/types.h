@@ -42,15 +42,16 @@ typedef struct geif_node {
     int32_t  left_child;           /**< Index of left child in tree's node array (-1 if leaf) */
     int32_t  right_child;          /**< Index of right child in tree's node array (-1 if leaf) */
     uint32_t normal_offset;        /**< Offset into tree's normal pool: &normals_pool[normal_offset] */
-    double   pdotn;                /**< Precomputed scalar threshold: sum(n_j * (A_j + B_j) / 2) */
+    double   pdotn;                /**< Precomputed scalar threshold: sum(p_j * n_j) */
     double   step_weight;          /**< Continuous metric increment Delta H for this cut */
     double   delta_AB;             /**< Normalized generator separation ||B - A|| */
     int32_t  sample_count;         /**< Number of samples remaining in this node */
     uint32_t leaf_point_idx;       /**< Sample pool index of representative point (leaf only) */
+    uint32_t leaf_sample_offset;   /**< Offset into tree's leaf_samples array where indices begin */
 } geif_node_t;
 
 /**
- * @brief Representation of an individual Voronoi tree in contiguous memory.
+ * @brief Representation of an individual tree in contiguous memory.
  */
 typedef struct geif_tree {
     geif_node_t *nodes;            /**< Contiguous array of nodes */
@@ -58,6 +59,9 @@ typedef struct geif_tree {
     size_t       node_capacity;    /**< Allocated node capacity */
     double      *normals_pool;     /**< Contiguous buffer of normal vectors [node_count * dimensions] */
     size_t       normals_capacity; /**< Capacity of normals buffer */
+    uint32_t    *leaf_samples;     /**< Contiguous buffer of leaf sample pool indices */
+    size_t       leaf_samples_count;
+    size_t       leaf_samples_capacity;
     double       max_path_depth;   /**< Longest metric path accumulated in this tree */
 } geif_tree_t;
 
@@ -76,17 +80,23 @@ typedef struct geif_forest {
     double       *envelope_span;   /**< Physical span (max - min) per dimension [dimensions] */
     double       *effective_span;  /**< Regularized span floor for zero-variance features [dimensions] */
     uint8_t      *dim_active;      /**< Flag: 1 if dimension has variance >= epsilon, 0 if constant */
+    int32_t       scale_range_idx; /**< Dimension index with largest range for isotropic scaling (-1 if unscaled) */
+    double        avg_sample_dist; /**< Average scaled sample point distance for nearest distance analysis */
+    double        c_factor;        /**< c(psi) average path length for sub-sample size */
 
-    // Global Metrics
+    // Global Metrics & Calibration
     double        delta_nominal;   /**< Mean generator spacing across the ensemble */
     double        H_train_max;     /**< Deepest metric depth observed in training data */
     double        H_max;           /**< Calibrated universal scale: kappa * H_train_max */
+    double        min_score;       /**< Empirical minimum anomaly score in training pool */
+    double        max_score;       /**< Calibrated maximum anomaly score (theoretical outer limit) */
     double        average_score;   /**< Mean anomaly score across training pool */
     double        percentage_score;/**< Percentile threshold score based on training sample distribution */
     double       *averages;        /**< Running or calculated feature averages [dimensions] */
 
     // Reservoir Sample Pool
     double       *sample_pool;     /**< Contiguous sample matrix [pool_capacity * dimensions] */
+    double       *scaled_pool;     /**< Ephemeral cached scaled sample pool [pool_capacity * dimensions] */
     size_t        pool_count;      /**< Current number of samples in the pool */
     size_t        pool_capacity;   /**< Maximum capacity of sample pool (tree_count * samples_per_tree) */
     uint64_t      total_rows_seen; /**< Total rows streamed through the reservoir */

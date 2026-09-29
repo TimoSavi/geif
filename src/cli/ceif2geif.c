@@ -122,6 +122,7 @@ int main(int argc, char *argv[])
                 for (uint32_t t = 0; t < f->tree_count; t++) {
                     if (f->trees[t].nodes) free(f->trees[t].nodes);
                     if (f->trees[t].normals_pool) free(f->trees[t].normals_pool);
+                    if (f->trees[t].leaf_samples) free(f->trees[t].leaf_samples);
                 }
                 free(f->trees);
 

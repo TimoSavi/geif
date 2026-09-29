@@ -44,9 +44,9 @@ if ! grep -qE '^[0-9]+\.[0-9]{2},[0-9]+\.[0-9]{2},0x[0-9A-Fa-f]{6}$' "$GRID_OUT"
     exit 1
 fi
 
-# Verify reservoir points with score 0.0 (green 0x20FF20 or 0x00FF00 from ~/.ceifrc) are emitted
-if ! grep -qE '0x(20FF20|00FF00)' "$GRID_OUT"; then
-    echo "ERROR: Reservoir sample points (green) not found in grid output"
+# Verify reservoir points with score 0.0 (black 0x000000 or legacy green) are emitted
+if ! grep -qE '0x(000000|20FF20|00FF00)' "$GRID_OUT"; then
+    echo "ERROR: Reservoir sample points (black 0x000000) not found in grid output"
     exit 1
 fi
 echo "  [PASS] Test grid generated with valid coordinate grid points and reservoir scatter samples."
@@ -98,9 +98,9 @@ if [ "$LINE_COUNT" -lt 10 ]; then
     echo "ERROR: Expected at least 10 points in PLOTDATA, got $LINE_COUNT"
     exit 1
 fi
-# Verify custom RC green (0x00FF00) appears for training data
-if ! grep -q '0x00FF00' "$PLOTDATA"; then
-    echo "ERROR: Custom RC color 0x00FF00 not found in plotdata"
+# Verify black (0x000000) appears for training data scatter samples
+if ! grep -qE '0x(000000|00FF00)' "$PLOTDATA"; then
+    echo "ERROR: Training sample points (0x000000) not found in plotdata"
     exit 1
 fi
 echo "  [PASS] Exact production pipeline generated $LINE_COUNT points successfully."

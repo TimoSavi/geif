@@ -86,41 +86,12 @@ struct json_object *geif_forest_to_json_object(const geif_forest_t *f)
     json_object_object_add(root, "pool_count", json_object_new_int((int)f->pool_count));
     json_object_object_add(root, "sample_pool", j_pool);
 
-    // Save trees
-    struct json_object *j_trees = json_object_new_array();
-    for (uint32_t t = 0; t < f->tree_count; t++) {
-        const geif_tree_t *tree = &f->trees[t];
-        struct json_object *j_tree = json_object_new_object();
-        json_object_object_add(j_tree, "node_count", json_object_new_int((int)tree->node_count));
-
-        struct json_object *j_nodes = json_object_new_array();
-        for (size_t n = 0; n < tree->node_count; n++) {
-            const geif_node_t *node = &tree->nodes[n];
-            struct json_object *j_node = json_object_new_object();
-            json_object_object_add(j_node, "left", json_object_new_int(node->left_child));
-            json_object_object_add(j_node, "right", json_object_new_int(node->right_child));
-            json_object_object_add(j_node, "offset", json_object_new_int((int)node->normal_offset));
-            json_object_object_add(j_node, "pdotn", json_object_new_double(node->pdotn));
-            json_object_object_add(j_node, "weight", json_object_new_double(node->step_weight));
-            json_object_object_add(j_node, "delta", json_object_new_double(node->delta_AB));
-            json_object_object_add(j_node, "samples", json_object_new_int(node->sample_count));
-            json_object_object_add(j_node, "leaf_idx", json_object_new_int((int)node->leaf_point_idx));
-            json_object_array_add(j_nodes, j_node);
-        }
-        json_object_object_add(j_tree, "nodes", j_nodes);
-
-        struct json_object *j_normals = json_object_new_array();
-        if (tree->normals_pool && tree->node_count > 0) {
-            size_t total_normals = tree->node_count * f->dimensions;
-            for (size_t k = 0; k < total_normals; k++) {
-                json_object_array_add(j_normals, json_object_new_double(tree->normals_pool[k]));
-            }
-        }
-        json_object_object_add(j_tree, "normals", j_normals);
-
-        json_object_array_add(j_trees, j_tree);
-    }
-    json_object_object_add(root, "trees", j_trees);
+    // Save calibration metrics
+    json_object_object_add(root, "min_score", json_object_new_double(f->min_score));
+    json_object_object_add(root, "max_score", json_object_new_double(f->max_score));
+    json_object_object_add(root, "avg_sample_dist", json_object_new_double(f->avg_sample_dist));
+    json_object_object_add(root, "c_factor", json_object_new_double(f->c_factor));
+    json_object_object_add(root, "scale_range_idx", json_object_new_int(f->scale_range_idx));
 
     return root;
 }
@@ -241,48 +212,70 @@ geif_status_t geif_forest_from_json_object(geif_forest_t **forest_out, struct js
         }
     }
 
-    // Load trees
-    struct json_object *j_trees;
-    if (json_object_object_get_ex(root, "trees", &j_trees)) {
-        int t_len = json_object_array_length(j_trees);
-        for (int t = 0; t < t_len && t < (int)f->tree_count; t++) {
-            struct json_object *j_tree = json_object_array_get_idx(j_trees, t);
-            geif_tree_t *tree = &f->trees[t];
+    // Load calibration metrics
+    if (json_object_object_get_ex(root, "min_score", &j_val)) f->min_score = json_object_get_double(j_val);
+    if (json_object_object_get_ex(root, "max_score", &j_val)) f->max_score = json_object_get_double(j_val);
+    if (json_object_object_get_ex(root, "avg_sample_dist", &j_val)) f->avg_sample_dist = json_object_get_double(j_val);
+    if (json_object_object_get_ex(root, "c_factor", &j_val)) f->c_factor = json_object_get_double(j_val);
+    if (json_object_object_get_ex(root, "scale_range_idx", &j_val)) f->scale_range_idx = json_object_get_int(j_val);
 
-            struct json_object *j_nodes;
-            if (json_object_object_get_ex(j_tree, "nodes", &j_nodes)) {
-                size_t n_len = (size_t)json_object_array_length(j_nodes);
-                tree->node_count = n_len;
-                tree->node_capacity = n_len;
-                tree->nodes = (geif_node_t *)malloc(n_len * sizeof(geif_node_t));
+    // If sample pool is present, build trees dynamically in RAM (taking < 0.05s)
+    if (f->pool_count > 0) {
+        double saved_min = f->min_score;
+        double saved_max = f->max_score;
+        double saved_avg = f->average_score;
+        double saved_pct = f->percentage_score;
 
-                for (size_t n = 0; n < n_len; n++) {
-                    struct json_object *j_node = json_object_array_get_idx(j_nodes, n);
-                    struct json_object *jv;
-                    geif_node_t *node = &tree->nodes[n];
+        geif_forest_train(f);
 
-                    json_object_object_get_ex(j_node, "left", &jv); node->left_child = json_object_get_int(jv);
-                    json_object_object_get_ex(j_node, "right", &jv); node->right_child = json_object_get_int(jv);
-                    json_object_object_get_ex(j_node, "offset", &jv); node->normal_offset = (uint32_t)json_object_get_int(jv);
-                    json_object_object_get_ex(j_node, "pdotn", &jv); node->pdotn = json_object_get_double(jv);
-                    json_object_object_get_ex(j_node, "weight", &jv); node->step_weight = json_object_get_double(jv);
-                    json_object_object_get_ex(j_node, "delta", &jv); node->delta_AB = json_object_get_double(jv);
-                    json_object_object_get_ex(j_node, "samples", &jv); node->sample_count = json_object_get_int(jv);
-                    json_object_object_get_ex(j_node, "leaf_idx", &jv); node->leaf_point_idx = (uint32_t)json_object_get_int(jv);
-                }
-            }
+        if (saved_min > 0.0) f->min_score = saved_min;
+        if (saved_max > 0.0) f->max_score = saved_max;
+        if (saved_avg > 0.0) f->average_score = saved_avg;
+        if (saved_pct > 0.0) f->percentage_score = saved_pct;
+    } else {
+        // Fallback: Load legacy trees if present in older model files
+        struct json_object *j_trees;
+        if (json_object_object_get_ex(root, "trees", &j_trees)) {
+            int t_len = json_object_array_length(j_trees);
+            for (int t = 0; t < t_len && t < (int)f->tree_count; t++) {
+                struct json_object *j_tree = json_object_array_get_idx(j_trees, t);
+                geif_tree_t *tree = &f->trees[t];
 
-            struct json_object *j_normals;
-            if (json_object_object_get_ex(j_tree, "normals", &j_normals)) {
-                size_t norm_len = (size_t)json_object_array_length(j_normals);
-                tree->normals_capacity = norm_len;
-                if (norm_len > 0) {
-                    tree->normals_pool = (double *)malloc(norm_len * sizeof(double));
-                    for (size_t k = 0; k < norm_len; k++) {
-                        tree->normals_pool[k] = json_object_get_double(json_object_array_get_idx(j_normals, k));
+                struct json_object *j_nodes;
+                if (json_object_object_get_ex(j_tree, "nodes", &j_nodes)) {
+                    size_t n_len = (size_t)json_object_array_length(j_nodes);
+                    tree->node_count = n_len;
+                    tree->node_capacity = n_len;
+                    tree->nodes = (geif_node_t *)malloc(n_len * sizeof(geif_node_t));
+
+                    for (size_t n = 0; n < n_len; n++) {
+                        struct json_object *j_node = json_object_array_get_idx(j_nodes, n);
+                        struct json_object *jv;
+                        geif_node_t *node = &tree->nodes[n];
+
+                        json_object_object_get_ex(j_node, "left", &jv); node->left_child = json_object_get_int(jv);
+                        json_object_object_get_ex(j_node, "right", &jv); node->right_child = json_object_get_int(jv);
+                        json_object_object_get_ex(j_node, "offset", &jv); node->normal_offset = (uint32_t)json_object_get_int(jv);
+                        json_object_object_get_ex(j_node, "pdotn", &jv); node->pdotn = json_object_get_double(jv);
+                        json_object_object_get_ex(j_node, "weight", &jv); node->step_weight = json_object_get_double(jv);
+                        json_object_object_get_ex(j_node, "delta", &jv); node->delta_AB = json_object_get_double(jv);
+                        json_object_object_get_ex(j_node, "samples", &jv); node->sample_count = json_object_get_int(jv);
+                        json_object_object_get_ex(j_node, "leaf_idx", &jv); node->leaf_point_idx = (uint32_t)json_object_get_int(jv);
                     }
-                } else {
-                    tree->normals_pool = NULL;
+                }
+
+                struct json_object *j_normals;
+                if (json_object_object_get_ex(j_tree, "normals", &j_normals)) {
+                    size_t norm_len = (size_t)json_object_array_length(j_normals);
+                    tree->normals_capacity = norm_len;
+                    if (norm_len > 0) {
+                        tree->normals_pool = (double *)malloc(norm_len * sizeof(double));
+                        for (size_t k = 0; k < norm_len; k++) {
+                            tree->normals_pool[k] = json_object_get_double(json_object_array_get_idx(j_normals, k));
+                        }
+                    } else {
+                        tree->normals_pool = NULL;
+                    }
                 }
             }
         }

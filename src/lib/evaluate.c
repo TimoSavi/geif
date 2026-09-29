@@ -9,16 +9,45 @@
 #include <string.h>
 #include <math.h>
 
+static double s_fast_c_cache[GEIF_FAST_C_SAMPLES];
+static bool s_c_cache_initialized = false;
+
+void geif_init_c_cache(void)
+{
+    if (s_c_cache_initialized) return;
+    s_fast_c_cache[0] = 0.0;
+    s_fast_c_cache[1] = 0.0;
+    double H = 0.0;
+    for (int n = 2; n < GEIF_FAST_C_SAMPLES; n++) {
+        H += 1.0 / (double)(n - 1);
+        s_fast_c_cache[n] = 2.0 * H - (2.0 * (double)(n - 1) / (double)n);
+    }
+    s_c_cache_initialized = true;
+}
+
+double geif_c(double n)
+{
+    if (!s_c_cache_initialized) geif_init_c_cache();
+    if (n <= 1.0) return 0.0;
+    int idx = (int)n;
+    if (idx < GEIF_FAST_C_SAMPLES) {
+        return s_fast_c_cache[idx];
+    }
+    double m = n - 1.0;
+    double H = log(m) + 0.5772156649015328606 + (1.0 / (2.0 * m)) - (1.0 / (12.0 * m * m));
+    return 2.0 * H - (2.0 * m / n);
+}
+
 static double evaluate_tree(const geif_forest_t *f,
                            const geif_tree_t *tree,
-                           const double *point)
+                           const double *scaled_point)
 {
     if (tree->node_count == 0) {
         return 0.0;
     }
 
     int32_t curr = 0;
-    double H_tree = 0.0;
+    double depth = 0.0;
     uint32_t d = f->dimensions;
 
     while (curr >= 0 && curr < (int32_t)tree->node_count) {
@@ -26,28 +55,34 @@ static double evaluate_tree(const geif_forest_t *f,
 
         // Leaf node reached
         if (node->left_child == -1 && node->right_child == -1) {
-            // Analytic completion bonus for duplicate / unpartitioned clusters in leaf
-            if (node->sample_count > 1) {
-                H_tree += log2((double)node->sample_count);
+            double leaf_c = 0.0;
+            if (f->avg_sample_dist > 0.0 && node->sample_count > 0 && tree->leaf_samples) {
+                // Find nearest sample in this leaf
+                double min_dist_sq = 1e300;
+                const uint32_t *leaf_s = &tree->leaf_samples[node->leaf_sample_offset];
+                for (int32_t i = 0; i < node->sample_count; i++) {
+                    uint32_t s_idx = leaf_s[i];
+                    const double *sample = (f->scaled_pool) ? &f->scaled_pool[s_idx * d]
+                                                           : &f->sample_pool[s_idx * d];
+                    double dist_sq = geif_dist_sq(scaled_point, sample, d);
+                    if (dist_sq < min_dist_sq) {
+                        min_dist_sq = dist_sq;
+                    }
+                }
+                double rel_dist = (sqrt(min_dist_sq) / f->avg_sample_dist) + 0.05;
+                double adjusted_n = (double)node->sample_count / rel_dist;
+                leaf_c = geif_c(adjusted_n);
+            } else if (node->sample_count > 1) {
+                leaf_c = geif_c((double)node->sample_count);
             }
-
-            // Residual Cell Distance probe: test if query point is inside an empty void / donut hole
-            const double *P_leaf = &f->sample_pool[node->leaf_point_idx * d];
-            double d_residual = geif_residual_distance(point, P_leaf, f->effective_span, f->dim_active, d);
-
-            // Cauchy-Lorentz void damping: attenuates depth if point is in an empty cavity
-            double ratio = d_residual / (f->delta_nominal > 1e-12 ? f->delta_nominal : 1e-12);
-            double void_damping = 1.0 / (1.0 + ratio * ratio);
-            H_tree *= void_damping;
-
-            break;
+            return depth + leaf_c;
         }
 
-        // Internal split node: accumulate metric depth
-        H_tree += node->step_weight;
+        // Internal split node
+        depth += 1.0;
 
         const double *normal = &tree->normals_pool[node->normal_offset];
-        double dot_val = geif_dot(point, normal, d);
+        double dot_val = geif_dot(scaled_point, normal, d);
 
         if (dot_val < node->pdotn) {
             curr = node->left_child;
@@ -56,7 +91,7 @@ static double evaluate_tree(const geif_forest_t *f,
         }
     }
 
-    return H_tree;
+    return depth;
 }
 
 double geif_forest_evaluate_metric_depth(const geif_forest_t *f,
@@ -68,24 +103,62 @@ double geif_forest_evaluate_metric_depth(const geif_forest_t *f,
         return 0.0;
     }
 
-    // Step 1: Accumulate continuous metric depth across the ensemble
+    uint32_t d = f->dimensions;
+    double stack_buf[64];
+    double *scaled_point = (d <= 64) ? stack_buf : (double *)malloc(d * sizeof(double));
+    if (!scaled_point) {
+        if (d_out_out) *d_out_out = 0.0;
+        return 0.0;
+    }
+
+    if (f->scale_range_idx >= 0 && f->envelope_span && f->envelope_min && f->envelope_max) {
+        double target_range = f->envelope_span[f->scale_range_idx];
+        double scale_min = f->envelope_min[f->scale_range_idx];
+        for (uint32_t j = 0; j < d; j++) {
+            scaled_point[j] = geif_scale_value(point[j], target_range, scale_min,
+                                               f->envelope_min[j], f->envelope_max[j]);
+        }
+    } else {
+        memcpy(scaled_point, point, d * sizeof(double));
+    }
+
+    // Step 1: Accumulate path length across the ensemble
     double sum_H = 0.0;
     for (uint32_t t = 0; t < f->tree_count; t++) {
-        sum_H += evaluate_tree(f, &f->trees[t], point);
+        sum_H += evaluate_tree(f, &f->trees[t], scaled_point);
     }
-    double H_avg = sum_H / f->tree_count;
+    double H_avg = sum_H / (double)f->tree_count;
 
-    // Step 2: Compute outer space stadium distance
-    double d_out = geif_stadium_distance(point, f->envelope_min, f->envelope_max,
-                                         f->effective_span, f->dimensions);
+    // Step 2: Compute outer space distance in scaled space
+    double dist_out_sq = 0.0;
+    double target_range = (f->scale_range_idx >= 0 && f->envelope_span) ? f->envelope_span[f->scale_range_idx] : 1.0;
+    if (f->envelope_min && f->envelope_max) {
+        for (uint32_t j = 0; j < d; j++) {
+            double d_low = f->envelope_min[j] - point[j];
+            double d_high = point[j] - f->envelope_max[j];
+            double delta = 0.0;
+            if (d_low > 0.0) delta = d_low;
+            else if (d_high > 0.0) delta = d_high;
 
-    // Step 3: Apply continuous outer space exponential damping (smooth stadium decay)
+            if (delta > 0.0 && f->envelope_span && f->envelope_span[j] > 1e-12) {
+                double norm = delta * (target_range / f->envelope_span[j]);
+                dist_out_sq += norm * norm;
+            }
+        }
+    }
+
+    double d_out_scaled = sqrt(dist_out_sq);
+
+    // Step 3: Apply continuous outer space exponential damping
     double H_final = H_avg;
-    if (d_out > 0.0) {
-        H_final *= exp(-d_out);
+    if (d_out_scaled > 0.0 && target_range > 1e-12) {
+        double rel_out = d_out_scaled / target_range;
+        H_final *= exp(-rel_out);
     }
 
-    if (d_out_out) *d_out_out = d_out;
+    if (scaled_point != stack_buf) free(scaled_point);
+
+    if (d_out_out) *d_out_out = d_out_scaled;
     return H_final;
 }
 
@@ -105,19 +178,24 @@ geif_status_t geif_forest_score_detailed(const geif_forest_t *f,
     if (metric_depth_out) *metric_depth_out = H_final;
     if (d_out_out) *d_out_out = d_out;
 
-    if (f->H_max <= 0.0) {
-        *score_out = 0.5;
-        return GEIF_OK;
+    double psi = (f->config.samples_per_tree > 0) ? (double)f->config.samples_per_tree : 256.0;
+    double c_psi = (f->c_factor > 0.0) ? f->c_factor : geif_c(psi);
+    if (c_psi <= 0.0) c_psi = 1.0;
+
+    // Standard Isolation Forest score s = 2^(-h / c)
+    double raw_score = pow(2.0, -H_final / c_psi);
+
+    // Scale score to [0, 1] using calibrated min_score and max_score
+    double scaled_score = raw_score;
+    double max_s = (f->max_score > 0.0) ? f->max_score : 1.0;
+    double min_s = f->min_score;
+    if (max_s > min_s) {
+        scaled_score = (raw_score - min_s) / (max_s - min_s);
+        if (scaled_score < 0.0) scaled_score = 0.0;
+        if (scaled_score > 1.0) scaled_score = 1.0;
     }
 
-    // Step 4: Compute normalized anomaly score relative to calibrated H_max
-    double score = 1.0 - (H_final / f->H_max);
-
-    // Clamp score to strict [0.0, 1.0] interval
-    if (score < 0.0) score = 0.0;
-    if (score > 1.0) score = 1.0;
-
-    *score_out = score;
+    *score_out = scaled_score;
     return GEIF_OK;
 }
 
