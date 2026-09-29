@@ -162,6 +162,14 @@ geif_status_t geif_forest_from_json_object(geif_forest_t **forest_out, struct js
     if (json_object_object_get_ex(root, "decimals", &j_val)) {
         f->decimals = json_object_get_int(j_val);
     }
+    if (json_object_object_get_ex(root, "outlier_score", &j_val)) {
+        const char *os = json_object_get_string(j_val);
+        if (os && strchr(os, 's')) f->scale_score = true;
+    }
+    if (globals && json_object_object_get_ex(globals, "outlierScore", &j_val)) {
+        const char *os = json_object_get_string(j_val);
+        if (os && strchr(os, 's')) f->scale_score = true;
+    }
 
     // Load envelopes
     struct json_object *j_arr;
@@ -433,6 +441,7 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
     }
     if (json_object_object_get_ex(root, "outlier_score", &j_val)) {
         strncpy(ens->outlier_score_spec, json_object_get_string(j_val), sizeof(ens->outlier_score_spec) - 1);
+        if (strchr(ens->outlier_score_spec, 's')) ens->scale_score = true;
     }
 
     if (globals) {
@@ -450,6 +459,7 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
         }
         if (ens->outlier_score_spec[0] == '\0' && json_object_object_get_ex(globals, "outlierScore", &j_val)) {
             strncpy(ens->outlier_score_spec, json_object_get_string(j_val), sizeof(ens->outlier_score_spec) - 1);
+            if (strchr(ens->outlier_score_spec, 's')) ens->scale_score = true;
         }
         if (json_object_object_get_ex(globals, "decimals", &j_val)) {
             ens->decimals = json_object_get_int(j_val);
@@ -541,6 +551,12 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
             } else {
                 geif_forest_destroy(sub);
             }
+        }
+    }
+
+    for (size_t i = 0; i < ens->count; i++) {
+        if (ens->entries[i].forest) {
+            ens->entries[i].forest->scale_score = ens->scale_score;
         }
     }
 

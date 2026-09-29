@@ -153,12 +153,20 @@ int main(void)
            forest_neg->envelope_min[0], forest_neg->envelope_max[0],
            forest_neg->envelope_min[1], forest_neg->envelope_max[1]);
 
-    // Inlier test at center (-500, -200)
+    // Inlier test at center (-500, -200) - raw Isolation Forest score (< 0.50 for inliers)
     double pt_core[2] = { -500.0, -200.0 };
     double score_core = 0.0;
     geif_forest_score(forest_neg, pt_core, &score_core);
-    printf("  Inlier center (-500, -200) anomaly score: %.6f (expected < 0.35)\n", score_core);
-    assert(score_core < 0.35);
+    printf("  Inlier center (-500, -200) raw anomaly score: %.6f (expected < 0.50)\n", score_core);
+    assert(score_core < 0.50);
+
+    // Inlier test with scaled score mode enabled (< 0.35)
+    forest_neg->scale_score = true;
+    double score_core_scaled = 0.0;
+    geif_forest_score(forest_neg, pt_core, &score_core_scaled);
+    printf("  Inlier center (-500, -200) scaled anomaly score: %.6f (expected < 0.35)\n", score_core_scaled);
+    assert(score_core_scaled < 0.35);
+    forest_neg->scale_score = false; // Reset to raw
 
     // Outlier in deep negative outer space (-700, -200)
     double pt_out_neg[2] = { -700.0, -200.0 };

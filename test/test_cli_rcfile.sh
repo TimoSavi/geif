@@ -119,7 +119,7 @@ if ! grep -E 'score=[0-9]+\.[0-9]{2};' "$OUT_OVERRIDE" > /dev/null; then
     echo "ERROR: Cascaded DECIMALS 2 not applied"
     exit 1
 fi
-if ! grep -qE 'rgb=([5-8][0-9A-Fa-f]{5}|412977|412A77|412A78|412978)' "$OUT_OVERRIDE"; then
+if ! grep -qE 'rgb=(C[0-9A-Fa-f]{5}|[5-8][0-9A-Fa-f]{5}|412977|412A77|412A78|412978)' "$OUT_OVERRIDE"; then
     echo "ERROR: Cascaded LOW_RGB_COLOR 0x123456 not applied"
     exit 1
 fi

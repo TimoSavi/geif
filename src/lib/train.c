@@ -74,11 +74,11 @@ static void init_dimension_scales(geif_forest_t *f)
 
     // Compute average scaled sample distance
     uint32_t n_eff = (f->pool_count < psi) ? (uint32_t)f->pool_count : psi;
-    if (n_eff < 1) n_eff = 1;
+    if (n_eff < 2) n_eff = 2;
     f->avg_sample_dist = sqrt(GEIF_DIST_AVG((double)d)) * (max_span / pow((double)n_eff, 1.0 / (double)d));
 
     geif_init_c_cache();
-    f->c_factor = geif_c((double)psi);
+    f->c_factor = geif_c((double)n_eff);
     f->delta_nominal = f->avg_sample_dist;
 }
 

@@ -168,6 +168,7 @@ geif_forest_t *geif_ensemble_get_or_create(geif_ensemble_t *ens, const char *cat
     strncpy(forest->ignore_dims_spec, ens->ignore_dims_spec, sizeof(forest->ignore_dims_spec) - 1);
     strncpy(forest->category_dims_spec, ens->category_dims_spec, sizeof(forest->category_dims_spec) - 1);
     forest->decimals = ens->decimals;
+    forest->scale_score = ens->scale_score;
 
     uint32_t entry_idx = (uint32_t)ens->count++;
     geif_category_entry_t *entry = &ens->entries[entry_idx];

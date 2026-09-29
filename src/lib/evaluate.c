@@ -185,17 +185,20 @@ geif_status_t geif_forest_score_detailed(const geif_forest_t *f,
     // Standard Isolation Forest score s = 2^(-h / c)
     double raw_score = pow(2.0, -H_final / c_psi);
 
-    // Scale score to [0, 1] using calibrated min_score and max_score
-    double scaled_score = raw_score;
-    double max_s = (f->max_score > 0.0) ? f->max_score : 1.0;
-    double min_s = f->min_score;
-    if (max_s > min_s) {
-        scaled_score = (raw_score - min_s) / (max_s - min_s);
-        if (scaled_score < 0.0) scaled_score = 0.0;
-        if (scaled_score > 1.0) scaled_score = 1.0;
+    if (f->scale_score) {
+        // Scale score to [0, 1] using calibrated min_score and max_score
+        double scaled_score = raw_score;
+        double max_s = (f->max_score > 0.0) ? f->max_score : 1.0;
+        double min_s = f->min_score;
+        if (max_s > min_s) {
+            scaled_score = (raw_score - min_s) / (max_s - min_s);
+            if (scaled_score < 0.0) scaled_score = 0.0;
+            if (scaled_score > 1.0) scaled_score = 1.0;
+        }
+        *score_out = scaled_score;
+    } else {
+        *score_out = raw_score;
     }
-
-    *score_out = scaled_score;
     return GEIF_OK;
 }
 
