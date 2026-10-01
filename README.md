@@ -41,40 +41,75 @@
 ## Key Innovations & Mathematical Foundation
 
 ### 1. Data-Adaptive Voronoi Bisectors
-Standard Isolation Forests make axis-aligned cuts, creating severe rectangular artifacts. Standard EIF draws arbitrary random normal vectors from uniform spherical distributions, which fail when dimensions have radically different physical scales (e.g. coordinates with a 5000:1 aspect ratio).
+Standard Isolation Forests make axis-aligned cuts, creating rectangular artifacts. Standard EIF draws arbitrary random normal vectors from uniform spherical distributions, which fail when dimensions have radically different physical scales.
 
 GEIF solves this by choosing two distinct points $A$ and $B$ from each node's subsample and placing the splitting hyperplane at their perpendicular bisector:
-$$P_{\text{mid}} = \frac{A + B}{2}, \quad \vec{n} = \frac{B - A}{\|B - A\|}$$
+
+$$
+P_{\text{mid}} = \frac{A + B}{2}, \quad \vec{n} = \frac{B - A}{\Vert B - A \Vert}
+$$
+
 - **Scale Invariant**: Adapts intrinsically to the local geometry and aspect ratios of the data without requiring manual normalization or feature scaling.
 - **Zero-Variance Feature Masking**: Automatically detects degenerate features with near-zero variance and isolates them safely without numerical instability.
 
-### 2. Smooth Euclidean Stadium Metric ("Outer Space")
-When an observation falls outside the bounding box observed during training:
-- Conventional tree structures fail to differentiate between a point slightly outside the box and a point millions of units away in outer space.
-- GEIF computes the exact Euclidean distance $d_{\text{out}}$ to the training envelope bounding box:
-  $$d_{\text{out}}(x) = \sqrt{\sum_{j=1}^D \max(0, \text{min}_j - x_j)^2 + \max(0, x_j - \text{max}_j)^2}$$
-- GEIF calculates the effective coordinate span $S_{\text{eff}} = \sqrt{\sum_j (\text{max}_j - \text{min}_j)^2}$.
-- An exponential attenuation transforms outer space distance into a continuous metric depth penalty:
-  $$\Delta h_{\text{out}} = H_{\text{max}} \cdot \left(1.0 - \exp\left(-\frac{d_{\text{out}}}{S_{\text{eff}}}\right)\right)$$
-- As $d_{\text{out}} \to \infty$, the anomaly score smoothly and continuously converges to $1.000000$.
+### 2. Asymptotic Exponential Outer Space Attenuation
+When an observation falls outside the training data bounding envelope ($[\min_j, \max_j]$), conventional tree structures fail to differentiate between a point slightly outside the box and a point far in outer space.
 
-### 3. "Zero Kelvin" Universal Scale Calibration
-Anomaly scores in GEIF are normalized in the range $[0.0, 1.0]$ with clear, interpretable semantics:
-- **0.000000 ("Zero Kelvin")**: The theoretical absolute inlier — approachable asymptotically as sample density and depth increase, but never exceeded.
-- **0.10 – 0.35**: Nominal cluster inliers.
-- **0.50**: Default decision boundary threshold.
-- **0.80 – 1.00**: Definite anomalies and points far outside the training distribution.
+GEIF computes the normalized exterior Euclidean distance $d_{\text{norm}}$:
 
-Calibration depth $H_{\text{max}}$ is determined from the deepest observed node during training, scaled by a headroom factor:
-$$H_{\text{max}} = 1.25 \times \max_{t \in \text{Trees}} (\text{max-depth}_t)$$
+$$
+d_{\text{norm}} = \sqrt{\sum_{j=1}^D \left(\frac{\max(0, \min_j - x_j) + \max(0, x_j - \max_j)}{\text{span}_j}\right)^2}
+$$
+
+An asymptotic exponential decay pulls the score smoothly toward 1.0 without sharp cliffs or rectangular plateaus:
+
+$$
+s = 1.0 - (1.0 - s_0) \cdot e^{-\beta \cdot d_{\text{norm}}}
+$$
+
+where $s_0 = 2^{-H / c}$ is the ensemble tree anomaly score and $\beta = 0.10$ (`GEIF_OUTER_DECAY_RATE`, aligned with CEIF). Bending begins smoothly around $0.60 \dots 0.70$ near data boundaries and exponentially approaches 1.0 in outer space. Scores are strictly bounded below 1.0 ($s \le 1.0 - 10^{-6}$) to preserve dynamic range.
+
+### 3. Structural "Zero Kelvin" Universal Scale Calibration
+Anomaly scores in GEIF are calibrated using the **Zero Kelvin principle**:
+- GEIF traverses all trees in memory via `tree_find_max_height()`, locating the theoretical deepest leaf:
+
+$$
+H_{\text{leaf}} = \text{depth} + c\left(\frac{\text{sample-count}}{\text{MIN-REL-DIST}}\right)
+$$
+
+- Averaging across all trees gives:
+
+$$
+\bar{H}_{\text{zero-kelvin}} = \frac{1}{T}\sum_{t=0}^{T-1} H_{\max}(t)
+$$
+
+- The baseline minimum score is calibrated directly:
+
+$$
+s_{\min} = \frac{1}{2^{\bar{H}_{\text{zero-kelvin}} / c}}
+$$
+
+When scaled scores are requested (`-O <thresh>s` or `f->scale_score`), scores are linearly mapped to $[0.0, 1.0 - 10^{-6}]$:
+
+$$
+s_{\text{scaled}} = \frac{s - s_{\min}}{s_{\max} - s_{\min}}
+$$
 
 ### 4. Streaming Reservoir Sampling & Age Decay
 The training pool maintains a fixed maximum capacity:
-$$N_{\text{pool}} = N_{\text{trees}} \times N_{\text{samples}} \quad (\text{e.g., } 100 \times 256 = 25{,}600)$$
+
+$$
+N_{\text{pool}} = N_{\text{trees}} \times N_{\text{samples}} \quad (\text{e.g., } 100 \times 256 = 25{,}600)
+$$
+
 Any streaming input of arbitrary length is ingested via Algorithm R reservoir sampling, guaranteeing an unbiased uniform sample even if the input stream is sorted or clustered.
 
 When updating existing models over time, GEIF applies exponential age decay (`-D <rate>d`):
-$$P_{\text{retain}}(\Delta t) = \exp\left(-\frac{\Delta t}{\tau}\right)$$
+
+$$
+P_{\text{retain}}(\Delta t) = \exp\left(-\frac{\Delta t}{\tau}\right)
+$$
+
 Stale reservoir samples are probabilistically replaced by incoming observations, allowing the model to adapt dynamically to evolving production environments.
 
 ---

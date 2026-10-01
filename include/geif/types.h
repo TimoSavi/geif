@@ -25,6 +25,8 @@ extern "C" {
 #define MIN_REL_DIST                   GEIF_MIN_REL_DIST
 #define GEIF_NODE_MIN_SAMPLE           3        /**< Minimum samples required to split a node */
 #define NODE_MIN_SAMPLE                GEIF_NODE_MIN_SAMPLE
+#define GEIF_OUTER_DECAY_RATE          0.10     /**< Exponential approach rate to 1.0 in outer space */
+#define OUTER_DECAY_RATE               GEIF_OUTER_DECAY_RATE
 
 /**
  * @brief Configuration parameters for training and evaluating GEIF.

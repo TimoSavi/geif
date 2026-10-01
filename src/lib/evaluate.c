@@ -150,17 +150,10 @@ double geif_forest_evaluate_metric_depth(const geif_forest_t *f,
 
     double d_out_scaled = sqrt(dist_out_sq);
 
-    // Step 3: Apply continuous outer space exponential damping
-    double H_final = H_avg;
-    if (d_out_scaled > 0.0 && target_range > 1e-12) {
-        double rel_out = d_out_scaled / target_range;
-        H_final *= exp(-rel_out);
-    }
-
     if (scaled_point != stack_buf) free(scaled_point);
 
     if (d_out_out) *d_out_out = d_out_scaled;
-    return H_final;
+    return H_avg;
 }
 
 geif_status_t geif_forest_score_detailed(const geif_forest_t *f,
@@ -183,22 +176,31 @@ geif_status_t geif_forest_score_detailed(const geif_forest_t *f,
     double c_psi = (f->c_factor > 0.0) ? f->c_factor : geif_c(psi);
     if (c_psi <= 0.0) c_psi = 1.0;
 
-    // Standard Isolation Forest score s = 2^(-h / c)
-    double raw_score = pow(2.0, -H_final / c_psi);
+    // Standard Isolation Forest score s = 1.0 / 2^(H / c)
+    double score = 1.0 / pow(2.0, H_final / c_psi);
+
+    // Outer space exponential attenuation from CEIF:
+    // score = 1.0 - (1.0 - score) * exp(-OUTER_DECAY_RATE * d_norm)
+    if (d_out > 0.0) {
+        double target_range = (f->scale_range_idx >= 0 && f->envelope_span) ? f->envelope_span[f->scale_range_idx] : 1.0;
+        double d_norm = (target_range > 1e-12) ? (d_out / target_range) : d_out;
+        score = 1.0 - (1.0 - score) * exp(-GEIF_OUTER_DECAY_RATE * d_norm);
+    }
+    if (score >= 1.0) score = 1.0 - 1e-6;
 
     if (f->scale_score) {
         // Scale score to [0, 1] using calibrated min_score and max_score
-        double scaled_score = raw_score;
         double max_s = (f->max_score > 0.0) ? f->max_score : 1.0;
         double min_s = f->min_score;
+        double scaled_score = score;
         if (max_s > min_s) {
-            scaled_score = (raw_score - min_s) / (max_s - min_s);
+            scaled_score = (score - min_s) / (max_s - min_s);
             if (scaled_score < 0.0) scaled_score = 0.0;
-            if (scaled_score > 1.0) scaled_score = 1.0;
+            if (scaled_score >= 1.0) scaled_score = 1.0 - 1e-6;
         }
         *score_out = scaled_score;
     } else {
-        *score_out = raw_score;
+        *score_out = score;
     }
     return GEIF_OK;
 }
