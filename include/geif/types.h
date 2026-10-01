@@ -29,16 +29,30 @@ extern "C" {
 #define OUTER_DECAY_RATE               GEIF_OUTER_DECAY_RATE
 
 /**
+ * @brief Selectable algorithm engines in GEIF.
+ */
+typedef enum geif_algo_type {
+    GEIF_ALGO_CEIF = 0,        /**< CEIF: Data-anchored isotropic Gaussian cuts with Zero Kelvin & outer decay */
+    GEIF_ALGO_BUBBLE,          /**< Hyperspherical Bubble Cavity Carving */
+    GEIF_ALGO_EXEMPLAR,        /**< Non-tree direct SIMD Cauchy density kernel */
+    GEIF_ALGO_VORONOI          /**< Pure Voronoi perpendicular bisector splits */
+} geif_algo_type_t;
+
+#define GEIF_ALGO_DEFAULT GEIF_ALGO_CEIF
+#define GEIF_ALGO_EIF     GEIF_ALGO_CEIF
+
+/**
  * @brief Configuration parameters for training and evaluating GEIF.
  */
 typedef struct geif_config {
-    uint32_t tree_count;           /**< Number of trees in the forest (default: 100) */
-    uint32_t samples_per_tree;     /**< Sub-sample size psi per tree (default: 256) */
-    uint32_t max_depth;            /**< Hard tree depth cap (default: 16) */
-    double   kappa;                /**< Absolute Zero Kelvin headroom factor (default: 1.25) */
-    double   alpha;                /**< Metric depth density sensitivity (default: 1.0) */
-    uint32_t ceiling_factor;       /**< Reservoir ceiling factor (default: 3) */
-    uint32_t seed;                 /**< RNG seed (0 for auto / time-based) */
+    uint32_t         tree_count;           /**< Number of trees in the forest (default: 100) */
+    uint32_t         samples_per_tree;     /**< Sub-sample size psi per tree (default: 256) */
+    uint32_t         max_depth;            /**< Hard tree depth cap (default: 16) */
+    double           kappa;                /**< Absolute Zero Kelvin headroom factor (default: 1.25) */
+    double           alpha;                /**< Metric depth density sensitivity (default: 1.0) */
+    uint32_t         ceiling_factor;       /**< Reservoir ceiling factor (default: 3) */
+    uint32_t         seed;                 /**< RNG seed (0 for auto / time-based) */
+    geif_algo_type_t algo;                 /**< Algorithm engine selection (default: GEIF_ALGO_CEIF) */
 } geif_config_t;
 
 /**
@@ -115,6 +129,7 @@ typedef struct geif_forest {
     char          category_dims_spec[128];/**< Category columns spec (e.g. "12") */
     int           decimals;               /**< Decimal precision for serialization (-d, default: 6) */
     bool          scale_score;            /**< Flag indicating if anomaly scores are scaled [0..1] via min/max */
+    void         *algo_data;              /**< Optional algorithm-specific auxiliary state */
 } geif_forest_t;
 
 typedef struct {

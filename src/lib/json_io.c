@@ -40,12 +40,14 @@ struct json_object *geif_forest_to_json_object(const geif_forest_t *f)
     int dec = (f->decimals >= 0) ? f->decimals : 6;
 
     json_object_object_add(root, "format", json_object_new_string("GEIF-1.0"));
+    json_object_object_add(root, "algorithm", json_object_new_string(geif_algo_name(f->config.algo)));
     json_object_object_add(root, "dimensions", json_object_new_int((int)f->dimensions));
     json_object_object_add(root, "tree_count", json_object_new_int((int)f->tree_count));
     json_object_object_add(root, "samples_per_tree", json_object_new_int((int)f->config.samples_per_tree));
     json_object_object_add(root, "max_depth", json_object_new_int((int)f->config.max_depth));
     json_object_object_add(root, "kappa", json_object_new_double(f->config.kappa));
     json_object_object_add(root, "alpha", json_object_new_double(f->config.alpha));
+    json_object_object_add(root, "seed", json_object_new_int64((int64_t)f->config.seed));
     json_object_object_add(root, "total_rows_seen", json_object_new_int64((int64_t)f->total_rows_seen));
     json_object_object_add(root, "decimals", json_object_new_int(dec));
 
@@ -91,6 +93,12 @@ geif_status_t geif_forest_from_json_object(geif_forest_t **forest_out, struct js
     uint32_t dimensions = (uint32_t)json_object_get_int(j_val);
 
     geif_config_t cfg = geif_config_default();
+    if (json_object_object_get_ex(root, "algorithm", &j_val)) {
+        cfg.algo = geif_algo_from_name(json_object_get_string(j_val));
+    } else {
+        cfg.algo = GEIF_ALGO_DEFAULT;
+    }
+    if (json_object_object_get_ex(root, "seed", &j_val)) cfg.seed = (uint32_t)json_object_get_int64(j_val);
     if (json_object_object_get_ex(root, "tree_count", &j_val)) cfg.tree_count = (uint32_t)json_object_get_int(j_val);
     if (json_object_object_get_ex(root, "samples_per_tree", &j_val)) cfg.samples_per_tree = (uint32_t)json_object_get_int(j_val);
     if (json_object_object_get_ex(root, "max_depth", &j_val)) cfg.max_depth = (uint32_t)json_object_get_int(j_val);
@@ -301,6 +309,7 @@ geif_status_t geif_ensemble_save_json(const geif_ensemble_t *ens, const char *pa
     if (!root) return GEIF_ERR_OUT_OF_MEMORY;
 
     json_object_object_add(root, "format", json_object_new_string("GEIF-1.0"));
+    json_object_object_add(root, "algorithm", json_object_new_string(geif_algo_name(ens->config.algo)));
     json_object_object_add(root, "dimensions", json_object_new_int((int)ens->dimensions));
     json_object_object_add(root, "total_input_cols", json_object_new_int((int)ens->total_input_cols));
     json_object_object_add(root, "subforest_count", json_object_new_int((int)ens->count));

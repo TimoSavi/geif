@@ -24,6 +24,8 @@ const char *geif_status_str(geif_status_t status)
         return "Feature dimension count mismatch";
     case GEIF_ERR_DEGENERATE_DATA:
         return "All dataset points are degenerate or identical";
+    case GEIF_ERR_NOT_SUPPORTED:
+        return "Requested algorithm or feature is not supported";
     default:
         return "Unknown error";
     }

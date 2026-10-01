@@ -4,6 +4,7 @@
  */
 
 #include "geif/geif.h"
+#include "algo.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -19,6 +20,7 @@ geif_config_t geif_config_default(void)
     cfg.alpha             = GEIF_DEFAULT_ALPHA;
     cfg.ceiling_factor    = GEIF_DEFAULT_CEILING_FACTOR;
     cfg.seed              = 0;
+    cfg.algo              = GEIF_ALGO_DEFAULT;
     return cfg;
 }
 
@@ -107,6 +109,11 @@ void geif_forest_destroy(geif_forest_t *f)
             }
         }
         free(f->trees);
+    }
+
+    const geif_algo_ops_t *ops = geif_algo_get_ops(f->config.algo);
+    if (ops && ops->destroy) {
+        ops->destroy(f);
     }
 
     if (f->envelope_min)   free(f->envelope_min);

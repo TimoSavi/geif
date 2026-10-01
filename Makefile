@@ -16,6 +16,12 @@ LIBS = -lm $(JSON_LIBS)
 LIB_SRCS = src/lib/error.c \
            src/lib/forest.c \
            src/lib/reservoir.c \
+           src/lib/tree_common.c \
+           src/lib/algo_registry.c \
+           src/lib/algo_ceif.c \
+           src/lib/algo_voronoi.c \
+           src/lib/algo_exemplar.c \
+           src/lib/algo_bubble.c \
            src/lib/train.c \
            src/lib/evaluate.c \
            src/lib/json_io.c \
@@ -96,6 +102,8 @@ test: $(STATIC_LIB) $(CLI_BIN)
 	@./test/test_cli_grid.sh
 	@echo "--- Running Feature 10: CEIF to GEIF Model Migration Tool (ceif2geif) Test ---"
 	@./test/test_cli_ceif2geif.sh
+	@echo "--- Running Feature 11: Multi-Algorithm POC Suite (-B, --algo) Test ---"
+	@./test/test_cli_algorithms.sh
 	@echo "All unit and integration tests passed successfully!"
 
 test-prod: $(STATIC_LIB) $(CLI_BIN) $(MIGRATE_BIN)

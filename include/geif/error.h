@@ -21,7 +21,8 @@ typedef enum geif_status {
     GEIF_ERR_FORMAT_CORRUPT  = -4,  /**< Input format or model file corrupted */
     GEIF_ERR_EMPTY_DATASET   = -5,  /**< Dataset is empty or insufficient samples */
     GEIF_ERR_DIM_MISMATCH    = -6,  /**< Feature dimension count mismatch */
-    GEIF_ERR_DEGENERATE_DATA = -7   /**< All data points are completely degenerate */
+    GEIF_ERR_DEGENERATE_DATA = -7,  /**< All data points are completely degenerate */
+    GEIF_ERR_NOT_SUPPORTED   = -8   /**< Requested algorithm or feature is not supported */
 } geif_status_t;
 
 /**

@@ -68,6 +68,7 @@ static void print_usage(const char *prog)
     printf("  -r <file>      Load trained model from JSON file (use '-' for stdin)\n");
     printf("  -o <file>      Output file for scores (default: stdout, '-' for stdout)\n");
     printf("  -O <thresh>    Outlier threshold: float [0..1], 'average', percentage (e.g. '80%%'), or scaled (e.g. '0.65s')\n");
+    printf("  -B, --algo <s> Algorithm engine: ceif (default), bubble, exemplar, voronoi\n");
     printf("  -T [margin]    Generate synthetic test grid for population drift visualization (margin: e.g. 0.1)\n");
     printf("  -k             Prune most extreme outlier from model reservoir and recalibrate (repeatable)\n");
     printf("  -g <file>      Configuration / RC file (overrides ~/.geifrc and ~/.ceifrc)\n");
@@ -419,9 +420,22 @@ int main(int argc, char *argv[])
 
     geif_config_t config = geif_config_default();
 
+    static const struct option long_options[] = {
+        {"algo",         required_argument, 0, 'B'},
+        {"algorithm",    required_argument, 0, 'B'},
+        {"method",       required_argument, 0, 'B'},
+        {"trees",        required_argument, 0, 't'},
+        {"samples",      required_argument, 0, 's'},
+        {"output",       required_argument, 0, 'o'},
+        {"help",         no_argument,       0, 'h'},
+        {"version",      no_argument,       0, 'v'},
+        {0, 0, 0, 0}
+    };
+
     int opt;
-    while ((opt = getopt(argc, argv, "l:a:w:r:o:T::O:t:i:s:m:f:e:HqvhI:U:L:C:F:R:N:M:p:SD:d:j:v::WAkg:")) != -1) {
+    while ((opt = getopt_long(argc, argv, "l:a:w:r:o:T::O:t:i:s:m:f:e:HqvhI:U:L:C:F:R:N:M:p:SD:d:j:v::WAkg:B:", long_options, NULL)) != -1) {
         switch (opt) {
+        case 'B': config.algo = geif_algo_from_name(optarg); break;
         case 'l': learn_file = optarg; break;
         case 'a': analyze_file = optarg; break;
         case 'w': save_file = optarg; break;

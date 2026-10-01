@@ -19,6 +19,17 @@ extern "C" {
 geif_config_t geif_config_default(void);
 
 /**
+ * @brief Converts an algorithm type enum to string identifier.
+ */
+const char *geif_algo_name(geif_algo_type_t algo);
+
+/**
+ * @brief Parses an algorithm name string to its enum type.
+ * Supports: "ceif", "eif", "gaussian", "bubble", "exemplar", "voronoi".
+ */
+geif_algo_type_t geif_algo_from_name(const char *name);
+
+/**
  * @brief Allocates and initializes a new GEIF forest.
  *
  * @param[out] forest_out Pointer to receive the allocated forest.
