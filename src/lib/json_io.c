@@ -4,6 +4,7 @@
  */
 
 #include "geif/geif.h"
+#include "tree_common.h"
 #include <json-c/json.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -50,6 +51,13 @@ struct json_object *geif_forest_to_json_object(const geif_forest_t *f)
     json_object_object_add(root, "seed", json_object_new_int64((int64_t)f->config.seed));
     json_object_object_add(root, "total_rows_seen", json_object_new_int64((int64_t)f->total_rows_seen));
     json_object_object_add(root, "decimals", json_object_new_int(dec));
+    json_object_object_add(root, "H_train_max", json_object_new_double(f->H_train_max));
+    json_object_object_add(root, "H_max", json_object_new_double(f->H_max));
+    json_object_object_add(root, "min_score", json_object_new_double(f->min_score));
+    json_object_object_add(root, "max_score", json_object_new_double(f->max_score));
+    json_object_object_add(root, "average_score", json_object_new_double(f->average_score));
+    json_object_object_add(root, "percentage_score", json_object_new_double(f->percentage_score));
+    json_object_object_add(root, "delta_nominal", json_object_new_double(f->delta_nominal));
 
     // Metadata & Column Configuration
     if (f->category[0] != '\0') {
@@ -115,6 +123,8 @@ geif_status_t geif_forest_from_json_object(geif_forest_t **forest_out, struct js
     if (json_object_object_get_ex(root, "H_max", &j_val)) f->H_max = json_object_get_double(j_val);
     if (json_object_object_get_ex(root, "average_score", &j_val)) f->average_score = json_object_get_double(j_val);
     if (json_object_object_get_ex(root, "percentage_score", &j_val)) f->percentage_score = json_object_get_double(j_val);
+    if (json_object_object_get_ex(root, "min_score", &j_val)) f->min_score = json_object_get_double(j_val);
+    if (json_object_object_get_ex(root, "max_score", &j_val)) f->max_score = json_object_get_double(j_val);
     if (json_object_object_get_ex(root, "delta_nominal", &j_val)) f->delta_nominal = json_object_get_double(j_val);
     if (json_object_object_get_ex(root, "total_rows_seen", &j_val)) f->total_rows_seen = (uint64_t)json_object_get_int64(j_val);
 
@@ -170,13 +180,14 @@ geif_status_t geif_forest_from_json_object(geif_forest_t **forest_out, struct js
     if (json_object_object_get_ex(root, "decimals", &j_val)) {
         f->decimals = json_object_get_int(j_val);
     }
+    f->scale_score = true;
     if (json_object_object_get_ex(root, "outlier_score", &j_val)) {
         const char *os = json_object_get_string(j_val);
-        if (os && strchr(os, 's')) f->scale_score = true;
+        (void)os;
     }
     if (globals && json_object_object_get_ex(globals, "outlierScore", &j_val)) {
         const char *os = json_object_get_string(j_val);
-        if (os && strchr(os, 's')) f->scale_score = true;
+        (void)os;
     }
 
     // Load envelopes
@@ -276,6 +287,10 @@ geif_status_t geif_forest_from_json_object(geif_forest_t **forest_out, struct js
                 }
             }
         }
+    }
+
+    if (f->trees && f->tree_count > 0 && (f->min_score <= 0.0 || f->max_score <= 0.0)) {
+        geif_tree_calibrate(f);
     }
 
     *forest_out = f;
@@ -448,9 +463,9 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
     if (json_object_object_get_ex(root, "category_dims", &j_val)) {
         strncpy(ens->category_dims_spec, json_object_get_string(j_val), sizeof(ens->category_dims_spec) - 1);
     }
+    ens->scale_score = true;
     if (json_object_object_get_ex(root, "outlier_score", &j_val)) {
         strncpy(ens->outlier_score_spec, json_object_get_string(j_val), sizeof(ens->outlier_score_spec) - 1);
-        if (strchr(ens->outlier_score_spec, 's')) ens->scale_score = true;
     }
 
     if (globals) {
@@ -468,7 +483,6 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
         }
         if (ens->outlier_score_spec[0] == '\0' && json_object_object_get_ex(globals, "outlierScore", &j_val)) {
             strncpy(ens->outlier_score_spec, json_object_get_string(j_val), sizeof(ens->outlier_score_spec) - 1);
-            if (strchr(ens->outlier_score_spec, 's')) ens->scale_score = true;
         }
         if (json_object_object_get_ex(globals, "decimals", &j_val)) {
             ens->decimals = json_object_get_int(j_val);

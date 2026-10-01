@@ -4,6 +4,7 @@
  */
 
 #include "tree_common.h"
+#include "algo.h"
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -275,6 +276,7 @@ geif_status_t geif_tree_score_point(const geif_forest_t *f,
         double d_norm = (target_range > 1e-12) ? (d_out / target_range) : d_out;
         score = 1.0 - (1.0 - score) * exp(-GEIF_OUTER_DECAY_RATE * d_norm);
     }
+    if (score < 0.0) score = 0.0;
     if (score >= 1.0) score = 1.0 - 1e-6;
 
     if (f->scale_score) {
@@ -320,9 +322,13 @@ void geif_tree_find_max_height(const geif_forest_t *f,
 
     if (node->left_child != -1) {
         geif_tree_find_max_height(f, t, node->left_child, depth + 1.0, max_h);
+    } else {
+        if (depth > *max_h) *max_h = depth;
     }
     if (node->right_child != -1) {
         geif_tree_find_max_height(f, t, node->right_child, depth + 1.0, max_h);
+    } else {
+        if (depth > *max_h) *max_h = depth;
     }
 }
 
@@ -352,11 +358,16 @@ void geif_tree_calibrate(geif_forest_t *f)
     if (f->min_score > 1.0) f->min_score = 1.0;
     f->max_score = 1.0;
 
+    const geif_algo_ops_t *ops = geif_algo_get_ops(f->config.algo);
     double sum_score = 0.0;
     for (size_t i = 0; i < f->pool_count; i++) {
         const double *pt = &f->sample_pool[i * f->dimensions];
         double s = 0.0;
-        geif_tree_score_point(f, pt, &s, NULL, NULL);
+        if (ops && ops->score) {
+            ops->score(f, pt, &s, NULL, NULL);
+        } else {
+            geif_tree_score_point(f, pt, &s, NULL, NULL);
+        }
         sum_score += s;
     }
     f->average_score = (f->pool_count > 0) ? (sum_score / (double)f->pool_count) : 0.5;

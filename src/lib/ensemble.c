@@ -60,6 +60,7 @@ geif_status_t geif_ensemble_create(geif_ensemble_t **ensemble_out,
     ens->dimensions = dimensions;
     ens->config = config ? *config : geif_config_default();
     ens->decimals = 6;
+    ens->scale_score = true;
 
     ens->capacity = GEIF_ENS_INIT_CAPACITY;
     ens->entries = (geif_category_entry_t *)calloc(ens->capacity, sizeof(geif_category_entry_t));
@@ -354,8 +355,8 @@ geif_status_t geif_ensemble_score_detailed(const geif_ensemble_t *ens,
     }
 
     if (!forest) {
-        // Unknown category unseen during training: maximum outlier
-        *score_out = 1.0;
+        // Unknown category unseen during training: maximum outlier (1.0 unreachable)
+        *score_out = 1.0 - 1e-6;
         if (metric_depth_out) *metric_depth_out = 0.0;
         if (d_out_out) *d_out_out = 999.0;
         return GEIF_ERR_INVALID_ARG;

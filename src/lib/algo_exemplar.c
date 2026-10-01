@@ -133,7 +133,7 @@ static geif_status_t geif_exemplar_score(const geif_forest_t *f,
 {
     if (!f || !point || !score_out) return GEIF_ERR_INVALID_ARG;
     if (f->pool_count == 0) {
-        *score_out = 1.0;
+        *score_out = 1.0 - 1e-6;
         return GEIF_OK;
     }
 
@@ -228,6 +228,7 @@ static geif_status_t geif_exemplar_score(const geif_forest_t *f,
         double d_norm = (target_range > 1e-12) ? (d_out / target_range) : d_out;
         score = 1.0 - (1.0 - score) * exp(-GEIF_OUTER_DECAY_RATE * d_norm);
     }
+    if (score < 0.0) score = 0.0;
     if (score >= 1.0) score = 1.0 - 1e-6;
 
     if (f->scale_score) {

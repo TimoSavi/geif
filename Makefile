@@ -104,7 +104,13 @@ test: $(STATIC_LIB) $(CLI_BIN)
 	@./test/test_cli_ceif2geif.sh
 	@echo "--- Running Feature 11: Multi-Algorithm POC Suite (-B, --algo) Test ---"
 	@./test/test_cli_algorithms.sh
+	@echo "--- Running Feature 12: Bubble Reference Suite & Benchmark Test ---"
+	@./test/test_ref_bubble.sh
 	@echo "All unit and integration tests passed successfully!"
+
+test-ref: $(STATIC_LIB) $(CLI_BIN)
+	@echo "--- Running Bubble Reference Suite & Benchmark Test ---"
+	@./test/test_ref_bubble.sh
 
 test-prod: $(STATIC_LIB) $(CLI_BIN) $(MIGRATE_BIN)
 	@echo "--- Running End-to-End Production Cron Suite (plan.md) ---"

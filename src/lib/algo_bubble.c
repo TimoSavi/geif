@@ -304,6 +304,7 @@ static geif_status_t geif_bubble_score(const geif_forest_t *f,
         double d_norm = (target_range > 1e-12) ? (d_out_scaled / target_range) : d_out_scaled;
         score = 1.0 - (1.0 - score) * exp(-GEIF_OUTER_DECAY_RATE * d_norm);
     }
+    if (score < 0.0) score = 0.0;
     if (score >= 1.0) score = 1.0 - 1e-6;
 
     if (f->scale_score) {

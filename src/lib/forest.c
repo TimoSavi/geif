@@ -81,6 +81,7 @@ geif_status_t geif_forest_create(geif_forest_t **forest_out,
     }
 
     f->decimals = 6;
+    f->scale_score = true;
 
     if (f->config.seed == 0) {
         srand((unsigned int)(time(NULL) ^ 0x5DEECE66DULL));

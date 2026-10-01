@@ -67,7 +67,7 @@ static void print_usage(const char *prog)
     printf("  -w <file>      Save trained model to JSON file (use '-' for stdout)\n");
     printf("  -r <file>      Load trained model from JSON file (use '-' for stdin)\n");
     printf("  -o <file>      Output file for scores (default: stdout, '-' for stdout)\n");
-    printf("  -O <thresh>    Outlier threshold: float [0..1], 'average', percentage (e.g. '80%%'), or scaled (e.g. '0.65s')\n");
+    printf("  -O <thresh>    Outlier threshold: float [0..1] (scaled by default), 'average', or percentage (e.g. '80%%')\n");
     printf("  -B, --algo <s> Algorithm engine: ceif (default), bubble, exemplar, voronoi\n");
     printf("  -T [margin]    Generate synthetic test grid for population drift visualization (margin: e.g. 0.1)\n");
     printf("  -k             Prune most extreme outlier from model reservoir and recalibrate (repeatable)\n");
@@ -388,7 +388,6 @@ int main(int argc, char *argv[])
     double threshold         = 0.5;
     bool threshold_is_average = false;
     bool threshold_is_percentage = false;
-    bool threshold_is_scaled = false;
     double outlier_percentage = 0.0;
     bool query_mode          = false;
     bool verbose             = false;
@@ -456,21 +455,14 @@ int main(int argc, char *argv[])
             if (strcmp(optarg, "average") == 0) {
                 threshold_is_average = true;
                 threshold_is_percentage = false;
-                threshold_is_scaled = false;
             } else {
                 threshold_is_average = false;
                 size_t olen = strlen(optarg);
                 if (olen > 0 && optarg[olen - 1] == '%') {
                     threshold_is_percentage = true;
-                    threshold_is_scaled = false;
                     outlier_percentage = atof(optarg);
-                } else if (olen > 0 && optarg[olen - 1] == 's') {
-                    threshold_is_percentage = false;
-                    threshold_is_scaled = true;
-                    threshold = atof(optarg);
                 } else {
                     threshold_is_percentage = false;
-                    threshold_is_scaled = false;
                     threshold = atof(optarg);
                 }
             }
@@ -601,21 +593,14 @@ int main(int argc, char *argv[])
         if (strcmp(rc_cfg.outlier_score_spec, "average") == 0) {
             threshold_is_average = true;
             threshold_is_percentage = false;
-            threshold_is_scaled = false;
         } else {
             threshold_is_average = false;
             size_t olen = strlen(rc_cfg.outlier_score_spec);
             if (olen > 0 && rc_cfg.outlier_score_spec[olen - 1] == '%') {
                 threshold_is_percentage = true;
-                threshold_is_scaled = false;
                 outlier_percentage = atof(rc_cfg.outlier_score_spec);
-            } else if (olen > 0 && rc_cfg.outlier_score_spec[olen - 1] == 's') {
-                threshold_is_percentage = false;
-                threshold_is_scaled = true;
-                threshold = atof(rc_cfg.outlier_score_spec);
             } else {
                 threshold_is_percentage = false;
-                threshold_is_scaled = false;
                 threshold = atof(rc_cfg.outlier_score_spec);
             }
         }
@@ -644,37 +629,26 @@ int main(int argc, char *argv[])
             printf("Loaded model from '%s' (%zu sub-forests, %u dimensions)\n",
                    load_file, ensemble->count, ensemble->dimensions);
         }
+        ensemble->scale_score = true;
+        for (size_t i = 0; i < ensemble->count; i++) {
+            if (ensemble->entries[i].forest) ensemble->entries[i].forest->scale_score = true;
+        }
         if (cli_outlier_score_given) {
             strncpy(ensemble->outlier_score_spec, cli_outlier_score_spec, sizeof(ensemble->outlier_score_spec) - 1);
-            ensemble->scale_score = threshold_is_scaled;
-            for (size_t i = 0; i < ensemble->count; i++) {
-                if (ensemble->entries[i].forest) ensemble->entries[i].forest->scale_score = threshold_is_scaled;
-            }
         } else if (ensemble->outlier_score_spec[0] != '\0') {
             if (strcmp(ensemble->outlier_score_spec, "average") == 0) {
                 threshold_is_average = true;
                 threshold_is_percentage = false;
-                threshold_is_scaled = false;
             } else {
                 threshold_is_average = false;
                 size_t olen = strlen(ensemble->outlier_score_spec);
                 if (olen > 0 && ensemble->outlier_score_spec[olen - 1] == '%') {
                     threshold_is_percentage = true;
-                    threshold_is_scaled = false;
                     outlier_percentage = atof(ensemble->outlier_score_spec);
-                } else if (olen > 0 && ensemble->outlier_score_spec[olen - 1] == 's') {
-                    threshold_is_percentage = false;
-                    threshold_is_scaled = true;
-                    threshold = atof(ensemble->outlier_score_spec);
                 } else {
                     threshold_is_percentage = false;
-                    threshold_is_scaled = false;
                     threshold = atof(ensemble->outlier_score_spec);
                 }
-            }
-            ensemble->scale_score = threshold_is_scaled;
-            for (size_t i = 0; i < ensemble->count; i++) {
-                if (ensemble->entries[i].forest) ensemble->entries[i].forest->scale_score = threshold_is_scaled;
             }
         }
         if (threshold_is_percentage) {
@@ -845,7 +819,7 @@ int main(int argc, char *argv[])
         // Save column metadata into ensemble
         ensemble->total_input_cols = total_cols;
         ensemble->decimals = decimals;
-        ensemble->scale_score = threshold_is_scaled;
+        ensemble->scale_score = true;
         if (cli_outlier_score_given) {
             strncpy(ensemble->outlier_score_spec, cli_outlier_score_spec, sizeof(ensemble->outlier_score_spec) - 1);
         }

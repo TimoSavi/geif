@@ -16,6 +16,10 @@
 *.log
 *.geif
 *.ceif
+*.png
+test/plot_*.csv
+test/*.json
+test/dist_bubble.csv
 
 # Editor & OS files
 .DS_Store
