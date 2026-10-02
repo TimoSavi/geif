@@ -40,7 +40,7 @@
 - [C17 Library API](#c17-library-api)
 - [Documentation & Deep Dives](#documentation--deep-dives)
 - [Development & Attribution](#development--attribution)
-- [License](#license)
+- [License & Dataset Attribution](#license--dataset-attribution)
 
 ---
 
@@ -465,8 +465,12 @@ Key architectural components, mathematical models (hyperspherical Bubble trees, 
 
 ---
 
-## License
+## License & Dataset Attribution
 
+### Source Code License
 This project is licensed under the terms of the **GNU General Public License Version 3 (GNU GPLv3)**. See the [LICENSE](file:///home/timo_savinen_elisa_fi/git/geif/LICENSE) file for the full license text.
 
 Copyright (c) 2026 Timo Savinen.
+
+### Test & Benchmark Datasets License
+The benchmark datasets located in [`test/data/`](file:///home/timo_savinen_elisa_fi/git/geif/test/data/README.md) (`winequality-red.csv` and `paddydataset.csv`) are licensed under the **Creative Commons Attribution 4.0 International (CC BY 4.0)** license. See [`test/data/README.md`](file:///home/timo_savinen_elisa_fi/git/geif/test/data/README.md) for full citations and licensing terms.
