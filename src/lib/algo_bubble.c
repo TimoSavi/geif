@@ -151,24 +151,9 @@ static double evaluate_bubble_tree(const geif_forest_t *f,
             double leaf_c = 0.0;
             if (f->avg_sample_dist > 0.0 && node->sample_count > 0 && tree->leaf_samples &&
                 (node->leaf_sample_offset + (size_t)node->sample_count <= tree->leaf_samples_count)) {
-                double min_dist_sq = 1e300;
-                const uint32_t *leaf_s = &tree->leaf_samples[node->leaf_sample_offset];
-                for (int32_t i = 0; i < node->sample_count; i++) {
-                    uint32_t s_idx = leaf_s[i];
-                    if (s_idx < f->pool_count) {
-                        const double *sample = (f->scaled_pool) ? &f->scaled_pool[s_idx * d]
-                                                               : &f->sample_pool[s_idx * d];
-                        double dist_sq = geif_dist_sq(scaled_point, sample, d);
-                        if (dist_sq < min_dist_sq) min_dist_sq = dist_sq;
-                    }
-                }
-                if (min_dist_sq < 1e299) {
-                    double rel_dist = (sqrt(min_dist_sq) / f->avg_sample_dist) + MIN_REL_DIST;
-                    double adjusted_n = (double)node->sample_count / rel_dist;
-                    leaf_c = geif_c(adjusted_n);
-                } else if (node->sample_count > 1) {
-                    leaf_c = geif_c((double)node->sample_count);
-                }
+                double rel_dist = geif_calc_leaf_rel_dist(f, tree, node, scaled_point);
+                double adjusted_n = (double)node->sample_count / rel_dist;
+                leaf_c = geif_c(adjusted_n);
             } else if (node->sample_count > 1) {
                 leaf_c = geif_c((double)node->sample_count);
             }

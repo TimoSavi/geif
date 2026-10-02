@@ -126,6 +126,102 @@ uint32_t append_leaf_samples(geif_tree_t *tree, const uint32_t *samples, size_t 
     return offset;
 }
 
+static inline void max_heap_sift_down(double *heap, uint32_t i, uint32_t n)
+{
+    double val = heap[i];
+    while (1) {
+        uint32_t left = 2 * i + 1;
+        if (left >= n) break;
+        uint32_t right = left + 1;
+        uint32_t largest = (right < n && heap[right] > heap[left]) ? right : left;
+        if (heap[largest] <= val) break;
+        heap[i] = heap[largest];
+        i = largest;
+    }
+    heap[i] = val;
+}
+
+double geif_calc_leaf_rel_dist(const geif_forest_t *f,
+                              const geif_tree_t *tree,
+                              const geif_node_t *node,
+                              const double *scaled_point)
+{
+    if (!f || !tree || !node || node->sample_count <= 0 || !tree->leaf_samples ||
+        f->avg_sample_dist <= 0.0) {
+        return 1.0;
+    }
+
+    uint32_t d = f->dimensions;
+    uint32_t max_nearest = (d < 5) ? (1U << d) : 32U;
+    const uint32_t *leaf_s = &tree->leaf_samples[node->leaf_sample_offset];
+    int32_t n_samples = node->sample_count;
+
+    /* Fast path: if leaf has <= max_nearest samples, all valid samples belong
+       to the nearest bounding set. No heap, buffer tracking, or eviction needed. */
+    if ((uint32_t)n_samples <= max_nearest) {
+        double sum_d = 0.0;
+        uint32_t valid = 0;
+        for (int32_t i = 0; i < n_samples; i++) {
+            uint32_t s_idx = leaf_s[i];
+            if (s_idx < f->pool_count) {
+                const double *sample = (f->scaled_pool) ? &f->scaled_pool[s_idx * d]
+                                                       : &f->sample_pool[s_idx * d];
+                sum_d += geif_dist_sq(scaled_point, sample, d);
+                valid++;
+            }
+        }
+        if (valid == 0) return 1.0;
+        double mean_d = sum_d / (double)valid;
+        return (sqrt(mean_d) / f->avg_sample_dist) + MIN_REL_DIST;
+    }
+
+    /* Heap path: maintain K smallest squared distances using a stack-allocated max-heap */
+    double heap[32];
+    uint32_t filled = 0;
+    int32_t i = 0;
+
+    while (i < n_samples && filled < max_nearest) {
+        uint32_t s_idx = leaf_s[i++];
+        if (s_idx < f->pool_count) {
+            const double *sample = (f->scaled_pool) ? &f->scaled_pool[s_idx * d]
+                                                   : &f->sample_pool[s_idx * d];
+            heap[filled++] = geif_dist_sq(scaled_point, sample, d);
+        }
+    }
+
+    if (filled == 0) return 1.0;
+    if (filled < max_nearest) {
+        double sum_d = 0.0;
+        for (uint32_t j = 0; j < filled; j++) sum_d += heap[j];
+        double mean_d = sum_d / (double)filled;
+        return (sqrt(mean_d) / f->avg_sample_dist) + MIN_REL_DIST;
+    }
+
+    /* Build max-heap */
+    for (int32_t p = (int32_t)(max_nearest >> 1) - 1; p >= 0; p--) {
+        max_heap_sift_down(heap, (uint32_t)p, max_nearest);
+    }
+
+    /* Process remaining samples */
+    for (; i < n_samples; i++) {
+        uint32_t s_idx = leaf_s[i];
+        if (s_idx < f->pool_count) {
+            const double *sample = (f->scaled_pool) ? &f->scaled_pool[s_idx * d]
+                                                   : &f->sample_pool[s_idx * d];
+            double dsq = geif_dist_sq(scaled_point, sample, d);
+            if (dsq < heap[0]) {
+                heap[0] = dsq;
+                max_heap_sift_down(heap, 0, max_nearest);
+            }
+        }
+    }
+
+    double sum_d = 0.0;
+    for (uint32_t j = 0; j < max_nearest; j++) sum_d += heap[j];
+    double mean_d = sum_d / (double)max_nearest;
+    return (sqrt(mean_d) / f->avg_sample_dist) + MIN_REL_DIST;
+}
+
 double evaluate_tree(const geif_forest_t *f,
                     const geif_tree_t *tree,
                     const double *scaled_point)
@@ -146,26 +242,9 @@ double evaluate_tree(const geif_forest_t *f,
             double leaf_c = 0.0;
             if (f->avg_sample_dist > 0.0 && node->sample_count > 0 && tree->leaf_samples &&
                 (node->leaf_sample_offset + (size_t)node->sample_count <= tree->leaf_samples_count)) {
-                double min_dist_sq = 1e300;
-                const uint32_t *leaf_s = &tree->leaf_samples[node->leaf_sample_offset];
-                for (int32_t i = 0; i < node->sample_count; i++) {
-                    uint32_t s_idx = leaf_s[i];
-                    if (s_idx < f->pool_count) {
-                        const double *sample = (f->scaled_pool) ? &f->scaled_pool[s_idx * d]
-                                                               : &f->sample_pool[s_idx * d];
-                        double dist_sq = geif_dist_sq(scaled_point, sample, d);
-                        if (dist_sq < min_dist_sq) {
-                            min_dist_sq = dist_sq;
-                        }
-                    }
-                }
-                if (min_dist_sq < 1e299) {
-                    double rel_dist = (sqrt(min_dist_sq) / f->avg_sample_dist) + MIN_REL_DIST;
-                    double adjusted_n = (double)node->sample_count / rel_dist;
-                    leaf_c = geif_c(adjusted_n);
-                } else if (node->sample_count > 1) {
-                    leaf_c = geif_c((double)node->sample_count);
-                }
+                double rel_dist = geif_calc_leaf_rel_dist(f, tree, node, scaled_point);
+                double adjusted_n = (double)node->sample_count / rel_dist;
+                leaf_c = geif_c(adjusted_n);
             } else if (node->sample_count > 1) {
                 leaf_c = geif_c((double)node->sample_count);
             }

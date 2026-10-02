@@ -18,6 +18,11 @@ int32_t allocate_node(geif_tree_t *tree);
 uint32_t append_normal(geif_tree_t *tree, const double *normal, uint32_t d);
 uint32_t append_leaf_samples(geif_tree_t *tree, const uint32_t *samples, size_t count);
 
+double geif_calc_leaf_rel_dist(const geif_forest_t *f,
+                              const geif_tree_t *tree,
+                              const geif_node_t *node,
+                              const double *scaled_point);
+
 double evaluate_tree(const geif_forest_t *f,
                     const geif_tree_t *tree,
                     const double *scaled_point);
