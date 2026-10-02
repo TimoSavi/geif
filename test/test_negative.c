@@ -127,6 +127,7 @@ int main(void)
     // -------------------------------------------------------------------------
     printf("\nTest 4: Full Forest Training on Negative Gaussian Cluster...\n");
     geif_config_t cfg = geif_config_default();
+    cfg.algo = GEIF_ALGO_CEIF;
     cfg.tree_count = 50;
     cfg.samples_per_tree = 128;
 

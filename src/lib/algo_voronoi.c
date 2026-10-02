@@ -10,6 +10,21 @@
 #include <string.h>
 #include <math.h>
 
+/**
+ * @brief Recursively builds a Voronoi perpendicular bisector tree node.
+ *
+ * Randomly samples pairs of distinct observations from the node subset,
+ * computes their perpendicular bisector hyperplane (n = (B - A) / ||B - A||,
+ * p = (A + B) / 2), and partitions points based on the dot product sign.
+ *
+ * @param f         Pointer to the forest.
+ * @param tree      Pointer to the tree being built.
+ * @param indices   Subarray of sample pool indices for this node.
+ * @param count     Number of samples in indices.
+ * @param depth     Current tree depth from root.
+ * @param max_depth Maximum allowable tree depth.
+ * @return Allocated node index, or -1 on error.
+ */
 static int32_t build_voronoi_node(geif_forest_t *f,
                                  geif_tree_t *tree,
                                  uint32_t *indices,
@@ -154,6 +169,15 @@ static int32_t build_voronoi_node(geif_forest_t *f,
     return node_idx;
 }
 
+/**
+ * @brief Trains an ensemble of Voronoi perpendicular bisector trees.
+ *
+ * Subsamples observations per tree and constructs binary trees using pure
+ * midpoint perpendicular bisector cuts.
+ *
+ * @param f Pointer to the forest instance.
+ * @return GEIF_OK on success, or error status.
+ */
 static geif_status_t geif_voronoi_train(geif_forest_t *f)
 {
     if (!f || f->pool_count == 0) return GEIF_ERR_EMPTY_DATASET;
@@ -203,6 +227,16 @@ static geif_status_t geif_voronoi_train(geif_forest_t *f)
     return GEIF_OK;
 }
 
+/**
+ * @brief Evaluates calibrated anomaly score using the Voronoi bisector ensemble.
+ *
+ * @param[in]  f               Pointer to the forest.
+ * @param[in]  point           Raw unscaled observation vector.
+ * @param[out] score_out       Pointer to receive calibrated anomaly score.
+ * @param[out] metric_depth_out Optional pointer to receive average depth H_avg.
+ * @param[out] d_out_out       Optional pointer to receive outer distance d_out.
+ * @return GEIF_OK on success, or error status.
+ */
 static geif_status_t geif_voronoi_score(const geif_forest_t *f,
                                       const double *point,
                                       double *score_out,

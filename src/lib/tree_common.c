@@ -349,7 +349,7 @@ geif_status_t geif_tree_score_point(const geif_forest_t *f,
     // Standard Isolation Forest score s = 1.0 / 2^(H / c)
     double score = 1.0 / pow(2.0, H_final / c_psi);
 
-    // Outer space exponential attenuation from CEIF
+    // Outer space exponential attenuation: asymptotic convergence towards 1.0 without boundary wall
     if (d_out > 0.0) {
         double target_range = (f->scale_range_idx >= 0 && f->envelope_span) ? f->envelope_span[f->scale_range_idx] : 1.0;
         double d_norm = (target_range > 1e-12) ? (d_out / target_range) : d_out;

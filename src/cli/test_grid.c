@@ -12,17 +12,118 @@
 
 #define MAX_GRID_RESERVOIR_SAMPLES 10240
 
-static bool cat_matches(const cat_filter_t *filter, const char *cat_name)
+/**
+ * @brief Adds a regex pattern to the category filter list.
+ *
+ * Supports `-v <regex>` prefix for inverting matches (keep only matches).
+ * Matching categories are filtered out by default.
+ *
+ * @param cf  Pointer to the category filter structure.
+ * @param arg Command-line argument string containing regex pattern.
+ * @return true on successful regex compilation, false on error.
+ */
+bool geif_cat_filter_add(cat_filter_t *cf, const char *arg)
 {
-    if (!filter || !filter->active) return true;
-    int reg_res = regexec(&filter->regex, cat_name ? cat_name : "", 0, NULL, 0);
-    if (!filter->invert) {
-        return (reg_res == 0);
-    } else {
-        return (reg_res != 0);
+    if (!cf || !arg) return false;
+    if (cf->count >= GEIF_MAX_CAT_FILTERS) {
+        fprintf(stderr, "geif: error: maximum category filter count (%d) exceeded\n", GEIF_MAX_CAT_FILTERS);
+        return false;
     }
+
+    const char *p = arg;
+    while (*p == ' ' || *p == '\t') p++;
+
+    bool invert = false;
+    if (strncmp(p, "-v", 2) == 0 && (p[2] == ' ' || p[2] == '\t' || p[2] == '\0')) {
+        invert = true;
+        p += 2;
+        while (*p == ' ' || *p == '\t') p++;
+    }
+
+    geif_cat_filter_entry_t *entry = &cf->entries[cf->count];
+    memset(entry, 0, sizeof(*entry));
+    entry->invert = invert;
+
+    int rc = regcomp(&entry->regex, p, REG_EXTENDED | REG_NOSUB);
+    if (rc != 0) {
+        char errbuf[256];
+        regerror(rc, &entry->regex, errbuf, sizeof(errbuf));
+        fprintf(stderr, "geif: error: invalid category regex '%s': %s\n", p, errbuf);
+        return false;
+    }
+    entry->compiled = true;
+    cf->count++;
+    cf->active = true;
+    return true;
 }
 
+/**
+ * @brief Checks if a category string is permitted by active regex filters.
+ *
+ * @param cf       Pointer to filter structure (NULL or inactive allows all).
+ * @param category Category name string to test.
+ * @return true if category should be processed, false if filtered out.
+ */
+bool geif_cat_filter_allows(const cat_filter_t *cf, const char *category)
+{
+    if (!cf || !cf->active || cf->count == 0) return true;
+    const char *cat = category ? category : "";
+    if (cat[0] == '\0') return true;
+
+    for (size_t i = 0; i < cf->count; i++) {
+        int rc = regexec(&cf->entries[i].regex, cat, 0, NULL, 0);
+        bool matches = (rc == 0);
+        if (!cf->entries[i].invert) {
+            // Standard filter: matching categories are FILTERED OUT
+            if (matches) return false;
+        } else {
+            // Inverted filter (-v): non-matching categories are FILTERED OUT
+            if (!matches) return false;
+        }
+    }
+    return true;
+}
+
+/**
+ * @brief Releases compiled regex resources in a category filter.
+ *
+ * @param cf Pointer to category filter structure.
+ */
+void geif_cat_filter_free(cat_filter_t *cf)
+{
+    if (!cf) return;
+    for (size_t i = 0; i < cf->count; i++) {
+        if (cf->entries[i].compiled) {
+            regfree(&cf->entries[i].regex);
+            cf->entries[i].compiled = false;
+        }
+    }
+    cf->count = 0;
+    cf->active = false;
+}
+
+/**
+ * @brief Synthesizes an N-dimensional uniform test grid across sample bounds.
+ *
+ * Evaluates anomaly scores over an odometer-stepped coordinate lattice to
+ * visualize decision manifolds, population drift, and cluster contours.
+ *
+ * @param ens                    Trained ensemble containing sub-forests.
+ * @param test_extension_factor  Margin expansion factor outside bounding box (e.g. 0.1).
+ * @param test_sample_interval   Number of grid steps along each dimension.
+ * @param filter                 Optional category regex filter.
+ * @param threshold              Anomaly score cutoff.
+ * @param threshold_is_average   Whether threshold is locked to ensemble mean.
+ * @param threshold_is_percentage Whether threshold is locked to sample percentile.
+ * @param point_tmpl             Output template string for each grid point.
+ * @param decimals               Floating point output decimal precision.
+ * @param list_sep               Field separator character.
+ * @param low_rgb                Hex RGB color for inliers (score 0).
+ * @param high_rgb               Hex RGB color for anomalies (score 1).
+ * @param printf_format          Format string for coordinates.
+ * @param print_dimension        Dimension filter pattern.
+ * @param out_fp                 Destination file stream.
+ */
 void geif_generate_test_grid(const geif_ensemble_t *ens,
                              double test_extension_factor,
                              int test_sample_interval,
@@ -43,7 +144,7 @@ void geif_generate_test_grid(const geif_ensemble_t *ens,
 
     for (size_t c = 0; c < ens->count; c++) {
         const char *cat_name = ens->entries[c].category;
-        if (!cat_matches(filter, cat_name)) continue;
+        if (!geif_cat_filter_allows(filter, cat_name)) continue;
 
         geif_forest_t *f = ens->entries[c].forest;
         if (!f || f->dimensions == 0) continue;

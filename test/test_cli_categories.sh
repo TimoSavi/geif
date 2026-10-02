@@ -83,4 +83,51 @@ echo "$CL_SUMMARY" | grep "Category Columns (-C): 12"
 echo "$CL_SUMMARY" | grep "Label Columns (-L):  1"
 echo "  [PASS] Combined -C 12 and -L 1 correctly resolved to 10 features across 6 sub-forests."
 
+# Test 8: Categorization mode (-c) with 100 circles benchmark dataset
+CIRCLES_TXT="/home/timo_savinen_elisa_fi/docs/tools/geif/prod_plan/circles.txt"
+if [ -f "$CIRCLES_TXT" ]; then
+    echo "Test 8: Categorization mode (-c) on 100 circles dataset..."
+    $BIN -l "$CIRCLES_TXT" -H -C 3 -w "$TMP_DIR/model_circles.json" -t 50 -s 64
+    
+    # Categorize first 50 rows of circles.txt
+    head -n 51 "$CIRCLES_TXT" > "$TMP_DIR/circles_sample.txt"
+    $BIN -r "$TMP_DIR/model_circles.json" -c "$TMP_DIR/circles_sample.txt" -H -p "%c,%C" > "$TMP_DIR/circles_cat_out.csv"
+    
+    # Verify accurate categorization (actual == predicted)
+    ACCURACY=$(awk -F',' '{total++; if ($1==$2) correct++} END {printf "%d/%d", correct, total}' "$TMP_DIR/circles_cat_out.csv")
+    if [ "$ACCURACY" != "50/50" ]; then
+        echo "  [FAIL] Expected 50/50 accurate predictions, got $ACCURACY"
+        exit 1
+    fi
+    echo "  [PASS] Categorization achieved $ACCURACY (100%) accuracy on test sample."
+
+    # Verify outlier suppression (-O 0.4) during categorization
+    $BIN -r "$TMP_DIR/model_circles.json" -c "$TMP_DIR/circles_sample.txt" -H -F "-v ^(6|11)$" -O 0.4 -p "%r: %c->%C (%s)" > "$TMP_DIR/circles_thresh_out.csv"
+    SUPPRESSED_LINES=$(wc -l < "$TMP_DIR/circles_thresh_out.csv")
+    # Rows not matching 6 or 11 will have score > 0.4 and be suppressed
+    if [ "$SUPPRESSED_LINES" -lt 1 ] || [ "$SUPPRESSED_LINES" -gt 10 ]; then
+        echo "  [FAIL] Unexpected line count for outlier suppression: $SUPPRESSED_LINES"
+        exit 1
+    fi
+    echo "  [PASS] Outlier suppression with -O 0.4 correctly filtered distant categories ($SUPPRESSED_LINES rows retained)."
+
+    # Test 9: Multi-filter (-F) exclusion and inverted retention
+    echo "Test 9: Multi-filter (-F) testing..."
+    # Exclude categories 6 and 11
+    $BIN -r "$TMP_DIR/model_circles.json" -c "$TMP_DIR/circles_sample.txt" -H -F "^6$" -F "^11$" -p "%C" > "$TMP_DIR/circles_multi_f.csv"
+    if grep -q -E "^(6|11)$" "$TMP_DIR/circles_multi_f.csv"; then
+        echo "  [FAIL] Categories 6 or 11 found despite -F exclusions!"
+        exit 1
+    fi
+    echo "  [PASS] Multiple -F flags correctly excluded categories 6 and 11."
+
+    # Inverted filter: keep only 6 and 11
+    $BIN -r "$TMP_DIR/model_circles.json" -c "$TMP_DIR/circles_sample.txt" -H -F "-v ^(6|11)$" -p "%C" > "$TMP_DIR/circles_inv_f.csv"
+    if grep -v -E "^(6|11)$" "$TMP_DIR/circles_inv_f.csv" | grep -q "[0-9]"; then
+        echo "  [FAIL] Non-(6|11) categories found with inverted filter -F '-v ^(6|11)$'!"
+        exit 1
+    fi
+    echo "  [PASS] Inverted filter -F '-v ^(6|11)$' retained exclusively categories 6 and 11."
+fi
+
 echo ">>> ALL FEATURE 3 TESTS PASSED SUCCESSFULLY! <<<"

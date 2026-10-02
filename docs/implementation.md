@@ -1,375 +1,332 @@
-# GEIF: Implementation Architecture & Modern C CLI Engineering Guide
+# GEIF: Implementation Architecture & Modern C17 Engineering Guide
 
 **Author / Maintainer:** Timo Savinen (AI-assisted)
 
-## 1. Engineering Philosophy: Modern C CLI Best Practices
+## 1. Engineering Philosophy: Modern C17 Architecture
 
-While GEIF builds upon the proven domain concepts of `ceif` (streaming CSV, online reservoir updates, vector anomaly scoring), its codebase is designed from the ground up following **modern C standards and CLI best practices**, rather than inheriting legacy C89/C99 idioms or monolithic tool structures.
-
-### 1.1 Core Principles of Modern C Architecture in GEIF
+GEIF is built upon modern ISO C17 standards and UNIX CLI design principles. The codebase cleanly decouples a standalone core library (`libgeif`) from the command-line interface (`bin/geif`), ensuring that the algorithmic core contains zero process exits, relies on explicit type discipline, and executes zero-allocation inference loops.
 
 ```
                      +---------------------------------------+
                      |         geif CLI (Frontend)          |
                      |  - POSIX / GNU options (getopt_long)  |
                      |  - Stdin/Stdout stream piping         |
-                     |  - NO_COLOR / isatty() diagnostics    |
-                     |  - sysexits exit codes                |
+                     |  - Output templating (%s, %m, %d)     |
+                     |  - Cascading RC file parser (~/.geifrc)|
                      +---------------------------------------+
-                                         │
-                             Calls Public C17 API
-                                         ▼
+                                          │
+                              Calls Public C17 API
+                                          ▼
                      +---------------------------------------+
                      |          libgeif (Core Engine)        |
                      |  - Zero exit() calls                  |
                      |  - Typed geif_status_t error codes    |
-                     |  - Pure Data-Oriented Memory layout   |
-                     |  - SIMD / AVX2 vector primitives      |
-                     |  - Zero-allocation inference loop     |
+                     |  - Modular algo vtable (algo_ops_t)   |
+                     |  - Zero Kelvin calibration engine     |
+                     |  - In-place quickselect partitioning  |
+                     |  - Sparse JSON serialization          |
                      +---------------------------------------+
 ```
 
-| Dimension | Legacy C Style (e.g. classic `ceif`) | Modern C Best Practice (GEIF) |
-|---|---|---|
-| **Language Standard** | Implicit C89/C99, platform-dependent | **Strict ISO C17** (`-std=c17 -Wall -Wextra -Wpedantic`) |
-| **Type Discipline** | Naked `int`, `long`, `char *` | Explicit `<stdint.h>` (`int32_t`, `size_t`), `<stdbool.h>` (`bool`) |
-| **Const Correctness** | Mutable pointers everywhere | Strict `const` everywhere (`const double * restrict`) |
-| **Error Handling** | Calls `exit(1)` or prints inside library | **Typed status enums** (`geif_status_t`); zero `exit()` in core |
-| **Separation of Concerns** | Monolithic CLI + library mingled | **Clean library (`libgeif`)** decoupled from **CLI (`geif`)** |
-| **Memory Allocation** | Fragmented `malloc` per node/vector | **Data-Oriented Contiguous Buffers (Arena / SoA)** |
-| **I/O & Streams** | Direct file descriptor juggling | UNIX pipeline-first: stdin (`-`), stdout, stderr separated |
-| **Diagnostics & UX** | Hardcoded terminal colors | `isatty()` detection, strict `NO_COLOR` compliance |
-| **Build System** | Autotools (`configure.ac`, `Makefile.am`) | **Modern CMake (>= 3.20)** + `compile_commands.json` |
+| Architectural Aspect | Modern C17 Implementation in GEIF |
+|---|---|
+| **Language Standard** | **Strict ISO C17** (`-std=c17 -Wall -Wextra -Wpedantic -O3 -march=native`) |
+| **Type Discipline** | Explicit `<stdint.h>` (`uint32_t`, `size_t`), `<stdbool.h>` (`bool`) |
+| **Const Correctness** | Strict `const` qualifiers for immutable buffers (`const double *x`) |
+| **Error Handling** | Typed enum return codes (`geif_status_t`); zero `exit()` in core library |
+| **Pluggable Algorithms** | Clean virtual function table interface (`geif_algo_ops_t`) |
+| **Memory Allocation** | Tree nodes allocated once; in-place array partitioning during training |
+| **I/O & Streaming** | UNIX pipeline-first: stdin (`-`), stdout (`-`), and stderr separated |
+| **Configuration** | Cascaded RC parser supporting `~/.geifrc`, `~/.ceifrc`, and `-g <file>` |
+| **Model Persistence** | Standard sparse JSON via `json-c` (pool-only persistence, fast rebuild) |
 
 ---
 
-## 2. Modern Repository & Directory Layout
+## 2. Repository & Source Code Structure
 
 ```text
-geif/
-├── CMakeLists.txt             # Modern CMake build definition (targets, sanitizers)
+git/geif/
+├── Makefile                   # C17 build targets (all, lib, bin, test, install)
 ├── include/
 │   └── geif/
-│       ├── geif.h             # Public C17 API for libgeif (clean, stable)
-│       ├── types.h            # Fixed-width types, error enums, and structures
-│       └── version.h          # Semantic versioning macros
+│       ├── geif.h             # Public C17 API header
+│       ├── types.h            # Forest structs, enum types, error codes
+│       └── error.h            # Error code definitions and status macros
 ├── src/
-│   ├── lib/                   # libgeif: Pure, standalone algorithm library
-│   │   ├── forest.c           # Forest lifecycle, memory allocation, and bounds
-│   │   ├── learn.c            # Voronoi bisector generator and recursive partitioning
-│   │   ├── analyze.c          # Metric continuous depth walk and score evaluation
-│   │   ├── serialize.c        # Versioned binary persistence and validation
-│   │   ├── simd_math.h        # Vector dot products (AVX2/NEON/compiler autovec)
-│   │   └── arena.c / .h       # Contiguous node/vector arena allocator
-│   └── cli/                   # geif CLI: Command-line frontend
-│       ├── main.c             # Argument parsing, mode dispatch, and exit codes
-│       ├── csv_stream.c / .h  # High-throughput streaming CSV parser
-│       ├── term_ui.c / .h     # Terminal progress, colors, and NO_COLOR detection
-│       └── json_emitter.c     # Formatted JSON output stream
-├── test/
-│   ├── unit/                  # Fast ctest unit tests (math, splits, memory)
-│   ├── integration/           # CLI end-to-end piping tests
-│   └── data/
-│       ├── complex2d.csv      # Topological cavity benchmark
-│       └── 2blob.csv          # Standard Gaussian benchmark
+│   ├── lib/                   # libgeif: Core algorithmic engine
+│   │   ├── algo.h             # Pluggable algorithm vtable interface
+│   │   ├── algo_registry.c    # Algorithm factory and lookup registry
+│   │   ├── algo_bubble.c      # Hyperspherical Bubble tree engine (default)
+│   │   ├── algo_voronoi.c     # Voronoi perpendicular bisector tree engine
+│   │   ├── algo_exemplar.c    # Exemplar kernel density estimation engine
+│   │   ├── algo_ceif.c        # Continuous hyperplane isolation engine
+│   │   ├── tree_common.c / .h # Shared tree traversal, Zero Kelvin, nearest nodes
+│   │   ├── forest.c           # Forest lifecycle, span calculation, health masking
+│   │   ├── ensemble.c         # Multi-category routing, sub-forest ensemble
+│   │   ├── evaluate.c         # Score evaluation, thresholding, percentile ranking
+│   │   ├── reservoir.c        # Algorithm R streaming reservoir sampling pool
+│   │   ├── json_io.c          # Sparse JSON model serializer and parser
+│   │   ├── geometry.h         # Vector dot products, Euclidean metrics
+│   │   └── error.c            # Error string translation (geif_status_str)
+│   ├── cli/                   # bin/geif: Command-line interface
+│   │   ├── main.c             # CLI option parsing, stream loops, exit codes
+│   │   ├── template.c / .h    # Dynamic format templating (%s, %m, %d, %rgb)
+│   │   ├── columns.c / .h     # Column range selector (-I, -U, -L, -C)
+│   │   ├── test_grid.c / .h   # Population drift synthetic grid generator (-T)
+│   │   └── rcfile.c / .h      # Cascading configuration file parser (-g)
+│   └── tools/
+│       └── ceif2geif.c        # Model migration utility for legacy formats
+├── test/                      # Comprehensive integration test suites
+│   ├── test_cli_algorithms.sh # Multi-algorithm engine test suite
+│   ├── test_cli_categories.sh # Multi-category routing and filtering test
+│   ├── test_cli_grid.sh       # Population drift test grid verification
+│   ├── test_cli_rcfile.sh     # RC configuration file parser test
+│   └── test_ref_bubble.sh     # Bubble reference benchmark suite
 └── docs/                      # Technical documentation
-    ├── algorithm.md           # Formal mathematical specification
-    └── implementation.md      # Engineering architecture (this document)
+    ├── algorithm.md           # Algorithmic and mathematical specification
+    ├── implementation.md      # Implementation architecture (this document)
+    ├── heatmaps.md            # Topological heatmaps and empirical scores
+    ├── manual.md              # CLI options and usage manual
+    └── build.md               # Build requirements and compilation instructions
 ```
 
 ---
 
-## 3. Modern Type Definitions & Data Structures (`include/geif/types.h`)
+## 3. Pluggable Algorithm Interface (`geif_algo_ops_t`)
 
-### 3.1 Strict Typed Error Statuses
-
-A core modern best practice is that **libraries must never abort or exit the calling process**:
+All spatial isolation algorithms in GEIF implement a common virtual method table defined in `src/lib/algo.h`:
 
 ```c
-typedef enum geif_status {
-    GEIF_OK                  =  0,
-    GEIF_ERR_INVALID_PARAM   = -1,
-    GEIF_ERR_OUT_OF_MEMORY   = -2,
-    GEIF_ERR_IO              = -3,
-    GEIF_ERR_FORMAT_CORRUPT  = -4,
-    GEIF_ERR_EMPTY_DATASET   = -5,
-    GEIF_ERR_DIM_MISMATCH    = -6
-} geif_status_t;
-
-// Utility for human-readable error diagnostics
-const char *geif_status_str(geif_status_t status);
+typedef struct geif_algo_ops {
+    const char *name;
+    const char *description;
+    
+    // Train an individual tree or populate model exemplars
+    geif_status_t (*train_tree)(geif_forest_t *forest, size_t tree_idx,
+                                const double *data, size_t n_rows,
+                                size_t dim, uint32_t seed);
+                                
+    // Evaluate continuous metric depth or raw anomaly score for a point
+    double (*evaluate_sample)(const geif_forest_t *forest, size_t tree_idx,
+                              const double *x, size_t dim);
+                              
+    // Optional per-tree destructor
+    void (*free_tree)(geif_forest_t *forest, size_t tree_idx);
+} geif_algo_ops_t;
 ```
+
+This interface decouples space partitioning geometry from forest management, streaming ingestion, scoring calibration, and JSON I/O.
 
 ---
 
-### 3.2 Data-Oriented Contiguous Memory Layout
+## 4. Short Implementation of Common Foundational Methods
 
-In classic implementations, allocating `double *n` separately for every node causes thousands of tiny heap allocations, cache line misses, and pointer chasing during tree traversal.
-
-**GEIF Modern Design**: Flatten node memory into contiguous arrays. Normal vectors are stored in a single contiguous pool per tree:
-
-```c
-// Compact 64-byte cache-aligned node structure
-typedef struct geif_node {
-    int32_t  left_child;        // Index in tree's node array (-1 if leaf)
-    int32_t  right_child;       // Index in tree's node array (-1 if leaf)
-    uint32_t normal_offset;     // Offset into tree's contiguous normals pool: &normals[offset]
-    double   pdotn;             // Precomputed scalar threshold: dot((A+B)/2, n)
-    double   step_weight;       // Continuous metric increment: delta_H
-    double   d_AB;              // Generator separation distance: ||B - A||
-    int32_t  sample_count;      // Samples in leaf (leaf only)
-    double   leaf_residual;     // Residual leaf weight (leaf only)
-} geif_node_t;
-
-typedef struct geif_tree {
-    geif_node_t *nodes;         // Contiguous array of nodes
-    size_t       node_count;    // Total nodes in this tree
-    double      *normals_pool;  // Contiguous buffer: [node_count * dimensions]
-    double       max_path_depth;// Longest path in this tree
-} geif_tree_t;
-
-typedef struct geif_forest {
-    uint32_t     dimensions;    // Feature count
-    uint32_t     tree_count;    // Number of trees (e.g. 200)
-    geif_tree_t *trees;         // Array of trees
-    
-    // Initial surrounding outer envelope
-    double      *envelope_min;  // Array of size [dimensions]
-    double      *envelope_max;  // Array of size [dimensions]
-    
-    // Universal geometric scale
-    double       H_max;         // Forest-wide maximum depth (score = 1.0 - H / H_max)
-    
-    // Category string for multi-category classification (-c)
-    char         category[64];
-} geif_forest_t;
-```
-
-#### Cache Benefits:
-- Traversal walks through `nodes[node_idx]` with maximum spatial locality.
-- Normal vectors reside in a linear array `normals_pool`, streaming directly into CPU L1/L2 data cache.
-
----
-
-## 4. Modern Library Core Implementation (`src/lib/`)
-
-### 4.1 SIMD-Vectorized Bisector Decision
-
-Modern C compilers (GCC and Clang) vectorize contiguous loops automatically when supplied with `restrict` pointers and `#pragma GCC ivdep`:
+### 4.1 Zero Kelvin Scale Calibration (`tree_common.c`)
+During forest initialization, `geif_tree_calc_deepest_path()` traverses each tree to find its theoretical maximum metric depth. The universal maximum depth $H_{\text{max}}$ is then calibrated:
 
 ```c
-static inline double geif_dot(const double * restrict a,
-                              const double * restrict b,
-                              size_t dim)
-{
-    double sum = 0.0;
-    #pragma GCC ivdep
-    for (size_t j = 0; j < dim; ++j) {
-        sum += a[j] * b[j];
+double geif_tree_calc_deepest_path(const geif_node_t *node, double current_depth) {
+    if (!node) return current_depth;
+    if (node->is_leaf) return current_depth + node->leaf_depth;
+    
+    double d_left  = geif_tree_calc_deepest_path(node->left,  current_depth + 1.0);
+    double d_right = geif_tree_calc_deepest_path(node->right, current_depth + 1.0);
+    return (d_left > d_right) ? d_left : d_right;
+}
+
+void geif_forest_calibrate_zero_kelvin(geif_forest_t *forest) {
+    double sum_deepest = 0.0;
+    for (size_t t = 0; t < forest->tree_count; t++) {
+        sum_deepest += geif_tree_calc_deepest_path(forest->trees[t].root, 0.0);
     }
-    return sum;
+    double h_train_max = sum_deepest / (double)forest->tree_count;
+    forest->h_max = 1.15 * h_train_max;  // Calibrated scale factor
+    forest->s_min = exp(-forest->h_max / forest->c_factor);
+    forest->s_max = 1.0;
 }
 ```
 
-### 4.2 Zero-Allocation Inference (`analyze.c`)
-
-The evaluation function guarantees **zero heap allocations**:
+### 4.2 Non-Reachable 1.0 & Stadium Metric (`tree_common.c`, `evaluate.c`)
+Outer space distance is computed as the normalized Euclidean excursion outside the forest bounding envelope, smoothly attenuating the score asymptotically towards 1.0:
 
 ```c
-geif_status_t geif_evaluate(const geif_forest_t * restrict forest,
-                            const double * restrict x,
-                            double * restrict out_score)
-{
-    if (!forest || !x || !out_score) {
-        return GEIF_ERR_INVALID_PARAM;
+double geif_eval_outer_stadium_decay(double base_score, double d_out) {
+    if (d_out <= 0.0) return base_score;
+    // Asymptotic exponential convergence towards 1.0
+    return 1.0 - (1.0 - base_score) * exp(-0.10 * d_out);
+}
+```
+
+### 4.3 Nearest Bounding-Box Calculation (`tree_common.c`)
+When evaluating hollow cavities or leaf residual density, distance to the bounding box corners of the leaf node is computed in normalized coordinate space:
+
+```c
+double geif_calc_leaf_relative_dist(const double *x, const double *bounds_min,
+                                    const double *bounds_max, const double *spans,
+                                    size_t dim) {
+    double sum_sq = 0.0;
+    for (size_t j = 0; j < dim; j++) {
+        double span = (spans && spans[j] > 1e-9) ? spans[j] : 1.0;
+        double diff = 0.0;
+        if (x[j] < bounds_min[j]) diff = (bounds_min[j] - x[j]) / span;
+        else if (x[j] > bounds_max[j]) diff = (x[j] - bounds_max[j]) / span;
+        sum_sq += diff * diff;
     }
+    return sqrt(sum_sq);
+}
+```
 
-    const size_t dim = forest->dimensions;
+### 4.4 Dimension Regularization & Health Masking (`forest.c`)
+Before training, dimension spans are measured across all input coordinates. If $\text{span}_j \le 10^{-9}$, it is flagged as constant:
 
-    // 1. Initial surrounding outer envelope check: O(D)
-    for (size_t j = 0; j < dim; ++j) {
-        if (x[j] < forest->envelope_min[j] || x[j] > forest->envelope_max[j]) {
-            *out_score = 1.000000;
-            return GEIF_OK;
+```c
+void geif_forest_update_bounds(geif_forest_t *forest, const double *data, size_t n_rows) {
+    for (size_t j = 0; j < forest->dim; j++) {
+        double min_v = data[j], max_v = data[j];
+        for (size_t i = 1; i < n_rows; i++) {
+            double v = data[i * forest->dim + j];
+            if (v < min_v) min_v = v;
+            if (v > max_v) max_v = v;
+        }
+        forest->bounds_min[j] = min_v;
+        forest->bounds_max[j] = max_v;
+        double span = max_v - min_v;
+        if (span <= 1e-9) {
+            forest->spans[j] = 1.0;
+            forest->dim_weights[j] = 0.0; // Health mask: zero weight
+        } else {
+            forest->spans[j] = span;
+            forest->dim_weights[j] = 1.0;
         }
     }
-
-    // 2. Ensemble traversal
-    double total_metric_depth = 0.0;
-    const uint32_t t_count = forest->tree_count;
-
-    for (uint32_t t = 0; t < t_count; ++t) {
-        const geif_tree_t *tree = &forest->trees[t];
-        int32_t curr = 0; // Root is always at index 0
-        double tree_depth = 0.0;
-
-        while (true) {
-            const geif_node_t *node = &tree->nodes[curr];
-            if (node->left_child == -1 && node->right_child == -1) {
-                tree_depth += node->leaf_residual;
-                break;
-            }
-
-            tree_depth += node->step_weight;
-            const double *n = &tree->normals_pool[node->normal_offset];
-
-            if (geif_dot(x, n, dim) < node->pdotn) {
-                curr = node->left_child;
-            } else {
-                curr = node->right_child;
-            }
-        }
-        total_metric_depth += tree_depth;
-    }
-
-    // 3. Normalized score computation (Zero Kelvin Principle)
-    const double H_avg = total_metric_depth / (double)t_count;
-    double score = 1.0 - (H_avg / forest->H_max);
-
-    // Natural structural invariant guarantees score > 0.0 and score <= 1.0
-    if (score < 0.0) score = 0.0;
-    else if (score > 1.0) score = 1.0;
-
-    *out_score = score;
-    return GEIF_OK;
-}
-
-### 4.3 Structural H_max Computation (The Zero Kelvin Principle)
-
-In accordance with the Zero Kelvin Principle, $H_{\max}$ is derived purely and deterministically from tree topology at the end of training. No sample sweeps or test queries are needed:
-
-```c
-static double compute_tree_max_depth(const geif_tree_t *tree, int32_t node_idx, double current_depth)
-{
-    const geif_node_t *node = &tree->nodes[node_idx];
-    if (node->left_child == -1 && node->right_child == -1) {
-        return current_depth + node->leaf_residual;
-    }
-    double d_step = current_depth + node->step_weight;
-    double left_max  = compute_tree_max_depth(tree, node->left_child, d_step);
-    double right_max = compute_tree_max_depth(tree, node->right_child, d_step);
-    return (left_max > right_max) ? left_max : right_max;
-}
-
-void geif_forest_finalize_hmax(geif_forest_t *forest)
-{
-    double total_leaf_max = 0.0;
-    for (uint32_t t = 0; t < forest->tree_count; ++t) {
-        total_leaf_max += compute_tree_max_depth(&forest->trees[t], 0, 0.0);
-    }
-    forest->H_max = total_leaf_max / (double)forest->tree_count;
 }
 ```
 
 ---
 
-## 5. Modern CLI Frontend Best Practices (`src/cli/`)
+## 5. Implementation of Algorithm Engines
 
-### 5.1 Clean Separation of Data and Diagnostics
-Following the UNIX philosophy:
-- **`stdout`**: Strictly reserved for processed data (CSV, JSON, scores). Can be cleanly piped to `awk`, `cut`, or downstream services.
-- **`stderr`**: Progress bars, summary statistics, warnings, and error messages.
-
-### 5.2 Terminal Color Discipline (NO_COLOR Support)
-Modern CLI tools must respect the environment to prevent breaking automated log scrapers:
+### 5.1 Hyperspherical Bubble Trees (`algo_bubble.c`, Default)
+The Bubble engine utilizes:
+- **Stack-Allocated Center**: Statically allocated `stack_center[64]` on the call stack for $D \le 64$.
+- **$O(N)$ Hoare Quickselect**: Fast median selection on a single reusable scratch buffer `dists_scratch`.
+- **In-Place Two-Pointer Partitioning**: Swaps indices in-place without heap allocations.
 
 ```c
-bool cli_should_use_color(FILE *stream)
-{
-    // 1. If output is redirected (pipe/file), disable color
-    if (!isatty(fileno(stream))) {
-        return false;
+// In-place partition: left subset dist^2 <= R^2, right subset dist^2 > R^2
+size_t l = 0, r = n - 1;
+while (l <= r) {
+    if (dists[indices[l]] <= r2) {
+        l++;
+    } else {
+        size_t tmp = indices[l];
+        indices[l] = indices[r];
+        indices[r] = tmp;
+        if (r == 0) break;
+        r--;
     }
-    // 2. Comply with https://no-color.org standard
-    if (getenv("NO_COLOR") != NULL) {
-        return false;
+}
+size_t left_count = l;
+```
+
+### 5.2 Voronoi Bisector Hyperplanes (`algo_voronoi.c`)
+Computes the difference vector between two random points and the midpoint intercept, executing a single dot product per node:
+
+```c
+for (size_t j = 0; j < dim; j++) {
+    normal[j] = sample_b[j] - sample_a[j];
+    midpoint[j] = 0.5 * (sample_a[j] + sample_b[j]);
+}
+double pdotn = geif_dot_product(midpoint, normal, dim);
+// Inference branch: geif_dot_product(x, normal, dim) < pdotn ? left : right
+```
+
+### 5.3 Exemplar Kernel Density (`algo_exemplar.c`)
+Non-tree spatial density kernel evaluating Cauchy distances across the reservoir pool:
+
+```c
+double geif_exemplar_evaluate(const geif_forest_t *forest, const double *x) {
+    const geif_reservoir_t *res = forest->reservoir;
+    if (!res || res->count == 0) return 0.5;
+    
+    double sum_density = 0.0;
+    for (size_t i = 0; i < res->count; i++) {
+        const double *p = &res->data[i * forest->dim];
+        double dist2 = geif_scaled_euclidean_dist2(x, p, forest->spans, forest->dim);
+        sum_density += 1.0 / (1.0 + dist2);
     }
-    // 3. Check explicit terminal capabilities
-    const char *term = getenv("TERM");
-    if (!term || strcmp(term, "dumb") == 0) {
-        return false;
-    }
-    return true;
+    double avg_density = sum_density / (double)res->count;
+    return 1.0 - (1.0 / (1.0 + avg_density));
 }
 ```
 
-### 5.3 First-Class Stdin / Stdout Piping (`-`)
-Support standard stream piping for cloud and containerized workflows:
+### 5.4 Continuous Hyperplane Engine (`algo_ceif.c`)
+Generates data-anchored isotropic Gaussian cuts with Marsaglia polar normal vectors, accumulating continuous depth increments $\Delta H = 1/\delta$.
+
+---
+
+## 6. Configuration Management & RC Parser (`rcfile.c`)
+
+GEIF supports cascading configuration discovery:
+1. `~/.geifrc` (User default)
+2. `~/.ceifrc` (Legacy fallback)
+3. Custom file specified via `-g <file>` (can be specified multiple times; later files take precedence)
+
+Supported RC directives:
+
+```ini
+# Core hyper-parameters
+TREES 100
+MAX_SAMPLES 256
+OUTLIER_SCORE 0.50
+ALGO bubble
+
+# Output and display
+DECIMALS 4
+LOW_RGB_COLOR 4DF64D
+HIGH_RGB_COLOR F25DF2
+PRINT_DIMENSION 1
+```
+
+The parser uses `strcasecmp` to match keys case-insensitively, trims comments (`#`), and validates numeric bounds safely.
+
+---
+
+## 7. Model Migration Utility (`ceif2geif`)
+
+Located in `src/tools/ceif2geif.c`, this utility migrates legacy CEIF models to modern GEIF-1.0 sparse JSON format:
+
 ```bash
-# Streaming inference in a pipeline:
-cat telemetry_stream.csv | geif -r production.geif -a - | grep -v ',0\.0'
+# Ingest legacy model and output validated GEIF-1.0 JSON
+bin/ceif2geif -v legacy_model.json -o geif_model.json
+
+# Stdin / stdout pipeline migration
+cat legacy_model.json | bin/ceif2geif - > migrated_model.json
 ```
 
-### 5.4 Standardized Exit Codes (`<sysexits.h>`)
-Instead of arbitrary `exit(1)`:
-- `0`: Success (`EXIT_SUCCESS`).
-- `64`: Command-line usage error (`EX_USAGE`).
-- `65`: Data format error (`EX_DATAERR`).
-- `66`: Cannot open input file (`EX_NOINPUT`).
-- `70`: Internal software error (`EX_SOFTWARE`).
-- `71`: Operating system error (`EX_OSERR`).
+Additionally, `bin/geif -r` automatically detects and transparently loads legacy CEIF JSON models without requiring manual pre-conversion.
 
 ---
 
-## 6. Modern Build System: CMake 3.20+ with Presets
+## 8. CLI Streaming Pipeline & Execution Modes
 
-Replace legacy Autotools with clean, modern CMake:
+The `geif` executable (`src/cli/main.c`) is designed for high-throughput streaming in UNIX pipelines:
 
-```cmake
-cmake_minimum_required(VERSION 3.20)
-project(geif VERSION 1.0.0 LANGUAGES C)
+```bash
+# 1. Training mode: Ingest CSV and emit sparse JSON model
+cat train.csv | ./bin/geif -l - -w model.json -B bubble -t 100 -s 256
 
-set(CMAKE_C_STANDARD 17)
-set(CMAKE_C_STANDARD_REQUIRED ON)
-set(CMAKE_C_EXTENSIONS OFF)
+# 2. Scoring pipeline: Read JSON model and score streaming test points
+cat test.csv | ./bin/geif -r model.json -a - -o - -O 0.50 -p "%d;score=%s;label=%l"
 
-# Modern compiler hardening flags
-add_compile_options(
-    -Wall -Wextra -Wpedantic -Wconversion -Wshadow
-    -Wformat=2 -Wundef -fstack-protector-strong
-)
+# 3. Categorization mode: Classify samples against all trained sub-forests
+cat stream.csv | ./bin/geif -r model.json -c - -O 0.45 -p "assigned=%c score=%s"
 
-# Core library (libgeif)
-add_library(geif_core STATIC
-    src/lib/forest.c
-    src/lib/learn.c
-    src/lib/analyze.c
-    src/lib/serialize.c
-)
-target_include_directories(geif_core PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include>
-)
-
-# CLI executable
-add_executable(geif src/cli/main.c src/cli/csv_stream.c src/cli/term_ui.c)
-target_link_libraries(geif PRIVATE geif_core m)
-
-# Sanitizer target for development & CI
-option(ENABLE_SANITIZERS "Enable Address and Undefined sanitizers" OFF)
-if(ENABLE_SANITIZERS)
-    target_compile_options(geif_core PUBLIC -fsanitize=address,undefined -fno-omit-frame-pointer)
-    target_link_options(geif_core PUBLIC -fsanitize=address,undefined)
-endif()
+# 4. Population drift grid generation: Synthesize test grid for visualization
+./bin/geif -l train.csv -T 0.1 -i 150 -O 0 -p "%d,0x%x" -o grid.csv
 ```
 
-### Developer Experience:
-- Run `cmake -B build -DENABLE_SANITIZERS=ON` for instant memory-error detection during tests.
-- Generates `build/compile_commands.json` automatically for Neovim/VSCode `clangd` completion.
-
----
-
-## 7. Migration Roadmap from `ceif` to Modern `geif`
-
-1. **Step 1: Setup Modern CMake Skeleton & `include/geif/types.h`**
-   - Create repo with strict C17 compiler flags and error enum definitions.
-2. **Step 2: Implement Contiguous Memory Layout (`arena.c` / `forest.c`)**
-   - Build flat node and normal buffer allocators.
-3. **Step 3: Implement Pure Algorithmic Core (`learn.c` & `analyze.c`)**
-   - Voronoi bisector splits, outer envelope clamping, metric depth accumulation, and $H_{\max}$ calculation.
-4. **Step 4: Port High-Speed Streaming I/O (`csv_stream.c`)**
-   - Adapt `ceif`'s fast CSV parser into a clean modular streaming reader.
-5. **Step 5: Assemble CLI Frontend (`main.c`)**
-   - GNU long options, UNIX stream piping, `NO_COLOR` terminal handling, and standard sysexits return codes.
-6. **Step 6: Automated Test Suite & Benchmarking**
-   - Unit tests under `ctest`, leak tests with Valgrind and AddressSanitizer, and visual heatmap comparisons against `complex2d.csv`.
+### Return Code Contract:
+- **0**: Clean execution; no outliers detected (all scores $< \text{threshold}$).
+- **2**: Outliers detected during scoring (at least one score $\ge \text{threshold}$).
+- **1**: Fatal error (invalid CLI arguments, I/O failure, or memory exhaustion).

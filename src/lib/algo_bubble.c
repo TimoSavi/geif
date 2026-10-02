@@ -10,19 +10,73 @@
 #include <string.h>
 #include <math.h>
 
-static int cmp_doubles(const void *a, const void *b)
+/**
+ * @brief Swaps two double-precision floating point values in-place.
+ */
+static inline void swap_doubles(double *a, double *b)
 {
-    double da = *(const double *)a;
-    double db = *(const double *)b;
-    return (da > db) - (da < db);
+    double tmp = *a;
+    *a = *b;
+    *b = tmp;
 }
 
+/**
+ * @brief Finds the k-th smallest element using Hoare's Quickselect in O(N) average time.
+ *
+ * Used to compute the median squared radius directly on squared Euclidean distances,
+ * avoiding O(N log N) sorting and eliminating sqrt() operations entirely during training.
+ *
+ * @param arr Array of double values (partially reordered in-place).
+ * @param n   Total number of elements in arr.
+ * @param k   0-based index of the desired order statistic (e.g. n / 2 for median).
+ * @return The value of the k-th smallest element.
+ */
+static double quickselect_median(double *arr, size_t n, size_t k)
+{
+    size_t left = 0, right = n - 1;
+    while (left < right) {
+        size_t mid = left + (right - left) / 2;
+        double pivot = arr[mid];
+        swap_doubles(&arr[mid], &arr[right]);
+        size_t i = left;
+        for (size_t j = left; j < right; j++) {
+            if (arr[j] <= pivot) {
+                swap_doubles(&arr[i], &arr[j]);
+                i++;
+            }
+        }
+        swap_doubles(&arr[i], &arr[right]);
+        if (i == k) return arr[i];
+        if (i < k) left = i + 1;
+        else right = i - 1;
+    }
+    return arr[left];
+}
+
+/**
+ * @brief Recursively constructs a hyperspherical Bubble tree node.
+ *
+ * Selects an exemplar point as center, computes squared distances for all samples,
+ * finds the median squared radius via O(N) quickselect, and partitions samples
+ * in-place into interior (<= R^2) and exterior (> R^2) child branches.
+ * Non-convex internal cavities terminate into empty void leaves.
+ *
+ * @param f             Pointer to the forest.
+ * @param tree          Pointer to the tree being built.
+ * @param indices       Subarray of sample pool indices assigned to this node.
+ * @param count         Number of samples in indices.
+ * @param depth         Current tree depth from root.
+ * @param max_depth     Maximum allowable tree depth.
+ * @param dists_scratch Reusable scratchpad for squared distances.
+ * @return Allocated node index, or -1 on allocation failure.
+ */
 static int32_t build_bubble_node(geif_forest_t *f,
                                 geif_tree_t *tree,
                                 uint32_t *indices,
                                 size_t count,
                                 uint32_t depth,
-                                uint32_t max_depth)
+                                uint32_t max_depth,
+                                double *dists_scratch)
 {
     if (count < NODE_MIN_SAMPLE || depth >= max_depth) {
         if (depth == 0) {
@@ -50,16 +104,9 @@ static int32_t build_bubble_node(geif_forest_t *f,
     node->leaf_sample_offset = 0;
 
     uint32_t d = f->dimensions;
-    double *center = (double *)malloc(d * sizeof(double));
-    double *dists = (double *)malloc(count * sizeof(double));
-    uint32_t *left_indices = (uint32_t *)malloc(count * sizeof(uint32_t));
-    uint32_t *right_indices = (uint32_t *)malloc(count * sizeof(uint32_t));
-
-    if (!center || !dists || !left_indices || !right_indices) {
-        if (center) free(center);
-        if (dists) free(dists);
-        if (left_indices) free(left_indices);
-        if (right_indices) free(right_indices);
+    double stack_center[64];
+    double *center = (d <= 64) ? stack_center : (double *)malloc(d * sizeof(double));
+    if (!center) {
         node = &tree->nodes[node_idx];
         node->leaf_sample_offset = append_leaf_samples(tree, indices, count);
         return node_idx;
@@ -70,33 +117,35 @@ static int32_t build_bubble_node(geif_forest_t *f,
     const double *c_pt = &f->scaled_pool[indices[c_idx] * d];
     memcpy(center, c_pt, d * sizeof(double));
 
+    // Compute squared Euclidean distances directly (no sqrt required)
     for (size_t i = 0; i < count; i++) {
         const double *pt = &f->scaled_pool[indices[i] * d];
-        dists[i] = sqrt(geif_dist_sq(center, pt, d));
+        dists_scratch[i] = geif_dist_sq(center, pt, d);
     }
 
-    qsort(dists, count, sizeof(double), cmp_doubles);
-    double radius = dists[count / 2];
-    if (radius < 1e-6) radius = 1e-6;
-    double radius_sq = radius * radius;
+    // O(N) Quickselect median squared radius
+    double radius_sq = quickselect_median(dists_scratch, count, count / 2);
+    if (radius_sq < 1e-12) radius_sq = 1e-6;
 
-    size_t left_count = 0;
-    size_t right_count = 0;
-    for (size_t i = 0; i < count; i++) {
-        const double *pt = &f->scaled_pool[indices[i] * d];
+    // In-place partition of indices into left (<= R^2) and right (> R^2)
+    size_t l = 0;
+    size_t r = count;
+    while (l < r) {
+        const double *pt = &f->scaled_pool[indices[l] * d];
         if (geif_dist_sq(center, pt, d) <= radius_sq) {
-            left_indices[left_count++] = indices[i];
+            l++;
         } else {
-            right_indices[right_count++] = indices[i];
+            r--;
+            uint32_t tmp = indices[l];
+            indices[l] = indices[r];
+            indices[r] = tmp;
         }
     }
-
-    free(dists);
+    size_t left_count = l;
+    size_t right_count = count - l;
 
     if (left_count == 0 || right_count == 0) {
-        free(center);
-        free(left_indices);
-        free(right_indices);
+        if (d > 64) free(center);
         node = &tree->nodes[node_idx];
         node->leaf_sample_offset = append_leaf_samples(tree, indices, count);
         return node_idx;
@@ -108,20 +157,17 @@ static int32_t build_bubble_node(geif_forest_t *f,
     node->step_weight = 1.0;
     node->leaf_sample_offset = 0;
 
-    free(center);
+    if (d > 64) free(center);
 
     int32_t left_child = -1;
     int32_t right_child = -1;
 
     if (left_count > 1) {
-        left_child = build_bubble_node(f, tree, left_indices, left_count, depth + 1, max_depth);
+        left_child = build_bubble_node(f, tree, indices, left_count, depth + 1, max_depth, dists_scratch);
     }
     if (right_count > 1) {
-        right_child = build_bubble_node(f, tree, right_indices, right_count, depth + 1, max_depth);
+        right_child = build_bubble_node(f, tree, &indices[left_count], right_count, depth + 1, max_depth, dists_scratch);
     }
-
-    free(left_indices);
-    free(right_indices);
 
     node = &tree->nodes[node_idx];
     node->left_child = left_child;
@@ -134,6 +180,17 @@ static int32_t build_bubble_node(geif_forest_t *f,
     return node_idx;
 }
 
+/**
+ * @brief Traverses a Bubble tree to evaluate continuous metric depth for a point.
+ *
+ * Traverses inside the hypersphere if dist_sq(x, center) <= R^2, otherwise
+ * branches outside. Applies leaf cavity relative distance damping at leaves.
+ *
+ * @param f            Pointer to the forest.
+ * @param tree         Pointer to the isolation tree.
+ * @param scaled_point Query point in normalized coordinate space.
+ * @return Accumulated metric depth H.
+ */
 static double evaluate_bubble_tree(const geif_forest_t *f,
                                   const geif_tree_t *tree,
                                   const double *scaled_point)
@@ -176,6 +233,15 @@ static double evaluate_bubble_tree(const geif_forest_t *f,
     return depth;
 }
 
+/**
+ * @brief Trains an ensemble of hyperspherical Bubble isolation trees.
+ *
+ * Normalizes dimension scales, draws subsamples per tree, and builds cavity-carving
+ * trees with in-place median partitioning and Zero Kelvin universal calibration.
+ *
+ * @param f Pointer to the forest instance.
+ * @return GEIF_OK on success, or error status.
+ */
 static geif_status_t geif_bubble_train(geif_forest_t *f)
 {
     if (!f || f->pool_count == 0) return GEIF_ERR_EMPTY_DATASET;
@@ -187,7 +253,12 @@ static geif_status_t geif_bubble_train(geif_forest_t *f)
     if (psi < 2) psi = (uint32_t)f->pool_count;
 
     uint32_t *subsample = (uint32_t *)malloc(psi * sizeof(uint32_t));
-    if (!subsample) return GEIF_ERR_OUT_OF_MEMORY;
+    double *dists_scratch = (double *)malloc(psi * sizeof(double));
+    if (!subsample || !dists_scratch) {
+        if (subsample) free(subsample);
+        if (dists_scratch) free(dists_scratch);
+        return GEIF_ERR_OUT_OF_MEMORY;
+    }
 
     size_t current_pool_idx = 0;
 
@@ -216,15 +287,30 @@ static geif_status_t geif_bubble_train(geif_forest_t *f)
 
         uint32_t tree_max_depth = (f->config.max_depth > 0) ? f->config.max_depth
                                                             : (uint32_t)(ceil(log2(psi)) + 1);
-        build_bubble_node(f, tree, subsample, psi, 0, tree_max_depth);
+        build_bubble_node(f, tree, subsample, psi, 0, tree_max_depth, dists_scratch);
     }
 
     free(subsample);
+    free(dists_scratch);
 
     geif_tree_calibrate(f);
     return GEIF_OK;
 }
 
+/**
+ * @brief Scores a sample observation against the trained Bubble forest.
+ *
+ * Traverses all trees in the ensemble, accumulates average metric depth H_avg,
+ * computes normalized outer space distance d_out to the bounding box, and applies
+ * asymptotic exponential stadium attenuation: score = 1 - (1 - score)*exp(-0.10*d_out).
+ *
+ * @param[in]  f               Pointer to the forest.
+ * @param[in]  point           Raw unscaled observation vector.
+ * @param[out] score_out       Pointer to receive calibrated anomaly score.
+ * @param[out] metric_depth_out Optional pointer to receive average depth H_avg.
+ * @param[out] d_out_out       Optional pointer to receive outer distance d_out.
+ * @return GEIF_OK on success, or error status.
+ */
 static geif_status_t geif_bubble_score(const geif_forest_t *f,
                                       const double *point,
                                       double *score_out,

@@ -17,11 +17,23 @@
 extern "C" {
 #endif
 
+#define GEIF_MAX_CAT_FILTERS 32
+
 typedef struct {
-    bool    active;
-    bool    invert;
     regex_t regex;
+    bool    invert;
+    bool    compiled;
+} geif_cat_filter_entry_t;
+
+typedef struct {
+    bool                    active;
+    size_t                  count;
+    geif_cat_filter_entry_t entries[GEIF_MAX_CAT_FILTERS];
 } cat_filter_t;
+
+bool geif_cat_filter_add(cat_filter_t *cf, const char *arg);
+bool geif_cat_filter_allows(const cat_filter_t *cf, const char *category);
+void geif_cat_filter_free(cat_filter_t *cf);
 
 /**
  * @brief Generate a synthetic evaluation grid and training sample scatter points

@@ -15,27 +15,27 @@ echo "================================================================="
 echo "Training reference model with -C 12..."
 $BIN -l "$WINE_CSV" -H -f ';' -C 12 -w "$TMP_DIR/model_full.json" -i 20 -s 64
 
-# Test 1: Category Filter (-F) - Positive Regex Filter
-echo "Test 1: Category Filter (-F '^(5|6)$') - Score only categories 5 and 6..."
+# Test 1: Category Filter (-F) - Filter out categories matching regex
+echo "Test 1: Category Filter (-F '^(5|6)$') - Exclude categories 5 and 6..."
 $BIN -r "$TMP_DIR/model_full.json" -a "$WINE_CSV" -H -f ';' -F '^(5|6)$' -o "$TMP_DIR/filtered_pos.csv" || true
 LINES_POS=$(wc -l < "$TMP_DIR/filtered_pos.csv")
-# Category 5 has 681 rows, Category 6 has 638 rows. Total = 1319.
-if [ "$LINES_POS" -ne 1319 ]; then
-    echo "  [FAIL] Expected 1319 filtered rows (5 & 6), got $LINES_POS"
+# 1599 total - 1319 (categories 5 & 6) = 280 rows remaining.
+if [ "$LINES_POS" -ne 280 ]; then
+    echo "  [FAIL] Expected 280 filtered rows (excluding 5 & 6), got $LINES_POS"
     exit 1
 fi
-echo "  [PASS] Positive filter (-F '^(5|6)$') correctly filtered to exactly 1319 rows."
+echo "  [PASS] Filter (-F '^(5|6)$') correctly excluded categories 5 and 6 (280 rows kept)."
 
-# Test 2: Category Filter (-F) - Inverted Regex Filter (-F"-v ^5$")
-echo "Test 2: Category Inverted Filter (-F'-v ^5$') - Skip category 5..."
-$BIN -r "$TMP_DIR/model_full.json" -a "$WINE_CSV" -H -f ';' -F "-v ^5$" -o "$TMP_DIR/filtered_inv.csv" || true
+# Test 2: Category Inverted Filter (-F"-v ...") - Keep only matching categories
+echo "Test 2: Category Inverted Filter (-F'-v ^(5|6)$') - Keep only categories 5 and 6..."
+$BIN -r "$TMP_DIR/model_full.json" -a "$WINE_CSV" -H -f ';' -F "-v ^(5|6)$" -o "$TMP_DIR/filtered_inv.csv" || true
 LINES_INV=$(wc -l < "$TMP_DIR/filtered_inv.csv")
-# 1599 total - 681 (quality 5) = 918 rows
-if [ "$LINES_INV" -ne 918 ]; then
-    echo "  [FAIL] Expected 918 rows when category 5 excluded, got $LINES_INV"
+# Categories 5 (681) + 6 (638) = 1319 rows kept.
+if [ "$LINES_INV" -ne 1319 ]; then
+    echo "  [FAIL] Expected 1319 rows when keeping only categories 5 & 6, got $LINES_INV"
     exit 1
 fi
-echo "  [PASS] Inverted filter (-F'-v ^5$') correctly skipped category 5 (918 rows kept)."
+echo "  [PASS] Inverted filter (-F'-v ^(5|6)$') correctly retained only categories 5 and 6 (1319 rows kept)."
 
 # Test 3: Category Pruning by Minimum Row Count (-R <min_rows>)
 echo "Test 3: Train with Category Minimum Row Threshold (-R 100)..."

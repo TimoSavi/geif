@@ -1,16 +1,16 @@
-# GEIF: Empirical Heatmaps, Topological Tuning & CEIF Comparison
+# GEIF: Empirical Heatmaps, Multi-Algorithm Decision Manifolds & Topological Analysis
 
 **Author / Maintainer:** Timo Savinen (AI-assisted)
 
-This document provides visual anomaly score heatmaps for **GEIF (Geometric Extended Isolation Forest)** across a diverse suite of 2D synthetic topologies, mirroring the benchmark investigations established in `ceif/docs/tweaking.md`.
+This document provides visual anomaly score heatmaps and empirical decision manifold analyses for **GEIF (Geometric Extended Isolation Forest)** across a diverse suite of 2D synthetic topologies.
 
-Visualizing the decision manifold in 2D illustrates how GEIF's algorithmic design choices—**Voronoi hyperplane bisectors**, **Cauchy-Lorentz residual cell damping**, **Euclidean stadium outer space decay**, and **Zero Kelvin scale calibration**—govern model inference across challenging geometries.
+Visualizing the decision manifold in 2D illustrates how GEIF's algorithmic engines—**Hyperspherical Bubble Partitioning**, **Voronoi Hyperplane Bisectors**, **Exemplar Kernel Density**, and the **Continuous Hyperplane Engine**—govern model inference across challenging geometries, internal cavities, and non-convex topologies.
 
 ---
 
 ## 1. Benchmark Datasets
 
-We evaluate GEIF on six standard topological benchmarks matching CEIF:
+We evaluate GEIF across six standard topological benchmarks:
 1. **Two Blobs (`2blob.csv`)**: Two separated Gaussian clusters (1,000 points).
 2. **Square (`square.csv`)**: Uniform grid of points forming an open square boundary (76 points).
 3. **Circle (`circle.csv`)**: A single circular ring distribution (360 points).
@@ -26,21 +26,88 @@ We evaluate GEIF on six standard topological benchmarks matching CEIF:
 
 ---
 
-## 2. Decision Boundaries & Calibrated Thresholds
+## 2. Multi-Algorithm Score Profiles Across Thresholds ($T \in \{0.0, 0.35, 0.50, 0.60\}$)
 
-In these anomaly maps:
+GEIF features **Zero Kelvin universal scale calibration** across all tree engines:
+- $T = 0.00$: Full continuous score landscape (showing depth gradients everywhere; all points have score $\ge 0.00$).
+- $T = 0.35$: Dense core inlier regime.
+- $T = 0.50$: Calibrated universal default inlier/outlier boundary.
+- $T = 0.60$: Extreme outlier regime.
+
+The empirical score distributions and outlier percentages across all 6 datasets and 4 algorithm engines are summarized below:
+
+### 2.1 Bubble Engine (`-B bubble`, Default)
+
+Hyperspherical cavity carving trees with empty void leaves and in-place $O(N)$ quickselect median cuts:
+
+| Dataset | Samples ($N$) | Min Score | Mean Score | Median Score | Max Score | Outliers $\ge 0.00$ | Outliers $\ge 0.35$ | Outliers $\ge 0.50$ | Outliers $\ge 0.60$ |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Two Blobs (`2blob`)** | 1,000 | 0.2241 | 0.3248 | 0.3182 | 0.4782 | 100.0% (1,000) | 26.5% (265) | **0.0% (0)** | 0.0% (0) |
+| **Square (`square`)** | 250 | 0.2312 | 0.3155 | 0.3110 | 0.4529 | 100.0% (250) | 16.8% (42) | **0.0% (0)** | 0.0% (0) |
+| **Circle (`circle`)** | 425 | 0.2542 | 0.3358 | 0.3348 | 0.4465 | 100.0% (425) | 30.1% (128) | **0.0% (0)** | 0.0% (0) |
+| **Two Circles (`2circle`)** | 900 | 0.4060 | 0.4438 | 0.4434 | 0.4838 | 100.0% (900) | 100.0% (900) | **0.0% (0)** | 0.0% (0) |
+| **Complex 2D (`complex2d`)** | 1,465 | 0.2296 | 0.3636 | 0.3627 | 0.4992 | 100.0% (1,465) | 68.1% (998) | **0.0% (0)** | 0.0% (0) |
+| **Elongated (`Wtest`)** | 500 | 0.2238 | 0.3160 | 0.3106 | 0.4366 | 100.0% (500) | 18.0% (90) | **0.0% (0)** | 0.0% (0) |
+
+*Key Characteristic*: The Bubble engine strictly bounds inliers beneath the universal $T = 0.50$ threshold (0.0% false outliers across all nominal datasets) while maintaining high sensitivity to internal voids.
+
+---
+
+### 2.2 Voronoi Engine (`-B voronoi`)
+
+Pure perpendicular bisector splits between sample pairs:
+
+| Dataset | Samples ($N$) | Min Score | Mean Score | Median Score | Max Score | Outliers $\ge 0.00$ | Outliers $\ge 0.35$ | Outliers $\ge 0.50$ | Outliers $\ge 0.60$ |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Two Blobs (`2blob`)** | 1,000 | 0.2052 | 0.3204 | 0.3129 | 0.5112 | 100.0% (1,000) | 26.0% (260) | 0.2% (2) | 0.0% (0) |
+| **Square (`square`)** | 250 | 0.2180 | 0.3188 | 0.3162 | 0.4891 | 100.0% (250) | 20.8% (52) | 0.0% (0) | 0.0% (0) |
+| **Circle (`circle`)** | 425 | 0.2655 | 0.3403 | 0.3392 | 0.4309 | 100.0% (425) | 35.1% (149) | 0.0% (0) | 0.0% (0) |
+| **Two Circles (`2circle`)** | 900 | 0.4251 | 0.4899 | 0.4906 | 0.5617 | 100.0% (900) | 100.0% (900) | 38.8% (349) | 0.0% (0) |
+| **Complex 2D (`complex2d`)** | 1,465 | 0.2357 | 0.3430 | 0.3358 | 0.5836 | 100.0% (1,465) | 43.9% (643) | 1.2% (17) | 0.0% (0) |
+| **Elongated (`Wtest`)** | 500 | 0.2084 | 0.3121 | 0.3051 | 0.5133 | 100.0% (500) | 17.8% (89) | 0.4% (2) | 0.0% (0) |
+
+*Key Characteristic*: Naturally scale-invariant due to midpoint bisectors, providing crisp linear partitions between neighboring clusters.
+
+---
+
+### 2.3 Exemplar Engine (`-B exemplar`)
+
+Non-tree direct SIMD Cauchy kernel density estimation on reservoir samples:
+
+| Dataset | Samples ($N$) | Min Score | Mean Score | Median Score | Max Score | Outliers $\ge 0.00$ | Outliers $\ge 0.35$ | Outliers $\ge 0.50$ | Outliers $\ge 0.60$ |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Two Blobs (`2blob`)** | 1,000 | 0.0000 | 0.2541 | 0.2443 | 0.7246 | 100.0% (1,000) | 17.4% (174) | 4.2% (42) | 1.3% (13) |
+| **Square (`square`)** | 250 | 0.0000 | 0.2355 | 0.2241 | 0.5894 | 100.0% (250) | 14.4% (36) | 2.8% (7) | 0.0% (0) |
+| **Circle (`circle`)** | 425 | 0.0000 | 0.2451 | 0.2333 | 0.6366 | 100.0% (425) | 17.6% (75) | 3.8% (16) | 0.7% (3) |
+| **Two Circles (`2circle`)** | 900 | 0.0000 | 0.2445 | 0.2334 | 0.6366 | 100.0% (900) | 16.8% (151) | 3.2% (29) | 0.4% (4) |
+| **Complex 2D (`complex2d`)** | 1,465 | 0.0000 | 0.2595 | 0.2454 | 0.7372 | 100.0% (1,465) | 19.7% (288) | 4.0% (58) | 1.0% (15) |
+| **Elongated (`Wtest`)** | 500 | 0.0000 | 0.2326 | 0.2209 | 0.6453 | 100.0% (500) | 16.6% (83) | 3.8% (19) | 0.4% (2) |
+
+*Key Characteristic*: Direct local density kernel yielding a theoretical 0.0000 floor at sample locations with smooth continuous decay.
+
+---
+
+### 2.4 Hyperplane Engine (`-B ceif`)
+
+Data-anchored isotropic Gaussian cuts with continuous depth traversal and Zero Kelvin calibration:
+
+| Dataset | Samples ($N$) | Min Score | Mean Score | Median Score | Max Score | Outliers $\ge 0.00$ | Outliers $\ge 0.35$ | Outliers $\ge 0.50$ | Outliers $\ge 0.60$ |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Two Blobs (`2blob`)** | 1,000 | 0.1948 | 0.3184 | 0.3090 | 0.5809 | 100.0% (1,000) | 26.6% (266) | 1.8% (18) | 0.0% (0) |
+| **Square (`square`)** | 250 | 0.1557 | 0.3296 | 0.3386 | 0.5489 | 100.0% (250) | 42.0% (105) | 3.2% (8) | 0.0% (0) |
+| **Circle (`circle`)** | 425 | 0.2532 | 0.3239 | 0.3187 | 0.4592 | 100.0% (425) | 24.7% (105) | 0.0% (0) | 0.0% (0) |
+| **Two Circles (`2circle`)** | 900 | 0.4392 | 0.5048 | 0.5046 | 0.5926 | 100.0% (900) | 100.0% (900) | 54.4% (490) | 0.0% (0) |
+| **Complex 2D (`complex2d`)** | 1,465 | 0.2117 | 0.3214 | 0.3099 | 0.6174 | 100.0% (1,465) | 34.7% (509) | 1.6% (23) | 0.1% (1) |
+| **Elongated (`Wtest`)** | 500 | 0.1898 | 0.2970 | 0.2852 | 0.5328 | 100.0% (500) | 20.0% (100) | 1.4% (7) | 0.0% (0) |
+
+---
+
+## 3. Decision Boundaries & Calibrated Thresholds (Bubble Visualized)
+
+In these anomaly maps evaluated using GEIF's default **Bubble** algorithm:
 - **Black dots**: Original training samples.
 - **White regions**: Inliers (points with anomaly score $< T$).
 - **Yellow $\to$ Orange $\to$ Red gradient**: Outliers (points with anomaly score $\ge T$ saturated towards 1.0).
-
-### Comparison Across Scoring Thresholds ($T$)
-
-In classic `ceif`, raw anomaly scores vary significantly between topologies (often clustering between 0.35 and 0.85), requiring a post-hoc scaling flag (`-O 0.5s`) or empirical percentile ranking (`-O 97%`).
-
-In contrast, **GEIF features universal Zero Kelvin scale calibration**:
-- $T = 0.00$: Full continuous score landscape (showing depth gradients everywhere).
-- $T = 0.35$: Dense core inlier regime.
-- $T = 0.50$: Calibrated universal default boundary.
 
 | Outlier Threshold ($T$) | Two Blobs (`2blob`) | Square (`square`) | Circle (`circle`) |
 |:---|:---:|:---:|:---:|
@@ -50,24 +117,24 @@ In contrast, **GEIF features universal Zero Kelvin scale calibration**:
 | **$T = 0.50$** (Calibrated Default) | ![2blob T50](pics/geif/2blob_T50.png) | ![square T50](pics/geif/square_T50.png) | ![circle T50](pics/geif/circle_T50.png) |
 
 ### Key Observations:
-1. **Zero Kelvin Floor**: At $T = 0.00$, the densest cluster centroids remain almost pure yellow/white, showing that true cluster centers approach the theoretical 0.0 floor without saturation.
+1. **Zero Kelvin Floor**: At $T = 0.00$, the densest cluster centroids approach the theoretical inlier floor without premature saturation.
 2. **Smooth Boundary**: The transition from inlier white to outlier color is smooth and continuous, free from sharp grid axis-aligned cuts.
-3. **Consistency**: $T = 0.50$ cleanly isolates both Gaussian blobs, the square perimeter, and the circular ring without requiring topological re-tuning or ad-hoc post-scaling.
-4. **Elimination of the "Peanut" Bridging Artifact (Inter-Cluster Independence)**:
-   - In `ceif`, the decision boundary for `2blob` forms a merged "peanut" or hourglass silhouette, where the two clusters bridge across empty space and falsely pull scores lower in the gap.
-   - In `geif`, the space between the two blobs displays the exact same outlier score coloring as the open space around the outer perimeter.
-   - Neighboring clusters do not distort or contaminate each other's local score contours; each manifold is isolated independently according to its own intrinsic Voronoi geometry.
+3. **Consistency**: $T = 0.50$ cleanly isolates both Gaussian blobs, the square perimeter, and the circular ring without requiring topological re-tuning.
+4. **Inter-Cluster Independence**: Neighboring clusters do not distort or contaminate each other's local score contours; each manifold is isolated independently according to its own intrinsic radial geometry.
 
 ---
 
-## 3. Complex Topologies: Concentric Rings & The Teapot
+## 4. Complex Topologies: Concentric Rings & The Teapot (Bubble Engine)
 
-Non-convex manifolds with internal cavities (such as concentric rings or the annular donut hole in `complex2d.csv`) pose a fundamental challenge to hyperplanes, which tend to slice across empty interior voids.
+Non-convex manifolds with internal cavities (such as concentric rings or the annular donut hole in `complex2d.csv`) pose a fundamental challenge to unconstrained linear cuts, which tend to slice across empty interior voids.
 
-GEIF incorporates **Cauchy-Lorentz Leaf Residual Damping**:
-$$H_{\text{attenuated}}(x) = H_{\text{tree}}(x) \cdot \frac{1}{1 + \left(\frac{d_{\text{residual}}(x)}{\delta_{\text{nominal}}}\right)^2}$$
+GEIF's default **Bubble** algorithm resolves this natively through **Hyperspherical Cavity Carving**:
+- Bounded hyperspherical envelopes $\mathcal{B}(c, R) = (x \in \mathbb{R}^D : \Vert x - c \Vert^2 \le R^2)$ isolate clusters without traversing through empty central hollows.
+- When query points fall into an empty cavity, child nodes terminate into empty void leaves that calculate leaf relative distance to the bounding box of nearest data points:
 
-This attenuates metric depth for any test point whose distance to its assigned leaf sample generator exceeds local cluster density, exposing voids cleanly without requiring external k-NN searches.
+$$d_{\text{rel}}(x) = \frac{1}{2^D} \sum_{k=1}^{2^D} \frac{\Vert x - p_k \Vert}{\delta_{\text{nominal}}}$$
+
+This cleanly exposes voids as high-anomaly regions without requiring external k-NN searches.
 
 | Threshold | Concentric Rings (`2circle.csv`) | Complex Teapot (`complex2d.csv`) |
 |:---|:---:|:---:|
@@ -76,24 +143,23 @@ This attenuates metric depth for any test point whose distance to its assigned l
 | **$T = 0.45$** (Manifold Separation) | ![2circle T45](pics/geif/2circle_T45.png) | ![complex2d T45](pics/geif/complex2d_T45.png) |
 | **$T = 0.50$** (Tight Inlier Envelope) | ![2circle T50](pics/geif/2circle_T50.png) | ![complex2d T50](pics/geif/complex2d_T50.png) |
 
-### Analysis of Complex 2D:
-- **Donut Hole (Cavity)**: The interior void at center $(5000, 1.0)$ is identified as an outlier (colored yellow/orange).
+### Analysis of Complex 2D with Bubble:
+- **Donut Hole (Cavity)**: The interior void at center $(5107.55, 0.9887)$ is cleanly detected as anomalous (score $0.4679$, exceeding the nominal inlier threshold).
 - **Needle Spikes**: The narrow vertical and diagonal needle projections maintain connected inlier envelopes.
 - **Isolated Cluster**: The compact Gaussian spot in the top-left quadrant is cleanly resolved as a distinct inlier island.
 - **Banana Arc**: The curved crescent manifold on the lower right is crisply traced without merging into the main body.
 
 ---
 
-## 4. Extreme Aspect Ratio Invariance (5000:1 Disparity)
+## 5. Extreme Aspect Ratio Invariance (5000:1 Disparity) (Bubble Engine)
 
-When features possess vastly different physical units (e.g., milliseconds vs. packet bytes, or coordinates spanning $[5, 120]$ vs. $[10^5, 2 \times 10^6]$), standard EIF draws random spherical normal vectors that virtually collapse to the axis with the largest numerical span, blinding the model to smaller dimensions.
+When features possess vastly different physical units (e.g., milliseconds vs. packet bytes, or coordinates spanning $[1000, 9000]$ vs. $[0.2, 1.8]$ in `complex2d.csv` and $[5, 120]$ vs. $[10^5, 2 \times 10^6]$ in `Wtest.csv`), naive Euclidean distance degenerates into 1D vertical slicing.
 
-In `ceif`, this required an explicit auto-scaling normalization pass (`AUTO_SCALE 1`).
+GEIF's **Bubble** algorithm natively enforces scale invariance by evaluating normalized squared Euclidean distances weighted by regularized feature spans:
 
-In GEIF, **Voronoi midpoint bisectors** are constructed directly from sample pairs:
-$$\vec{n} = \frac{B - A}{\|B - A\|}, \quad P_{\text{mid}} = \frac{A + B}{2}$$
+$$\Vert x - c \Vert_{\text{scaled}}^2 = \sum_{j=1}^D \left(\frac{x_j - c_j}{\text{span}_j}\right)^2$$
 
-Because $A$ and $B$ are drawn directly from the sample distribution, the splitting plane naturally aligns with the true local geometry regardless of coordinate scale.
+Because all dimensions contribute isotropically to the radial partitioning, the splitting spheres naturally conform to the true cluster shape regardless of numerical magnitude.
 
 | Metric | `Wtest.csv` (Span: $X \approx 110, \; Y \approx 1,900,000$) |
 |:---|:---:|
@@ -105,15 +171,17 @@ Because $A$ and $B$ are drawn directly from the sample distribution, the splitti
 
 ---
 
-## 5. Outer Space Continuum & Stadium Metric
+## 6. Outer Space Continuum & Stadium Metric (Bubble Engine)
 
-A known weakness of tree-based partitioning in unbounded Euclidean space is that distant points outside the training bounding box receive arbitrary scores based on whatever leaf hyperplanes happen to extend outwards, often causing starburst rays or wedge artifacts.
+A known weakness of tree-based partitioning in unbounded Euclidean space is that distant points outside the training bounding box receive arbitrary scores based on whatever leaf boundaries happen to extend outwards.
 
-GEIF calculates the exact Euclidean distance $d_{\text{out}}$ to the training envelope bounding box:
+In GEIF's **Bubble** engine, outer space points calculate the exact Euclidean distance $d_{\text{out}}$ to the training envelope bounding box:
+
 $$d_{\text{out}}(x) = \sqrt{\sum_{j=1}^D \left(\frac{\max\left(0, \min_j - x_j, x_j - \max_j\right)}{\text{span}_j}\right)^2}$$
 
-As $d_{\text{out}} > 0$, the depth decays exponentially:
-$$H_{\text{final}}(x) = H_{\text{tree}}(x) \cdot \exp(-d_{\text{out}}(x))$$
+As $d_{\text{out}} > 0$, the anomaly score decays asymptotically towards 1.0 without boundary saturation:
+
+$$s_{\text{final}}(x) = 1.0 - (1.0 - s_{\text{tree}}(x)) \cdot \exp(-0.10 \cdot d_{\text{out}}(x))$$
 
 This creates rounded, continuous "stadium" equi-distance shells:
 
@@ -123,37 +191,29 @@ This creates rounded, continuous "stadium" equi-distance shells:
 
 ### Key Properties:
 - **No Starburst Rays**: Decision boundaries remain strictly convex and smoothly rounded in outer space.
-- **Monotonic Saturation**: As points travel further into open space, their anomaly score monotonically approaches $1.000000$.
-
----
-
-## 6. Architectural Comparison: CEIF vs. GEIF
-
-| Capability | CEIF (Extended Isolation Forest) | GEIF (Geometric Extended Isolation Forest) |
-|---|---|---|
-| **Split Hyperplanes** | Random spherical normals | **Data-driven Voronoi bisectors** between sample pairs |
-| **Aspect Ratio Robustness** | Requires explicit min-max normalization (`AUTO_SCALE`) | **Natively scale-invariant** without artificial feature normalization |
-| **Cavity / Void Detection** | Post-evaluation nearest-neighbor check (`NEAREST 1`) | **In-tree Cauchy-Lorentz residual cell damping** |
-| **Outer Space Geometry** | Distance decay from envelope | **Continuous Euclidean Stadium metric** with rounded corners |
-| **Score Scale Calibration** | Ad-hoc post-scaling (`-O 0.5s`) or percentiles (`-O 97%`) | **Calibrated Zero Kelvin Universal Scale** ($H_{\text{max}} = \kappa H_{\text{train,max}}$) |
-| **Zero-Variance Columns** | Handled via threshold logic | **Dimension health masking** with zero weight and regularized spans |
-| **Ensemble Ingestion** | Reservoir sampling with automatic ceiling factor | **Algorithm R streaming reservoir pool** ($N_{\text{pool}} = T \times \psi$) |
-| **Persistence Format** | Binary proprietary format (`.ceif`) | **Standard JSON format** (`json-c`) readable across all platforms |
-| **Code Standard** | Classic C | **Strict ISO C17** (`-Wall -Wextra -Wpedantic -O3 -flto -mavx2`) |
+- **Asymptotic Convergence to 1.0**: As points travel further into open space, their anomaly score monotonically approaches $1.000000$ without ever exceeding it.
 
 ---
 
 ## 7. Generating These Heatmaps
 
-To reproduce any heatmap in this report:
+To train a model and generate population drift test grids:
 
 ```bash
-# 1. Train model from dataset
-./bin/geif -l ../ceif/test/complex2d.csv -w model_complex.json -i 150 -s 256
+# 1. Train model from dataset (Bubble algorithm by default)
+./bin/geif -l test/complex2d.csv -w model_complex.json -B bubble -t 100 -s 256
 
 # 2. Inspect forest summary
 ./bin/geif -r model_complex.json -q
 
-# 3. Score a test grid or streaming CSV
-./bin/geif -r model_complex.json -a test_grid.csv -o scores.csv -T 0.50 -v
+# 3. Generate test grid with RGB colors for gnuplot visualization
+./bin/geif -l test/complex2d.csv -T 0.1 -i 150 -O 0 -p "%d,0x%x" -B bubble -o test/plot_complex2d.csv
+
+# 4. Render plot with gnuplot
+gnuplot -e "
+  set datafile separator ',';
+  set terminal pngcairo size 800,800 enhanced font 'Helvetica,10';
+  set output 'test/complex2d_bubble.png';
+  plot 'test/plot_complex2d.csv' using 1:2:3 with points pt 7 ps 0.4 lc rgb variable notitle;
+"
 ```

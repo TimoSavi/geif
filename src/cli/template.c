@@ -106,15 +106,32 @@ size_t geif_format_template(char *out,
             if (n > 0) w += (size_t)n;
             break;
 
+        case 'r': // Row / line index
+            n = snprintf(out + w, out_size - w, "%llu", (unsigned long long)(ctx ? ctx->row_idx : 0));
+            if (n > 0) w += (size_t)n;
+            break;
+
         case 'l': // Label
+        case 'L':
             if (ctx && ctx->label && ctx->label[0] != '\0') {
                 n = snprintf(out + w, out_size - w, "%s", ctx->label);
                 if (n > 0) w += (size_t)n;
             }
             break;
 
-        case 'c': // Category
-        case 'C':
+        case 'c': // Category from input data (fallback to assigned category)
+            {
+                const char *cat = (ctx && ctx->input_category && ctx->input_category[0] != '\0')
+                                  ? ctx->input_category
+                                  : (ctx ? ctx->category : NULL);
+                if (cat && cat[0] != '\0') {
+                    n = snprintf(out + w, out_size - w, "%s", cat);
+                    if (n > 0) w += (size_t)n;
+                }
+            }
+            break;
+
+        case 'C': // Model / assigned category
             if (ctx && ctx->category && ctx->category[0] != '\0') {
                 n = snprintf(out + w, out_size - w, "%s", ctx->category);
                 if (n > 0) w += (size_t)n;

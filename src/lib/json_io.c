@@ -104,7 +104,11 @@ geif_status_t geif_forest_from_json_object(geif_forest_t **forest_out, struct js
     if (json_object_object_get_ex(root, "algorithm", &j_val)) {
         cfg.algo = geif_algo_from_name(json_object_get_string(j_val));
     } else {
-        cfg.algo = GEIF_ALGO_DEFAULT;
+        if (json_object_object_get_ex(root, "trees", NULL) || json_object_object_get_ex(root, "globals", NULL)) {
+            cfg.algo = GEIF_ALGO_CEIF;
+        } else {
+            cfg.algo = GEIF_ALGO_DEFAULT;
+        }
     }
     if (json_object_object_get_ex(root, "seed", &j_val)) cfg.seed = (uint32_t)json_object_get_int64(j_val);
     if (json_object_object_get_ex(root, "tree_count", &j_val)) cfg.tree_count = (uint32_t)json_object_get_int(j_val);
@@ -409,9 +413,15 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
     if (json_object_object_get_ex(root, "max_depth", &j_val)) cfg.max_depth = (uint32_t)json_object_get_int(j_val);
     if (json_object_object_get_ex(root, "kappa", &j_val)) cfg.kappa = json_object_get_double(j_val);
     if (json_object_object_get_ex(root, "alpha", &j_val)) cfg.alpha = json_object_get_double(j_val);
+    if (json_object_object_get_ex(root, "algorithm", &j_val)) {
+        cfg.algo = geif_algo_from_name(json_object_get_string(j_val));
+    }
 
     struct json_object *globals = NULL;
     json_object_object_get_ex(root, "globals", &globals);
+    if (!json_object_object_get_ex(root, "algorithm", NULL) && globals != NULL) {
+        cfg.algo = GEIF_ALGO_CEIF;
+    }
 
     struct json_object *j_forests = NULL;
     bool has_forests = json_object_object_get_ex(root, "forests", &j_forests);

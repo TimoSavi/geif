@@ -18,7 +18,8 @@ extern "C" {
 typedef struct {
     const char   *orig_line;         /**< %a / %v fallback: Original raw input line */
     const char   *label;             /**< %l: Extracted label string */
-    const char   *category;          /**< %c, %C: Extracted category string */
+    const char   *category;          /**< %C: Model / assigned category string */
+    const char   *input_category;    /**< %c: Category extracted from input data */
     double        score;             /**< %s: Anomaly score (0.0 .. 1.0) */
     double        metric_depth;      /**< %m: Metric tree depth (when -j not provided) */
     double        d_out;             /**< %d (when vector is NULL): Outer stadium distance */
@@ -27,6 +28,7 @@ typedef struct {
     time_t        timestamp;         /**< %t: Epoch timestamp */
     uint64_t      total_rows;        /**< %n: Category total rows */
     uint64_t      analyzed_rows;     /**< %o: Analyzed rows count */
+    uint64_t      row_idx;           /**< %r: 1-based row number */
     const double *vector;            /**< %d (in -p) / %d (in -j): Numeric feature vector */
     const double *averages;          /**< %a: Category feature averages */
     const double *attr_scores;       /**< %e: Single-dimension attribution / impact scores */

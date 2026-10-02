@@ -12,7 +12,7 @@
 #include <unistd.h>
 #include <getopt.h>
 
-#define CEIF2GEIF_VERSION "1.0.0"
+#define CEIF2GEIF_VERSION "1.1.0"
 
 static void print_usage(const char *prog)
 {

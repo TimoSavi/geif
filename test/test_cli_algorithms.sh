@@ -71,6 +71,11 @@ echo "Testing --algo long option..."
 grep -q "\"algorithm\":\"bubble\"" "$TEST_DIR/model_long.json"
 echo "  [PASS] --algo bubble long option verified."
 
+echo "Testing default algorithm when -B is omitted..."
+"$GEIF_BIN" -l "$DATA_CSV" -w "$TEST_DIR/model_default.json" -t 15 -s 32 > /dev/null
+grep -q "\"algorithm\":\"bubble\"" "$TEST_DIR/model_default.json"
+echo "  [PASS] Omitting -B correctly defaults to 'bubble' algorithm."
+
 echo "Testing 'eif' alias for 'ceif'..."
 "$GEIF_BIN" -l "$DATA_CSV" -B eif -w "$TEST_DIR/model_eif.json" -t 15 -s 32 > /dev/null
 grep -q "\"algorithm\":\"ceif\"" "$TEST_DIR/model_eif.json"

@@ -51,20 +51,20 @@ if ! grep -qE '0x(000000|20FF20|00FF00)' "$GRID_OUT"; then
 fi
 echo "  [PASS] Test grid generated with valid coordinate grid points and reservoir scatter samples."
 
-# Test 3: Category filtering with inverted regex (-F "-v ^catB$")
-echo "Test 3: Generating test grid with category filter (-F '-v ^catB$')..."
+# Test 3: Category filtering (-F "^catB$") - filter out catB
+echo "Test 3: Generating test grid with category filter (-F '^catB$')..."
 FILTER_OUT="$TEST_DIR/grid_filter.txt"
-"$GEIF_BIN" -r "$MODEL_JSON" -T 0.1 -i 10 -F "-v ^catB$" -e , -d 2 -p "%c;%d;0x%x" -o "$FILTER_OUT"
+"$GEIF_BIN" -r "$MODEL_JSON" -T 0.1 -i 10 -F "^catB$" -e , -d 2 -p "%c;%d;0x%x" -o "$FILTER_OUT"
 
 if grep -q '^catB;' "$FILTER_OUT"; then
-    echo "ERROR: catB points found despite inverted regex filter -F '-v ^catB$'"
+    echo "ERROR: catB points found despite category filter -F '^catB$'"
     exit 1
 fi
 if ! grep -q '^catA;' "$FILTER_OUT"; then
     echo "ERROR: catA points not found in filtered grid output"
     exit 1
 fi
-echo "  [PASS] Category filter -F correctly isolated target sub-forest for grid generation."
+echo "  [PASS] Category filter -F correctly filtered out catB and isolated catA for grid generation."
 
 # Test 4: Outlier threshold filtering with percentage (-O 80%)
 echo "Test 4: Generating test grid with percentile threshold (-O 80%)..."

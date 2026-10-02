@@ -18,6 +18,11 @@ typedef struct {
     double  avg_sigma;
 } geif_exemplar_state_t;
 
+/**
+ * @brief Releases heap-allocated adaptive bandwidth state for the exemplar model.
+ *
+ * @param f Pointer to the forest instance.
+ */
 static void geif_exemplar_destroy(geif_forest_t *f)
 {
     if (f && f->algo_data) {
@@ -28,6 +33,15 @@ static void geif_exemplar_destroy(geif_forest_t *f)
     }
 }
 
+/**
+ * @brief Trains the Exemplar model by computing adaptive local bandwidths.
+ *
+ * Bypasses binary tree construction entirely. For each sample in the reservoir pool,
+ * finds its K-nearest neighbors and calculates local bandwidth sigma_i.
+ *
+ * @param f Pointer to the forest instance.
+ * @return GEIF_OK on success, or error status.
+ */
 static geif_status_t geif_exemplar_train(geif_forest_t *f)
 {
     if (!f || f->pool_count == 0) return GEIF_ERR_EMPTY_DATASET;
@@ -125,6 +139,20 @@ static geif_status_t geif_exemplar_train(geif_forest_t *f)
     return GEIF_OK;
 }
 
+/**
+ * @brief Scores a query point via direct Cauchy kernel density estimation.
+ *
+ * Finds the K nearest exemplars in the reservoir pool and aggregates their
+ * kernel density: D = (1/K) * sum(1 / (1 + (dist_i / sigma_i)^2)).
+ * Score is evaluated as 1.0 - D with outer space stadium attenuation.
+ *
+ * @param[in]  f               Pointer to the forest.
+ * @param[in]  point           Raw unscaled observation vector.
+ * @param[out] score_out       Pointer to receive calibrated anomaly score.
+ * @param[out] metric_depth_out Optional pointer to receive density-based depth.
+ * @param[out] d_out_out       Optional pointer to receive outer distance d_out.
+ * @return GEIF_OK on success, or error status.
+ */
 static geif_status_t geif_exemplar_score(const geif_forest_t *f,
                                         const double *point,
                                         double *score_out,
