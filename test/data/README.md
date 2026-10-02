@@ -10,7 +10,7 @@ The datasets in this directory (`paddydataset.csv` and `winequality-red.csv`) ar
 
 > **License Notice:**
 > This dataset is licensed under a Creative Commons Attribution 4.0 International (CC BY 4.0) license.
-> You are free to share (copy and redistribute the material in any medium or format) and adapt (remix, transform, and build upon the material) for any purpose, even commercially, under the terms of providing appropriate credit.
+> This allows for the sharing and adaptation of the datasets for any purpose, provided that the appropriate credit is given.
 > 
 > Full license deed: https://creativecommons.org/licenses/by/4.0/
 

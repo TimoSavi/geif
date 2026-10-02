@@ -473,4 +473,4 @@ This project is licensed under the terms of the **GNU General Public License Ver
 Copyright (c) 2026 Timo Savinen.
 
 ### Test & Benchmark Datasets License
-The benchmark datasets located in [`test/data/`](file:///home/timo_savinen_elisa_fi/git/geif/test/data/README.md) (`winequality-red.csv` and `paddydataset.csv`) are licensed under the **Creative Commons Attribution 4.0 International (CC BY 4.0)** license. See [`test/data/README.md`](file:///home/timo_savinen_elisa_fi/git/geif/test/data/README.md) for full citations and licensing terms.
+The benchmark datasets located in [`test/data/`](file:///home/timo_savinen_elisa_fi/git/geif/test/data/README.md) (`winequality-red.csv` and `paddydataset.csv`) are licensed under the **Creative Commons Attribution 4.0 International (CC BY 4.0)** license. This allows for the sharing and adaptation of the datasets for any purpose, provided that the appropriate credit is given. See [`test/data/README.md`](file:///home/timo_savinen_elisa_fi/git/geif/test/data/README.md) for full citations and licensing terms.
