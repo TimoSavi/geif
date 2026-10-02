@@ -12,6 +12,12 @@
 #define GEIF_ENS_INIT_CAPACITY 16
 #define GEIF_ENS_INIT_HASH_SIZE 64
 
+/**
+ * @brief Computes 32-bit FNV-1a hash for string category keys.
+ *
+ * @param[in] str Null-terminated category name string.
+ * @return 32-bit hash value.
+ */
 static uint32_t ensemble_hash(const char *str)
 {
     if (!str) return 0;
@@ -23,6 +29,11 @@ static uint32_t ensemble_hash(const char *str)
     return h;
 }
 
+/**
+ * @brief Doubles hash table capacity and rehashes all category hash nodes.
+ *
+ * @param[in,out] ens Ensemble instance whose hash table is expanding.
+ */
 static void ensemble_rehash(geif_ensemble_t *ens)
 {
     size_t new_size = ens->hash_size * 2;
@@ -46,6 +57,17 @@ static void ensemble_rehash(geif_ensemble_t *ens)
     ens->hash_size = new_size;
 }
 
+/**
+ * @brief Allocates and initializes a multi-category GEIF ensemble router.
+ *
+ * Allocates dynamic category entries array and hash bucket array for fast O(1)
+ * sub-forest dispatching based on category labels.
+ *
+ * @param[out] ensemble_out Pointer receiving allocated ensemble handle.
+ * @param[in]  dimensions   Feature vector dimensionality.
+ * @param[in]  config       Configuration options copied to each newly created sub-forest.
+ * @return GEIF_OK on success, or GEIF_ERR_INVALID_ARG / GEIF_ERR_OUT_OF_MEMORY.
+ */
 geif_status_t geif_ensemble_create(geif_ensemble_t **ensemble_out,
                                    uint32_t dimensions,
                                    const geif_config_t *config)
@@ -81,6 +103,14 @@ geif_status_t geif_ensemble_create(geif_ensemble_t **ensemble_out,
     return GEIF_OK;
 }
 
+/**
+ * @brief Destroys an ensemble and all associated category sub-forests.
+ *
+ * Traverses entries to destroy all sub-forests, frees hash buckets and chain nodes,
+ * and frees the ensemble container. Safe to invoke with NULL.
+ *
+ * @param[in,out] ens Ensemble instance to destroy.
+ */
 void geif_ensemble_destroy(geif_ensemble_t *ens)
 {
     if (!ens) return;
@@ -112,6 +142,13 @@ void geif_ensemble_destroy(geif_ensemble_t *ens)
     free(ens);
 }
 
+/**
+ * @brief Searches for an existing category's sub-forest in the ensemble hash table.
+ *
+ * @param[in] ens      Ensemble instance.
+ * @param[in] category Category string name (empty string or NULL refers to default forest).
+ * @return Pointer to matching geif_forest_t, or NULL if category has not been created.
+ */
 geif_forest_t *geif_ensemble_find(const geif_ensemble_t *ens, const char *category)
 {
     if (!ens || !ens->hash_buckets || ens->count == 0) return NULL;
@@ -132,6 +169,17 @@ geif_forest_t *geif_ensemble_find(const geif_ensemble_t *ens, const char *catego
     return NULL;
 }
 
+/**
+ * @brief Looks up a category's sub-forest, or allocates and registers it if not found.
+ *
+ * Automatically expands the category entries dynamic array and rehashes the lookup
+ * table when load factor exceeds 75%. Propagates configuration and column slicing
+ * specifications to the newly instantiated sub-forest.
+ *
+ * @param[in,out] ens      Ensemble instance.
+ * @param[in]     category Category name string.
+ * @return Pointer to existing or newly created geif_forest_t, or NULL on error.
+ */
 geif_forest_t *geif_ensemble_get_or_create(geif_ensemble_t *ens, const char *category)
 {
     if (!ens) return NULL;
@@ -191,6 +239,18 @@ geif_forest_t *geif_ensemble_get_or_create(geif_ensemble_t *ens, const char *cat
     return forest;
 }
 
+/**
+ * @brief Feeds an observation vector into a category's sub-forest.
+ *
+ * Looks up or instantiates the sub-forest for category, updates the sub-forest's
+ * row count and timestamp, and passes the vector to geif_forest_feed() for
+ * streaming reservoir sampling.
+ *
+ * @param[in,out] ens      Ensemble instance.
+ * @param[in]     category Category name (or empty string/NULL for default).
+ * @param[in]     point    Observation feature vector.
+ * @return GEIF_OK on success, or an error status code.
+ */
 geif_status_t geif_ensemble_feed(geif_ensemble_t *ens,
                                  const char *category,
                                  const double *point)
@@ -217,6 +277,16 @@ geif_status_t geif_ensemble_feed(geif_ensemble_t *ens,
     return geif_forest_feed(forest, point);
 }
 
+/**
+ * @brief Prunes categories having fewer than min_rows training samples (-R).
+ *
+ * Destroys underpopulated sub-forests, compacts the active category entries list,
+ * and rebuilds the category hash table.
+ *
+ * @param[in,out] ens      Ensemble instance.
+ * @param[in]     min_rows Minimum sample count required to keep a category sub-forest.
+ * @return GEIF_OK on success, or GEIF_ERR_INVALID_ARG on NULL.
+ */
 geif_status_t geif_ensemble_prune_categories(geif_ensemble_t *ens, uint64_t min_rows)
 {
     if (!ens) return GEIF_ERR_INVALID_ARG;
@@ -263,6 +333,14 @@ geif_status_t geif_ensemble_prune_categories(geif_ensemble_t *ens, uint64_t min_
     return GEIF_OK;
 }
 
+/**
+ * @brief Prunes categories whose last ingestion timestamp is older than max_age_seconds.
+ *
+ * @param[in,out] ens             Ensemble instance.
+ * @param[in]     max_age_seconds Retention window in seconds (e.g. from -D days).
+ * @param[in]     now             Current Unix epoch timestamp (0 uses time(NULL)).
+ * @return GEIF_OK on success, or GEIF_ERR_INVALID_ARG on NULL.
+ */
 geif_status_t geif_ensemble_prune_age(geif_ensemble_t *ens, time_t max_age_seconds, time_t now)
 {
     if (!ens) return GEIF_ERR_INVALID_ARG;
@@ -312,6 +390,15 @@ geif_status_t geif_ensemble_prune_age(geif_ensemble_t *ens, time_t max_age_secon
     return GEIF_OK;
 }
 
+/**
+ * @brief Trains all sub-forests in the ensemble that contain reservoir samples.
+ *
+ * Iterates through each category entry, calling geif_forest_train() on any
+ * sub-forest with pool_count > 0.
+ *
+ * @param[in,out] ens Ensemble instance.
+ * @return GEIF_OK on success, GEIF_ERR_EMPTY_DATASET if no sub-forests exist, or an error code.
+ */
 geif_status_t geif_ensemble_train(geif_ensemble_t *ens)
 {
     if (!ens || ens->count == 0) return GEIF_ERR_EMPTY_DATASET;
@@ -329,6 +416,21 @@ geif_status_t geif_ensemble_train(geif_ensemble_t *ens)
     return GEIF_OK;
 }
 
+/**
+ * @brief Scores an observation against its category's sub-forest.
+ *
+ * Performs O(1) hash table lookup for category. If found, evaluates using that
+ * sub-forest and marks seen_in_analysis = true. If category was never seen during
+ * training, returns maximum outlier score (1.0 - 1e-6) and GEIF_ERR_INVALID_ARG.
+ *
+ * @param[in]  ens              Ensemble instance.
+ * @param[in]  category         Category name of observation.
+ * @param[in]  point            Feature vector.
+ * @param[out] score_out        Receives calibrated anomaly score.
+ * @param[out] metric_depth_out Optional pointer to receive metric depth.
+ * @param[out] d_out_out        Optional pointer to receive exterior distance.
+ * @return GEIF_OK on success, or GEIF_ERR_INVALID_ARG if category is unknown.
+ */
 geif_status_t geif_ensemble_score_detailed(const geif_ensemble_t *ens,
                                            const char *category,
                                            const double *point,
@@ -365,6 +467,16 @@ geif_status_t geif_ensemble_score_detailed(const geif_ensemble_t *ens,
     return geif_forest_score_detailed(forest, point, score_out, metric_depth_out, d_out_out);
 }
 
+/**
+ * @brief Formats a diagnostic summary of the ensemble and all sub-forests.
+ *
+ * Prints total dimensions, sub-forest count, column specs, and detailed statistics
+ * for each sub-forest (rows seen, pool size, tree count, calibrated H_max, timestamp).
+ *
+ * @param[in]  ens         Ensemble instance.
+ * @param[out] buffer      Destination text buffer.
+ * @param[in]  buffer_size Buffer capacity in bytes.
+ */
 void geif_ensemble_summary(const geif_ensemble_t *ens, char *buffer, size_t buffer_size)
 {
     if (!ens || !buffer || buffer_size == 0) return;
@@ -410,6 +522,17 @@ void geif_ensemble_summary(const geif_ensemble_t *ens, char *buffer, size_t buff
     }
 }
 
+/**
+ * @brief Prunes the k worst anomaly outliers from a forest's reservoir sample pool (-k).
+ *
+ * Iteratively scores all current reservoir samples against the forest, locates
+ * the sample with the highest anomaly score, removes it from the sample pool via
+ * memmove, and retrains the trees to recalibrate spatial boundaries without outlier bias.
+ *
+ * @param[in,out] f Forest instance.
+ * @param[in]     k Number of worst outlier samples to prune.
+ * @return GEIF_OK on success, or an error status code.
+ */
 geif_status_t geif_forest_remove_outliers(geif_forest_t *f, uint32_t k)
 {
     if (!f) return GEIF_ERR_INVALID_ARG;
@@ -450,6 +573,13 @@ geif_status_t geif_forest_remove_outliers(geif_forest_t *f, uint32_t k)
     return GEIF_OK;
 }
 
+/**
+ * @brief Prunes the k worst outlier samples across all sub-forests in an ensemble.
+ *
+ * @param[in,out] ens Ensemble instance.
+ * @param[in]     k   Number of outlier samples to prune per category.
+ * @return GEIF_OK on success, or an error code.
+ */
 geif_status_t geif_ensemble_remove_outliers(geif_ensemble_t *ens, uint32_t k)
 {
     if (!ens) return GEIF_ERR_INVALID_ARG;

@@ -12,6 +12,12 @@
 static double s_fast_c_cache[GEIF_FAST_C_SAMPLES];
 static bool s_c_cache_initialized = false;
 
+/**
+ * @brief Precomputes average path length normalization factors c(n) for small sample sizes.
+ *
+ * Populates s_fast_c_cache for indices 0 to GEIF_FAST_C_SAMPLES using iterative
+ * harmonic number accumulation to avoid expensive logarithmic approximations.
+ */
 void geif_init_c_cache(void)
 {
     if (s_c_cache_initialized) return;
@@ -25,6 +31,16 @@ void geif_init_c_cache(void)
     s_c_cache_initialized = true;
 }
 
+/**
+ * @brief Computes the standard Isolation Forest average path length expectation c(n).
+ *
+ * Uses cached harmonic values for n < GEIF_FAST_C_SAMPLES, and the Euler-Mascheroni
+ * logarithmic approximation with 2nd-order expansion for larger n:
+ * c(n) = 2 * (ln(n-1) + 0.5772156649 + 1/(2*(n-1)) - 1/(12*(n-1)^2)) - 2*(n-1)/n.
+ *
+ * @param[in] n Subsample count.
+ * @return Expected path length c(n), or 0.0 if n <= 1.
+ */
 double geif_c(double n)
 {
     if (!s_c_cache_initialized) geif_init_c_cache();
@@ -41,6 +57,17 @@ double geif_c(double n)
 #include "algo.h"
 #include "tree_common.h"
 
+/**
+ * @brief Evaluates the raw uncalibrated continuous metric depth across all trees.
+ *
+ * Traverses trees dispatching to the configured algorithm operations table,
+ * computing continuous tree traversal depth and exterior bounding box Euclidean distance.
+ *
+ * @param[in]  f         Forest instance.
+ * @param[in]  point     Feature vector.
+ * @param[out] d_out_out Optional pointer to receive exterior Euclidean distance.
+ * @return Average continuous metric depth across the ensemble.
+ */
 double geif_forest_evaluate_metric_depth(const geif_forest_t *f,
                                          const double *point,
                                          double *d_out_out)
@@ -59,6 +86,21 @@ double geif_forest_evaluate_metric_depth(const geif_forest_t *f,
     return geif_tree_evaluate_metric_depth(f, point, d_out_out);
 }
 
+/**
+ * @brief Evaluates an observation with full diagnostic metrics.
+ *
+ * Dispatches to the active algorithm engine to compute:
+ * 1. Normalized anomaly score in [0.0, 1.0).
+ * 2. Unscaled continuous metric depth H(x).
+ * 3. Exterior normalized stadium distance d_out.
+ *
+ * @param[in]  f                Forest instance.
+ * @param[in]  point            Feature vector to score.
+ * @param[out] score_out        Receives calibrated anomaly score.
+ * @param[out] metric_depth_out Optional pointer to receive unscaled depth.
+ * @param[out] d_out_out        Optional pointer to receive exterior distance.
+ * @return GEIF_OK on success, or an error status code.
+ */
 geif_status_t geif_forest_score_detailed(const geif_forest_t *f,
                                         const double *point,
                                         double *score_out,
@@ -75,6 +117,16 @@ geif_status_t geif_forest_score_detailed(const geif_forest_t *f,
     return ops->score(f, point, score_out, metric_depth_out, d_out_out);
 }
 
+/**
+ * @brief Evaluates the calibrated anomaly score for an observation.
+ *
+ * Convenience wrapper around geif_forest_score_detailed().
+ *
+ * @param[in]  f         Forest instance.
+ * @param[in]  point     Feature vector to score.
+ * @param[out] score_out Receives calibrated anomaly score in [0.0, 1.0).
+ * @return GEIF_OK on success, or error code.
+ */
 geif_status_t geif_forest_score(const geif_forest_t *f,
                                const double *point,
                                double *score_out)
@@ -82,6 +134,16 @@ geif_status_t geif_forest_score(const geif_forest_t *f,
     return geif_forest_score_detailed(f, point, score_out, NULL, NULL);
 }
 
+/**
+ * @brief Computes or retrieves per-dimension mean coordinate averages for the forest.
+ *
+ * Looks up forest->averages first, falls back to computing the mean across all
+ * reservoir pool samples, or takes the midpoint of the coordinate bounding envelope.
+ *
+ * @param[in]  forest       Forest instance.
+ * @param[out] averages_out Array of length forest->dimensions receiving baseline averages.
+ * @return GEIF_OK on success, or GEIF_ERR_INVALID_ARG on NULL arguments.
+ */
 geif_status_t geif_forest_get_averages(const geif_forest_t *forest,
                                       double *averages_out)
 {
@@ -117,6 +179,18 @@ geif_status_t geif_forest_get_averages(const geif_forest_t *forest,
     return GEIF_OK;
 }
 
+/**
+ * @brief Computes single-dimension attribution / impact scores (%e) for an observation.
+ *
+ * Isolates each feature's marginal contribution to anomaly score by replacing that
+ * dimension in the category baseline average vector with the observation's value,
+ * evaluating the resulting score.
+ *
+ * @param[in]  forest          Forest instance.
+ * @param[in]  point           Observation feature vector.
+ * @param[out] attr_scores_out Array of length forest->dimensions receiving attribution scores.
+ * @return GEIF_OK on success, or error status code.
+ */
 geif_status_t geif_forest_dimension_attribution(const geif_forest_t *forest,
                                                const double *point,
                                                double *attr_scores_out)
@@ -154,6 +228,9 @@ geif_status_t geif_forest_dimension_attribution(const geif_forest_t *forest,
     return GEIF_OK;
 }
 
+/**
+ * @brief Comparator for sorting double precision anomaly scores ascendingly.
+ */
 static int pscore_cmp(const void *a, const void *b)
 {
     double da = *(const double *)a;
@@ -163,6 +240,16 @@ static int pscore_cmp(const void *a, const void *b)
     return 0;
 }
 
+/**
+ * @brief Computes the empirical anomaly score threshold corresponding to a given percentile.
+ *
+ * Scores all observations currently in the forest's reservoir sample pool, sorts
+ * the score array ascendingly via qsort, and returns the score at rank (N - 1) * (percentile / 100).
+ *
+ * @param[in] forest     Forest instance.
+ * @param[in] percentile Target percentile in [0.0, 100.0] (e.g. 80.0, 94.0).
+ * @return Empirical score cutoff at that percentile rank.
+ */
 double geif_forest_calculate_percentile_score(const geif_forest_t *forest, double percentile)
 {
     if (!forest || forest->pool_count == 0 || !forest->sample_pool) {

@@ -20,6 +20,11 @@
 
 #define GEIF_VERSION "1.1.0"
 
+/**
+ * @brief Displays command-line syntax and comprehensive option reference for GEIF CLI.
+ *
+ * @param[in] prog Executable program name (argv[0]).
+ */
 static void print_usage(const char *prog)
 {
     printf("GEIF - Geometric Extended Isolation Forest (v%s)\n\n", GEIF_VERSION);
@@ -67,6 +72,18 @@ static void print_usage(const char *prog)
     printf("  -h             Show this help message and exit\n");
 }
 
+/**
+ * @brief Tokenizes a delimited text line with quote awareness and whitespace trimming.
+ *
+ * Strips carriage returns and newlines, parses quoted strings without splitting on interior
+ * delimiters, and trims surrounding whitespace. Modifies the input line buffer in-place.
+ *
+ * @param[in,out] line       Input character buffer to tokenize.
+ * @param[in]     delim      Delimiter character (e.g. ',', '\t', ';').
+ * @param[out]    tokens     Array of string pointers to receive token starts.
+ * @param[in]     max_tokens Maximum token capacity of tokens array.
+ * @return Number of tokens parsed.
+ */
 static uint32_t tokenize_line(char *line, char delim, char **tokens, uint32_t max_tokens)
 {
     uint32_t count = 0;
@@ -112,6 +129,15 @@ static uint32_t tokenize_line(char *line, char delim, char **tokens, uint32_t ma
     return count;
 }
 
+/**
+ * @brief Parses human-readable duration strings (e.g. "30d", "24h", "60m") into seconds.
+ *
+ * Supports units: 'y' (years), 'm'/'M' (months or minutes depending on context),
+ * 'w' (weeks), 'd' (days), 'h' (hours), 's' (seconds). Defaults to days if unit is omitted.
+ *
+ * @param[in] s Duration string (e.g. "7d").
+ * @return Duration in seconds, or 0 on error.
+ */
 static time_t parse_delete_interval(const char *s)
 {
     if (!s || s[0] == '\0') return 0;
@@ -158,6 +184,40 @@ static time_t parse_delete_interval(const char *s)
     return value;
 }
 
+/**
+ * @brief Evaluates an incoming CSV record against an ensemble during streaming analysis (-a).
+ *
+ * Extracts category and label, verifies category filters, routes to the corresponding
+ * sub-forest (or flags as an unseen category), computes anomaly score and metric depth,
+ * determines outlier status against threshold, and formats output via templates.
+ *
+ * @param[in,out] ensemble                 Category ensemble model.
+ * @param[in]     col_cfg                  Column mapping configuration.
+ * @param[in]     cat_filter               Active category filter rules (-F).
+ * @param[in]     tokens                   Parsed text fields of current row.
+ * @param[in]     n_tok                    Token count.
+ * @param[in]     orig_line                Original unparsed text line.
+ * @param[in]     line_num                 1-based row counter.
+ * @param[in]     list_sep                 Output list separator character (-e).
+ * @param[in]     cat_sep                  Category delimiter character (-C).
+ * @param[in]     threshold                Outlier decision boundary [0, 1].
+ * @param[in]     threshold_is_average     True if threshold is calibrated to category mean score.
+ * @param[in]     threshold_is_percentage  True if threshold is percentile-based.
+ * @param[in]     silent_outliers          True to suppress nominal inlier rows (-S).
+ * @param[in]     point_tmpl               Output format template for scored points (-p).
+ * @param[in]     average_tmpl             Output format template for nominal inliers (-v).
+ * @param[in]     new_cat_tmpl             Output format template for unseen categories (-N).
+ * @param[in]     decimals                 Floating point precision (-d).
+ * @param[in]     printf_format            Dimension format override string (-m).
+ * @param[in]     print_dimension          Per-dimension template expansion (-j).
+ * @param[in]     low_rgb                  Low-score RGB color hex.
+ * @param[in]     high_rgb                 High-score RGB color hex.
+ * @param[in,out] vec                      Scratch buffer for feature vector.
+ * @param[in]     dims                     Number of feature dimensions.
+ * @param[in,out] out_fp                   Output file stream.
+ * @param[in,out] analyzed                 Cumulative analyzed rows counter.
+ * @param[in,out] total_outliers           Cumulative outliers detected counter.
+ */
 static void process_scoring_row(geif_ensemble_t *ensemble,
                                 const geif_column_config_t *col_cfg,
                                 const cat_filter_t *cat_filter,
@@ -319,6 +379,38 @@ static void process_scoring_row(geif_ensemble_t *ensemble,
     }
 }
 
+/**
+ * @brief Classifies an unassigned input sample against all ensemble categories (-c).
+ *
+ * Scores the sample across all trained category sub-forests permitted by category filters,
+ * selects the category yielding the minimum anomaly score (closest geometric fit),
+ * checks outlier threshold limits, and outputs the assigned classification.
+ *
+ * @param[in,out] ensemble                 Category ensemble model.
+ * @param[in]     col_cfg                  Column mapping configuration.
+ * @param[in]     direct_feature_mapping   True if input has no label/category columns (features only).
+ * @param[in]     cat_filter               Active category filter rules (-F).
+ * @param[in]     tokens                   Parsed text fields of current row.
+ * @param[in]     n_tok                    Token count.
+ * @param[in]     orig_line                Original unparsed text line.
+ * @param[in]     line_num                 1-based row counter.
+ * @param[in]     list_sep                 Output list separator character (-e).
+ * @param[in]     cat_sep                  Category delimiter character (-C).
+ * @param[in]     threshold                Outlier threshold limit [0, 1].
+ * @param[in]     threshold_is_average     True if threshold is calibrated to category mean score.
+ * @param[in]     threshold_is_percentage  True if threshold is percentile-based.
+ * @param[in]     score_limit_given        True if -O outlier threshold was specified on CLI.
+ * @param[in]     point_tmpl               Output format template (-p).
+ * @param[in]     decimals                 Floating point precision (-d).
+ * @param[in]     printf_format            Dimension format override string (-m).
+ * @param[in]     print_dimension          Per-dimension template expansion (-j).
+ * @param[in]     low_rgb                  Low-score RGB color hex.
+ * @param[in]     high_rgb                 High-score RGB color hex.
+ * @param[in,out] vec                      Scratch buffer for feature vector.
+ * @param[in]     dims                     Number of feature dimensions.
+ * @param[in,out] out_fp                   Output file stream.
+ * @param[in,out] analyzed                 Cumulative analyzed rows counter.
+ */
 static void process_categorize_row(geif_ensemble_t *ensemble,
                                    const geif_column_config_t *col_cfg,
                                    bool direct_feature_mapping,
@@ -457,6 +549,16 @@ static void process_categorize_row(geif_ensemble_t *ensemble,
     if (attr_scores) free(attr_scores);
 }
 
+/**
+ * @brief Recalculates empirical percentile threshold scores for all sub-forests in an ensemble.
+ *
+ * Evaluates reservoir samples to locate the empirical score boundary corresponding
+ * to the given cumulative percentile (e.g. 80% or 95%).
+ *
+ * @param[in,out] ens     Category ensemble instance.
+ * @param[in]     pct     Percentile value (0.0 to 100.0).
+ * @param[in]     verbose True to print per-category percentile diagnostics.
+ */
 static void update_ensemble_percentage_scores(geif_ensemble_t *ens, double pct, bool verbose)
 {
     if (!ens) return;
@@ -473,6 +575,17 @@ static void update_ensemble_percentage_scores(geif_ensemble_t *ens, double pct, 
     }
 }
 
+/**
+ * @brief Main entry point for the GEIF CLI application.
+ *
+ * Handles CLI command-line arguments, RC configuration files, model loading/saving,
+ * training on CSV datasets, reservoir streaming, outlier pruning (-k),
+ * synthetic test grid generation (-T), and real-time anomaly inference (-a/-c).
+ *
+ * @param[in] argc Argument count.
+ * @param[in] argv Argument vector.
+ * @return 0 on success, non-zero exit code on failure.
+ */
 int main(int argc, char *argv[])
 {
     const char *learn_file      = NULL;

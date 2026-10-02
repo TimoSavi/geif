@@ -10,6 +10,19 @@
 #include <stdio.h>
 #include <time.h>
 
+/**
+ * @brief Returns the default configuration for GEIF forest creation.
+ *
+ * Defaults:
+ *  - tree_count:       GEIF_DEFAULT_TREE_COUNT (100)
+ *  - samples_per_tree: GEIF_DEFAULT_SAMPLES_PER_TREE (256)
+ *  - max_depth:        GEIF_DEFAULT_MAX_DEPTH (adaptive or 32)
+ *  - kappa:            GEIF_DEFAULT_KAPPA (1.15 headroom)
+ *  - alpha:            GEIF_DEFAULT_ALPHA (1.0 density sensitivity)
+ *  - algo:             GEIF_ALGO_DEFAULT (Hyperspherical Bubble trees)
+ *
+ * @return Populated geif_config_t structure with factory defaults.
+ */
 geif_config_t geif_config_default(void)
 {
     geif_config_t cfg;
@@ -24,6 +37,18 @@ geif_config_t geif_config_default(void)
     return cfg;
 }
 
+/**
+ * @brief Allocates and initializes a new GEIF forest instance.
+ *
+ * Sets up dynamic arrays for coordinate envelopes (min, max, span, effective span),
+ * active dimension tracking, dimension averages, the contiguous reservoir sample pool,
+ * and individual tree structures. Seeds PRNG if seed is 0.
+ *
+ * @param[out] forest_out Pointer to receive allocated forest handle.
+ * @param[in]  dimensions Number of feature dimensions (must be > 0).
+ * @param[in]  config     Pointer to user configuration, or NULL for default configuration.
+ * @return GEIF_OK on success, or GEIF_ERR_INVALID_ARG / GEIF_ERR_OUT_OF_MEMORY on failure.
+ */
 geif_status_t geif_forest_create(geif_forest_t **forest_out,
                                 uint32_t dimensions,
                                 const geif_config_t *config)
@@ -93,6 +118,16 @@ geif_status_t geif_forest_create(geif_forest_t **forest_out,
     return GEIF_OK;
 }
 
+/**
+ * @brief Deallocates all resources associated with a GEIF forest.
+ *
+ * Traverses individual trees to free per-tree node arrays, normal vectors,
+ * and leaf samples. Calls algorithm-specific cleanup hook if registered,
+ * frees all coordinate envelopes, sample pools, dimension averages,
+ * and finally frees the forest container. Safe to invoke with NULL.
+ *
+ * @param[in,out] f Forest instance to destroy.
+ */
 void geif_forest_destroy(geif_forest_t *f)
 {
     if (!f) return;
@@ -129,6 +164,17 @@ void geif_forest_destroy(geif_forest_t *f)
     free(f);
 }
 
+/**
+ * @brief Generates a multi-line human-readable summary of forest diagnostic metrics.
+ *
+ * Formats dimensionality, active dimensions, tree counts, sample pool utilization,
+ * rows seen, nominal spacing, and calibrated maximum height/scale factor into
+ * the destination string buffer.
+ *
+ * @param[in]  f    Forest instance.
+ * @param[out] buf  Destination string buffer.
+ * @param[in]  size Capacity of the destination buffer in bytes.
+ */
 void geif_forest_summary(const geif_forest_t *f, char *buf, size_t size)
 {
     if (!f || !buf || size == 0) return;

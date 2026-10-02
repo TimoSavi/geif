@@ -11,6 +11,12 @@
 #include <ctype.h>
 #include <math.h>
 
+/**
+ * @brief Trims leading and trailing ASCII whitespace in-place.
+ *
+ * @param[in,out] str Input string.
+ * @return Pointer to first non-whitespace character in str.
+ */
 static char *trim_whitespace(char *str)
 {
     while (isspace((unsigned char)*str)) str++;
@@ -21,6 +27,17 @@ static char *trim_whitespace(char *str)
     return str;
 }
 
+/**
+ * @brief Parses a comma-separated 1-based column range string into 0-based indices.
+ *
+ * Parses tokens such as "1,3,5-8" into an array of distinct 0-based indices
+ * [0, 2, 4, 5, 6, 7] while discarding duplicates.
+ *
+ * @param[in]  spec        Column specification string (e.g. "1-4,7").
+ * @param[out] indices     Destination array receiving 0-based indices.
+ * @param[in]  max_indices Maximum capacity of indices array.
+ * @return Number of resolved column indices, or -1 on syntax/range error.
+ */
 int geif_parse_dim_spec(const char *spec, uint32_t *indices, uint32_t max_indices)
 {
     if (!spec || !indices || max_indices == 0) return 0;
@@ -85,6 +102,14 @@ int geif_parse_dim_spec(const char *spec, uint32_t *indices, uint32_t max_indice
     return (int)count;
 }
 
+/**
+ * @brief Tests whether a given column index exists within an index array.
+ *
+ * @param[in] col_idx Column index to query.
+ * @param[in] list    Array of column indices.
+ * @param[in] count   Number of elements in list.
+ * @return True if col_idx is present, false otherwise.
+ */
 bool geif_has_col_index(uint32_t col_idx, const uint32_t *list, uint32_t count)
 {
     if (!list) return false;
@@ -94,6 +119,18 @@ bool geif_has_col_index(uint32_t col_idx, const uint32_t *list, uint32_t count)
     return false;
 }
 
+/**
+ * @brief Initializes a geif_column_config_t structure from CLI argument strings.
+ *
+ * Copies and parses the raw column specification strings for ignore (-I),
+ * include (-U), label (-L), and category (-C).
+ *
+ * @param[out] cfg           Column configuration object.
+ * @param[in]  ignore_spec   Specification string for ignored columns (or NULL).
+ * @param[in]  include_spec  Specification string for included columns (or NULL).
+ * @param[in]  label_spec    Specification string for label columns (or NULL).
+ * @param[in]  category_spec Specification string for category columns (or NULL).
+ */
 void geif_column_config_init(geif_column_config_t *cfg,
                              const char *ignore_spec,
                              const char *include_spec,
@@ -125,6 +162,11 @@ void geif_column_config_init(geif_column_config_t *cfg,
     }
 }
 
+/**
+ * @brief Frees dynamically allocated specification strings in column configuration.
+ *
+ * @param[in,out] cfg Column configuration instance to release.
+ */
 void geif_column_config_free(geif_column_config_t *cfg)
 {
     if (!cfg) return;
@@ -134,6 +176,19 @@ void geif_column_config_free(geif_column_config_t *cfg)
     if (cfg->category_spec) { xfree(cfg->category_spec); cfg->category_spec = NULL; }
 }
 
+/**
+ * @brief Resolves active feature column indices based on total input columns.
+ *
+ * Determines the set of numerical feature columns by applying precedence:
+ *  1. Label columns (-L) are excluded.
+ *  2. Category columns (-C) are excluded.
+ *  3. Included columns (-U), if specified, must contain the column.
+ *  4. Ignored columns (-I) are excluded.
+ *
+ * @param[in,out] cfg        Column configuration instance.
+ * @param[in]     total_cols Total number of fields detected in CSV header/row.
+ * @return True if at least one feature column was resolved, false otherwise.
+ */
 bool geif_column_config_resolve(geif_column_config_t *cfg, uint32_t total_cols)
 {
     if (!cfg || total_cols == 0) return false;
@@ -169,6 +224,18 @@ bool geif_column_config_resolve(geif_column_config_t *cfg, uint32_t total_cols)
     return (cfg->feature_dim_count > 0);
 }
 
+/**
+ * @brief Extracts continuous numerical feature values from parsed text tokens into a double vector.
+ *
+ * Iterates through active feature column indices, parsing each field with strtod().
+ * Replaces non-numeric tokens, NaNs, and infinities with 0.0.
+ *
+ * @param[in]  cfg        Resolved column configuration.
+ * @param[in]  tokens     Array of string pointers representing fields in current row.
+ * @param[in]  total_cols Number of tokens available in row.
+ * @param[out] vec        Destination double array (size >= cfg->feature_dim_count).
+ * @return True on success, false if input arguments are invalid.
+ */
 bool geif_extract_features(const geif_column_config_t *cfg,
                            char **tokens,
                            uint32_t total_cols,
@@ -195,6 +262,18 @@ bool geif_extract_features(const geif_column_config_t *cfg,
     return true;
 }
 
+/**
+ * @brief Concatenates values of configured label columns (-L) into an output string.
+ *
+ * Joins label fields using the specified separator character.
+ *
+ * @param[in]  cfg        Column configuration instance.
+ * @param[in]  tokens     Parsed string tokens from row.
+ * @param[in]  total_cols Total tokens available in row.
+ * @param[in]  sep        Delimiter character (e.g. '/' or '_').
+ * @param[out] out_buf    Destination buffer for composite label string.
+ * @param[in]  max_len    Capacity of destination buffer.
+ */
 void geif_extract_label(const geif_column_config_t *cfg,
                         char **tokens,
                         uint32_t total_cols,
@@ -232,6 +311,19 @@ void geif_extract_label(const geif_column_config_t *cfg,
     }
 }
 
+/**
+ * @brief Concatenates values of configured category columns (-C) into a routing key.
+ *
+ * Joins category fields using the specified separator character to form
+ * the lookup key for ensemble sub-forest dispatching.
+ *
+ * @param[in]  cfg        Column configuration instance.
+ * @param[in]  tokens     Parsed string tokens from row.
+ * @param[in]  total_cols Total tokens available in row.
+ * @param[in]  sep        Delimiter character.
+ * @param[out] out_buf    Destination buffer for composite category string.
+ * @param[in]  max_len    Capacity of destination buffer.
+ */
 void geif_extract_category(const geif_column_config_t *cfg,
                             char **tokens,
                             uint32_t total_cols,

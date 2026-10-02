@@ -7,6 +7,12 @@
 #include <string.h>
 #include <strings.h>
 
+/**
+ * @brief Returns the canonical string identifier for an algorithm type.
+ *
+ * @param[in] algo Algorithm enum identifier (e.g. GEIF_ALGO_BUBBLE).
+ * @return Constant string: "ceif", "bubble", "exemplar", or "voronoi".
+ */
 const char *geif_algo_name(geif_algo_type_t algo)
 {
     switch (algo) {
@@ -23,6 +29,18 @@ const char *geif_algo_name(geif_algo_type_t algo)
     }
 }
 
+/**
+ * @brief Parses a string algorithm name or alias into a geif_algo_type_t enum.
+ *
+ * Supports canonical names and aliases (case-insensitive):
+ *  - "bubble", "spherical" -> GEIF_ALGO_BUBBLE
+ *  - "voronoi"             -> GEIF_ALGO_VORONOI
+ *  - "exemplar", "knn", "density" -> GEIF_ALGO_EXEMPLAR
+ *  - "ceif", "eif", "gaussian"    -> GEIF_ALGO_CEIF
+ *
+ * @param[in] name Algorithm string identifier.
+ * @return Parsed geif_algo_type_t enum (defaults to GEIF_ALGO_DEFAULT if unknown).
+ */
 geif_algo_type_t geif_algo_from_name(const char *name)
 {
     if (!name || name[0] == '\0') {
@@ -50,6 +68,15 @@ geif_algo_type_t geif_algo_from_name(const char *name)
     return GEIF_ALGO_DEFAULT;
 }
 
+/**
+ * @brief Retrieves the polymorphic operations dispatch table for an algorithm.
+ *
+ * Returns pointer to the static geif_algo_ops_t table containing function pointers
+ * for train, score, serialize, deserialize, and destroy.
+ *
+ * @param[in] algo Algorithm type enum.
+ * @return Pointer to algorithm operations table.
+ */
 const geif_algo_ops_t *geif_algo_get_ops(geif_algo_type_t algo)
 {
     switch (algo) {

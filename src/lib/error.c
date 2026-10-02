@@ -5,6 +5,12 @@
 
 #include "geif/error.h"
 
+/**
+ * @brief Translates a geif_status_t numeric error code into a human-readable English description.
+ *
+ * @param[in] status Status code to convert.
+ * @return Static string pointer containing diagnostic message.
+ */
 const char *geif_status_str(geif_status_t status)
 {
     switch (status) {

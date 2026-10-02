@@ -9,6 +9,11 @@
 #include <assert.h>
 #include <math.h>
 
+/**
+ * @brief Unit test verifying outer space stadium distance calculations on interior and corner points.
+ *
+ * @return 0 on test success, or triggers assert failure.
+ */
 int main(void)
 {
     printf("Testing Outer Space Stadium Euclidean Distance...\n");

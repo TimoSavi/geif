@@ -11,6 +11,11 @@
 #include <assert.h>
 #include <math.h>
 
+/**
+ * @brief Unit test verifying negative coordinate spaces, translation invariance, and stadium decay.
+ *
+ * @return 0 on test success, or triggers assert failure.
+ */
 int main(void)
 {
     printf("=================================================================\n");

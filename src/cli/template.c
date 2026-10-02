@@ -8,6 +8,14 @@
 #include <string.h>
 #include <math.h>
 
+/**
+ * @brief Applies sRGB non-linear companding (gamma transfer function) to RGB components.
+ *
+ * Implements standard IEC 61966-2-1 transfer function to map linear light intensity
+ * to perception-corrected display RGB values.
+ *
+ * @param[in,out] color Array of 3 doubles (R, G, B in range [0, 255]).
+ */
 static inline void srgb_companding(double *color)
 {
     for (int i = 0; i < 3; i++) {
@@ -18,6 +26,17 @@ static inline void srgb_companding(double *color)
     }
 }
 
+/**
+ * @brief Interpolates between two hex colors according to anomaly score with sRGB companding.
+ *
+ * Clamps score to [0.0, 1.0], blends R/G/B channels linearly, and applies companding
+ * to produce visually uniform color gradients for UI/CLI output (%x).
+ *
+ * @param[in] score    Anomaly score in [0.0, 1.0].
+ * @param[in] low_rgb  24-bit hex color for nominal / low score (e.g. 0xFFFF00 yellow).
+ * @param[in] high_rgb 24-bit hex color for anomaly / high score (e.g. 0xFF0000 red).
+ * @return 24-bit RGB packed integer.
+ */
 static uint32_t score_to_rgb(double score, uint32_t low_rgb, uint32_t high_rgb)
 {
     if (score == 0.0) return 0x000000;
@@ -46,6 +65,16 @@ static uint32_t score_to_rgb(double score, uint32_t low_rgb, uint32_t high_rgb)
     return (ir << 16) | (ig << 8) | ib;
 }
 
+/**
+ * @brief Helper to format floating point values according to decimals or custom format.
+ *
+ * @param[out] buf      Destination text buffer.
+ * @param[in]  buf_sz   Capacity of buffer.
+ * @param[in]  val      Value to format.
+ * @param[in]  decimals Number of decimal places (or negative for %g).
+ * @param[in]  fmt      Optional printf format override string (or NULL).
+ * @return Number of characters written.
+ */
 static int format_double(char *buf, size_t buf_sz, double val, int decimals, const char *fmt)
 {
     if (!buf || buf_sz == 0) return 0;
@@ -58,6 +87,18 @@ static int format_double(char *buf, size_t buf_sz, double val, int decimals, con
     return snprintf(buf, buf_sz, "%g", val);
 }
 
+/**
+ * @brief Expands an output template string using evaluation context variables.
+ *
+ * Evaluates tokens such as %s (score), %l (label), %c (category), %m (metric depth),
+ * %d (feature dimensions), %e (attribution scores), %x (RGB color), and %v (raw row).
+ *
+ * @param[out] out      Destination buffer receiving expanded string.
+ * @param[in]  out_size Capacity of out buffer in bytes.
+ * @param[in]  tmpl     Format template string (e.g. "%l: score=%s (%x)").
+ * @param[in]  ctx      Template evaluation context populated during scoring.
+ * @return Number of bytes written excluding trailing null terminator.
+ */
 size_t geif_format_template(char *out,
                             size_t out_size,
                             const char *tmpl,

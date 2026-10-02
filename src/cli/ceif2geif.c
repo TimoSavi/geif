@@ -14,6 +14,11 @@
 
 #define CEIF2GEIF_VERSION "1.1.0"
 
+/**
+ * @brief Prints command-line help and usage instructions for ceif2geif.
+ *
+ * @param[in] prog Executable program name (argv[0]).
+ */
 static void print_usage(const char *prog)
 {
     printf("ceif2geif v%s - Migrate CEIF JSON models to GEIF-1.0 JSON models\n", CEIF2GEIF_VERSION);
@@ -31,6 +36,16 @@ static void print_usage(const char *prog)
     printf("  -V, --version          Display version and exit\n");
 }
 
+/**
+ * @brief Main entry point for ceif2geif model migration utility.
+ *
+ * Ingests legacy CEIF JSON models, reconstructs sample reservoirs and trees,
+ * optionally applies retrain overrides, and outputs clean GEIF-1.0 JSON models.
+ *
+ * @param[in] argc Argument count.
+ * @param[in] argv Argument vector.
+ * @return 0 on success, non-zero exit code on error.
+ */
 int main(int argc, char *argv[])
 {
     const char *input_file = NULL;

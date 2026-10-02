@@ -25,12 +25,23 @@ static size_t total_allocation = 0;
 static int stdin_opened = 0;
 static int stdout_opened = 0;
 
+/**
+ * @brief Prints an out-of-memory error message to stderr and terminates process.
+ *
+ * @param[in] n Number of bytes that failed allocation.
+ */
 static void panic_oom(size_t n)
 {
     fprintf(stderr, "geif: fatal: memory exhausted (failed to allocate %zu bytes)\n", n);
     exit(1);
 }
 
+/**
+ * @brief Allocates heap memory with out-of-memory abort and heap usage tracking.
+ *
+ * @param[in] n Number of bytes to allocate (if 0, allocates 1 byte).
+ * @return Pointer to allocated memory buffer.
+ */
 void *xmalloc(size_t n)
 {
     if (n == 0) n = 1;
@@ -46,6 +57,13 @@ void *xmalloc(size_t n)
     return p;
 }
 
+/**
+ * @brief Allocates zero-initialized heap memory with out-of-memory abort.
+ *
+ * @param[in] count Number of elements.
+ * @param[in] size  Size of each element.
+ * @return Pointer to zero-initialized memory.
+ */
 void *xcalloc(size_t count, size_t size)
 {
     if (count == 0 || size == 0) {
@@ -64,6 +82,13 @@ void *xcalloc(size_t count, size_t size)
     return p;
 }
 
+/**
+ * @brief Reallocates heap memory buffer with out-of-memory checking.
+ *
+ * @param[in] ptr Existing memory pointer (or NULL to malloc).
+ * @param[in] n   New size in bytes.
+ * @return Pointer to reallocated memory.
+ */
 void *xrealloc(void *ptr, size_t n)
 {
     if (!ptr) return xmalloc(n);
@@ -85,6 +110,12 @@ void *xrealloc(void *ptr, size_t n)
     return p;
 }
 
+/**
+ * @brief Duplicates a string using xmalloc with null-termination and memory tracking.
+ *
+ * @param[in] s Source string to duplicate.
+ * @return Newly allocated copy of string (or NULL if s is NULL).
+ */
 char *xstrdup(const char *s)
 {
     if (!s) return NULL;
@@ -94,6 +125,11 @@ char *xstrdup(const char *s)
     return p;
 }
 
+/**
+ * @brief Frees memory buffer and decrements heap usage tracking counter.
+ *
+ * @param[in] ptr Pointer to allocated memory to free.
+ */
 void xfree(void *ptr)
 {
     if (!ptr) return;
@@ -104,6 +140,16 @@ void xfree(void *ptr)
     free(ptr);
 }
 
+/**
+ * @brief Opens a file stream with transparent stdin/stdout support for "-".
+ *
+ * Prevents multiple simultaneous open attempts on stdin/stdout, and emits
+ * descriptive errno messages if fopen fails.
+ *
+ * @param[in] path File path or "-" for standard streams.
+ * @param[in] mode Open mode ("r", "w", "a", etc.).
+ * @return Opened FILE pointer, or NULL on error.
+ */
 FILE *xfopen(const char *path, const char *mode)
 {
     if (!path || !mode) return NULL;
@@ -135,6 +181,12 @@ FILE *xfopen(const char *path, const char *mode)
     return fp;
 }
 
+/**
+ * @brief Closes a file stream, safely flushing but not closing stdin/stdout/stderr.
+ *
+ * @param[in] fp FILE stream pointer to close.
+ * @return 0 on success, or EOF on error.
+ */
 int xfclose(FILE *fp)
 {
     if (!fp) return 0;
@@ -154,11 +206,19 @@ int xfclose(FILE *fp)
     return fclose(fp);
 }
 
+/**
+ * @brief Returns total active bytes currently tracked across all allocations.
+ *
+ * @return Allocation total in bytes.
+ */
 size_t xget_total_allocated(void)
 {
     return total_allocation;
 }
 
+/**
+ * @brief Resets the active allocation counter back to 0.
+ */
 void xreset_total_allocated(void)
 {
     total_allocation = 0;

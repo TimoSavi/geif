@@ -21,12 +21,32 @@
 double geif_c(double n);
 void geif_init_c_cache(void);
 
+/**
+ * @brief Linearly scales a value from [min, max] into a target range starting at scale_min.
+ *
+ * @param[in] value     Input value.
+ * @param[in] range     Span of target range.
+ * @param[in] scale_min Minimum of target range.
+ * @param[in] min       Source domain lower bound.
+ * @param[in] max       Source domain upper bound.
+ * @return Linearly scaled value.
+ */
 static inline double geif_scale_value(double value, double range, double scale_min, double min, double max)
 {
     if (max == min) return scale_min;
     return range * (value - min) / (max - min) + scale_min;
 }
 
+/**
+ * @brief Computes squared Euclidean distance between two d-dimensional points.
+ *
+ * Provides specialized unrolled branches for 2D and 3D with compiler vectorization hints.
+ *
+ * @param[in] a First point coordinate array.
+ * @param[in] b Second point coordinate array.
+ * @param[in] d Number of dimensions.
+ * @return Squared Euclidean distance.
+ */
 static inline double geif_dist_sq(const double * restrict a,
                                   const double * restrict b,
                                   uint32_t d)
@@ -53,6 +73,11 @@ static inline double geif_dist_sq(const double * restrict a,
     return dist_sq;
 }
 
+/**
+ * @brief Generates standard normal Gaussian random numbers using Marsaglia-Bray Box-Muller transform.
+ *
+ * @return Pseudo-random sample from standard normal distribution N(0, 1).
+ */
 static inline double geif_gaussrand(void)
 {
     static double U, V;

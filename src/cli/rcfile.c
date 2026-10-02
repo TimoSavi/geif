@@ -9,6 +9,11 @@
 #include <string.h>
 #include <ctype.h>
 
+/**
+ * @brief Initializes run-command configuration to factory defaults.
+ *
+ * @param[out] rc RC configuration structure to initialize.
+ */
 void geif_rc_config_init(geif_rc_config_t *rc)
 {
     if (!rc) return;
@@ -16,6 +21,13 @@ void geif_rc_config_init(geif_rc_config_t *rc)
     rc->category_sep = ';';
 }
 
+/**
+ * @brief Expands leading tilde ('~') in a file path to the user's HOME directory.
+ *
+ * @param[in]  in       Input path string.
+ * @param[out] out      Output buffer for expanded absolute path.
+ * @param[in]  out_size Capacity of output buffer.
+ */
 static void expand_path(const char *in, char *out, size_t out_size)
 {
     if (in[0] == '~' && (in[1] == '/' || in[1] == '\0')) {
@@ -29,6 +41,16 @@ static void expand_path(const char *in, char *out, size_t out_size)
     out[out_size - 1] = '\0';
 }
 
+/**
+ * @brief Extracts a configuration value matching a given key name from a line.
+ *
+ * Handles case-insensitive key comparison, optional whitespace, equal signs,
+ * and double quotes around string values.
+ *
+ * @param[in,out] line Line buffer from configuration file.
+ * @param[in]     key  Directive key name (e.g. "TREES").
+ * @return Pointer to trimmed value string inside line buffer, or NULL if no match.
+ */
 static char *extract_value(char *line, const char *key)
 {
     char *p = line;
@@ -58,6 +80,16 @@ static char *extract_value(char *line, const char *key)
     return start;
 }
 
+/**
+ * @brief Parses an RC configuration file and populates an rc_config structure.
+ *
+ * Reads directives such as TREES, SAMPLES, DECIMALS, OUTLIER_SCORE, PRINT_DIMENSION,
+ * and hex color codes. Ignores comments ('#') and blank lines.
+ *
+ * @param[in,out] rc       RC configuration instance.
+ * @param[in]     filepath Path to configuration file.
+ * @return True if file was read and parsed successfully, false on I/O error.
+ */
 bool geif_rc_parse_file(geif_rc_config_t *rc, const char *filepath)
 {
     if (!rc || !filepath) return false;
@@ -121,6 +153,16 @@ bool geif_rc_parse_file(geif_rc_config_t *rc, const char *filepath)
     return true;
 }
 
+/**
+ * @brief Discovers and loads the default user RC configuration file.
+ *
+ * Checks in priority order:
+ *  1. ~/.geifrc
+ *  2. ~/.ceifrc (legacy fallback)
+ *
+ * @param[in,out] rc RC configuration instance.
+ * @return True if a file was loaded or if no configuration file was present.
+ */
 bool geif_rc_load_default(geif_rc_config_t *rc)
 {
     char path[1024];

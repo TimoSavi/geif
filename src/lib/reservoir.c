@@ -7,6 +7,21 @@
 #include <stdlib.h>
 #include <string.h>
 
+/**
+ * @brief Ingests an observation vector into the forest's streaming reservoir sample pool.
+ *
+ * Implements Algorithm R reservoir sampling with an optional ceiling factor cap:
+ * 1. Increment total_rows_seen and expands the coordinate bounding box envelope.
+ * 2. If pool_count < pool_capacity (Phase 1), point is stored directly in the pool.
+ * 3. Once capacity is reached (Phase 2), uses a 64-bit pseudo-random replacement
+ *    index modulo effective_seen (bounded by ceiling_factor * capacity to prevent
+ *    sample freezing over very long streams). If slot falls within capacity, the
+ *    existing sample in that slot is replaced.
+ *
+ * @param[in,out] f     Forest instance.
+ * @param[in]     point Array of double coordinates of length f->dimensions.
+ * @return GEIF_OK on success, or GEIF_ERR_INVALID_ARG if arguments are NULL.
+ */
 geif_status_t geif_forest_feed(geif_forest_t *f, const double *point)
 {
     if (!f || !point) {

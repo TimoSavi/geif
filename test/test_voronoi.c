@@ -9,6 +9,11 @@
 #include <assert.h>
 #include <math.h>
 
+/**
+ * @brief Unit test verifying Voronoi bisector hyperplane calculation with extreme aspect ratios.
+ *
+ * @return 0 on test success, or triggers assert failure.
+ */
 int main(void)
 {
     printf("Testing Voronoi Bisector Normal Vector & Scale Invariance...\n");

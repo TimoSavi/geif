@@ -13,6 +13,16 @@
 struct json_object *geif_forest_to_json_object(const geif_forest_t *f);
 geif_status_t geif_forest_from_json_object(geif_forest_t **forest_out, struct json_object *root);
 
+/**
+ * @brief Formats a floating-point value to JSON with trimmed trailing zeros.
+ *
+ * Avoids precision bloat in saved JSON files by formatting with specified decimals
+ * and removing trailing decimal zeros and negative zeros ("-0").
+ *
+ * @param[in] val      Floating point value.
+ * @param[in] decimals Maximum decimal precision.
+ * @return Allocated json_object representing the double value.
+ */
 static struct json_object *geif_clean_double_json(double val, int decimals)
 {
     char buf[64];
@@ -31,6 +41,15 @@ static struct json_object *geif_clean_double_json(double val, int decimals)
     return json_object_new_double_s(val, buf);
 }
 
+/**
+ * @brief Serializes a geif_forest_t into a json-c json_object.
+ *
+ * Encodes forest hyperparameters, coordinate envelopes, dimension metadata,
+ * calibration parameters, and the raw reservoir sample pool.
+ *
+ * @param[in] f Forest instance to serialize.
+ * @return Pointer to newly allocated json_object root, or NULL on error.
+ */
 struct json_object *geif_forest_to_json_object(const geif_forest_t *f)
 {
     if (!f) return NULL;
@@ -90,6 +109,16 @@ struct json_object *geif_forest_to_json_object(const geif_forest_t *f)
     return root;
 }
 
+/**
+ * @brief Deserializes a json-c json_object into a populated geif_forest_t.
+ *
+ * Instantiates the forest, populates envelopes and sample pool, and automatically
+ * builds and calibrates the tree structures in RAM.
+ *
+ * @param[out] forest_out Pointer receiving the newly allocated forest.
+ * @param[in]  root       json-c root object representing the forest.
+ * @return GEIF_OK on success, or GEIF_ERR_FORMAT_CORRUPT / GEIF_ERR_OUT_OF_MEMORY.
+ */
 geif_status_t geif_forest_from_json_object(geif_forest_t **forest_out, struct json_object *root)
 {
     if (!forest_out || !root) return GEIF_ERR_INVALID_ARG;
@@ -301,6 +330,13 @@ geif_status_t geif_forest_from_json_object(geif_forest_t **forest_out, struct js
     return GEIF_OK;
 }
 
+/**
+ * @brief Serializes a single forest and writes it to a file or stdout in formatted JSON.
+ *
+ * @param[in] f    Forest instance to save.
+ * @param[in] path File destination path (or "-" for stdout).
+ * @return GEIF_OK on success, or GEIF_ERR_IO / GEIF_ERR_INVALID_ARG on failure.
+ */
 geif_status_t geif_forest_save_json(const geif_forest_t *f, const char *path)
 {
     if (!f || !path) return GEIF_ERR_INVALID_ARG;
@@ -320,6 +356,16 @@ geif_status_t geif_forest_save_json(const geif_forest_t *f, const char *path)
     return (ret == 0) ? GEIF_OK : GEIF_ERR_IO;
 }
 
+/**
+ * @brief Serializes an ensemble containing multiple category sub-forests to JSON.
+ *
+ * Emits global ensemble configuration, category routing dimensions, and an array
+ * of sub-forest objects with their respective sample pools and metadata.
+ *
+ * @param[in] ens  Ensemble instance to save.
+ * @param[in] path File destination path (or "-" for stdout).
+ * @return GEIF_OK on success, or GEIF_ERR_IO / GEIF_ERR_INVALID_ARG on failure.
+ */
 geif_status_t geif_ensemble_save_json(const geif_ensemble_t *ens, const char *path)
 {
     if (!ens || !path) return GEIF_ERR_INVALID_ARG;
@@ -378,6 +424,16 @@ geif_status_t geif_ensemble_save_json(const geif_ensemble_t *ens, const char *pa
     return (ret == 0) ? GEIF_OK : GEIF_ERR_IO;
 }
 
+/**
+ * @brief Reads and parses a JSON model file or stdin into a geif_ensemble_t.
+ *
+ * Supports native GEIF models, multi-category ensemble JSON files, and legacy CEIF
+ * model schemas, dynamically reconstructing memory structures and building trees.
+ *
+ * @param[out] ensemble_out Pointer receiving the loaded ensemble.
+ * @param[in]  path         File path or "-" to read from stdin.
+ * @return GEIF_OK on success, or an error status code.
+ */
 geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char *path)
 {
     if (!ensemble_out || !path) return GEIF_ERR_INVALID_ARG;
@@ -598,6 +654,16 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
     return GEIF_OK;
 }
 
+/**
+ * @brief Reads and parses a single forest model from a JSON file.
+ *
+ * Convenience function that loads the model via geif_ensemble_load_json()
+ * and extracts its primary/first sub-forest.
+ *
+ * @param[out] forest_out Pointer receiving the loaded forest.
+ * @param[in]  path       File path or "-" to read from stdin.
+ * @return GEIF_OK on success, or an error status code.
+ */
 geif_status_t geif_forest_load_json(geif_forest_t **forest_out, const char *path)
 {
     geif_ensemble_t *ens = NULL;
