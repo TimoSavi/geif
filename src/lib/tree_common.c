@@ -9,6 +9,16 @@
 #include <string.h>
 #include <math.h>
 
+/**
+ * @brief Initializes dimension scales, bounding envelopes, and nominal cluster distances.
+ *
+ * Scans the reservoir sample pool across all dimensions to compute coordinate extrema
+ * ([min, max]) and active spans. Identifies the dimension with the largest span to establish
+ * a normalized isotropic coordinate space for distance-invariant calculations. Also pre-computes
+ * average sample spacing (delta_nominal) and harmonic correction factor c(psi).
+ *
+ * @param[in,out] f Pointer to the forest instance.
+ */
 void init_dimension_scales(geif_forest_t *f)
 {
     uint32_t d = f->dimensions;
@@ -76,10 +86,18 @@ void init_dimension_scales(geif_forest_t *f)
     f->delta_nominal = f->avg_sample_dist;
 }
 
+/**
+ * @brief Dynamically allocates a new node slot in the tree's contiguous node pool.
+ *
+ * Doubles capacity as needed starting from GEIF_INITIAL_TREE_NODES. Initializes children to -1.
+ *
+ * @param[in,out] tree Pointer to the tree.
+ * @return Non-negative node index on success, or -1 on allocation failure.
+ */
 int32_t allocate_node(geif_tree_t *tree)
 {
     if (tree->node_count >= tree->node_capacity) {
-        size_t new_cap = (tree->node_capacity == 0) ? 64 : tree->node_capacity * 2;
+        size_t new_cap = (tree->node_capacity == 0) ? GEIF_INITIAL_TREE_NODES : tree->node_capacity * 2;
         geif_node_t *new_nodes = (geif_node_t *)realloc(tree->nodes, new_cap * sizeof(geif_node_t));
         if (!new_nodes) return -1;
         tree->nodes = new_nodes;
@@ -92,11 +110,21 @@ int32_t allocate_node(geif_tree_t *tree)
     return idx;
 }
 
+/**
+ * @brief Appends a normal vector or hypersphere center into the tree's contiguous float pool.
+ *
+ * Expands the tree->normals_pool buffer dynamically as needed.
+ *
+ * @param[in,out] tree   Pointer to the tree.
+ * @param[in]     normal Normal or center coordinate vector of length d.
+ * @param[in]     d      Dimensionality of the vector.
+ * @return Offset in tree->normals_pool where the normal vector is stored.
+ */
 uint32_t append_normal(geif_tree_t *tree, const double *normal, uint32_t d)
 {
     size_t needed = (tree->node_count + 1) * d;
     if (needed > tree->normals_capacity) {
-        size_t new_cap = (tree->normals_capacity == 0) ? 64 * d : tree->normals_capacity * 2;
+        size_t new_cap = (tree->normals_capacity == 0) ? GEIF_INITIAL_NORMALS_COUNT * d : tree->normals_capacity * 2;
         if (new_cap < needed) new_cap = needed;
         double *new_pool = (double *)realloc(tree->normals_pool, new_cap * sizeof(double));
         if (!new_pool) return 0;
@@ -108,12 +136,23 @@ uint32_t append_normal(geif_tree_t *tree, const double *normal, uint32_t d)
     return offset;
 }
 
+/**
+ * @brief Appends sample pool indices into the tree's leaf sample repository.
+ *
+ * Used for leaf-level nearest neighbor relative distance calculations. Expands
+ * tree->leaf_samples dynamically starting from GEIF_INITIAL_LEAF_SAMPLES.
+ *
+ * @param[in,out] tree    Pointer to the tree.
+ * @param[in]     samples Array of sample indices.
+ * @param[in]     count   Number of sample indices.
+ * @return Starting offset in tree->leaf_samples where indices are stored.
+ */
 uint32_t append_leaf_samples(geif_tree_t *tree, const uint32_t *samples, size_t count)
 {
     if (count == 0) return 0;
     size_t needed = tree->leaf_samples_count + count;
     if (needed > tree->leaf_samples_capacity) {
-        size_t new_cap = (tree->leaf_samples_capacity == 0) ? 128 : tree->leaf_samples_capacity * 2;
+        size_t new_cap = (tree->leaf_samples_capacity == 0) ? GEIF_INITIAL_LEAF_SAMPLES : tree->leaf_samples_capacity * 2;
         if (new_cap < needed) new_cap = needed;
         uint32_t *new_arr = (uint32_t *)realloc(tree->leaf_samples, new_cap * sizeof(uint32_t));
         if (!new_arr) return 0;
@@ -126,6 +165,16 @@ uint32_t append_leaf_samples(geif_tree_t *tree, const uint32_t *samples, size_t 
     return offset;
 }
 
+/**
+ * @brief Restores the max-heap property by sifting down the element at index i.
+ *
+ * Used to maintain the K smallest squared distances in the nearest-neighbor heap
+ * without heap allocations.
+ *
+ * @param[in,out] heap Array representing the binary max-heap.
+ * @param[in]     i    Index of the element to sift down.
+ * @param[in]     n    Total count of elements currently in the heap.
+ */
 static inline void max_heap_sift_down(double *heap, uint32_t i, uint32_t n)
 {
     double val = heap[i];
@@ -141,6 +190,22 @@ static inline void max_heap_sift_down(double *heap, uint32_t i, uint32_t n)
     heap[i] = val;
 }
 
+/**
+ * @brief Computes relative Euclidean distance from query point to nearest leaf samples.
+ *
+ * In GEIF, relative leaf distance (rel_dist) scales effective sample density in leaf nodes
+ * to prevent false positives in high-density regions and detect sparse interior voids/cavities.
+ * For low dimensions (d < 5), it searches up to 2^d samples (the number of hypercube orthants);
+ * for d >= 5, it caps the nearest neighbor set at GEIF_MAX_LEAF_NEAREST_SAMPLES (32) to bound
+ * computational complexity. Uses a stack-allocated binary max-heap to maintain the K smallest
+ * squared distances without heap allocations.
+ *
+ * @param[in] f            Pointer to the forest.
+ * @param[in] tree         Pointer to the isolation tree.
+ * @param[in] node         Leaf node containing sample indices.
+ * @param[in] scaled_point Query point in normalized coordinate space.
+ * @return Normalized relative distance factor (>= MIN_REL_DIST).
+ */
 double geif_calc_leaf_rel_dist(const geif_forest_t *f,
                               const geif_tree_t *tree,
                               const geif_node_t *node,
@@ -152,7 +217,7 @@ double geif_calc_leaf_rel_dist(const geif_forest_t *f,
     }
 
     uint32_t d = f->dimensions;
-    uint32_t max_nearest = (d < 5) ? (1U << d) : 32U;
+    uint32_t max_nearest = (d < GEIF_MAX_LEAF_NEAREST_DIM_CAP) ? (1U << d) : GEIF_MAX_LEAF_NEAREST_SAMPLES;
     const uint32_t *leaf_s = &tree->leaf_samples[node->leaf_sample_offset];
     int32_t n_samples = node->sample_count;
 
@@ -176,7 +241,7 @@ double geif_calc_leaf_rel_dist(const geif_forest_t *f,
     }
 
     /* Heap path: maintain K smallest squared distances using a stack-allocated max-heap */
-    double heap[32];
+    double heap[GEIF_MAX_LEAF_NEAREST_SAMPLES];
     uint32_t filled = 0;
     int32_t i = 0;
 
@@ -222,6 +287,18 @@ double geif_calc_leaf_rel_dist(const geif_forest_t *f,
     return (sqrt(mean_d) / f->avg_sample_dist) + MIN_REL_DIST;
 }
 
+/**
+ * @brief Traverses a single isolation tree to evaluate continuous metric path depth.
+ *
+ * Recursively (or iteratively) navigates split hyperplanes (dot product test vs pdotn)
+ * until reaching a terminal leaf. At the leaf, applies continuous metric depth estimation
+ * adjusted by relative leaf distance (rel_dist) and the harmonic function c(n).
+ *
+ * @param[in] f            Pointer to the forest.
+ * @param[in] tree         Pointer to the isolation tree.
+ * @param[in] scaled_point Query point in normalized coordinate space.
+ * @return Accumulated continuous depth including leaf residual completion.
+ */
 double evaluate_tree(const geif_forest_t *f,
                     const geif_tree_t *tree,
                     const double *scaled_point)
@@ -268,6 +345,19 @@ double evaluate_tree(const geif_forest_t *f,
     return depth;
 }
 
+/**
+ * @brief Evaluates average metric depth H across all trees in the forest.
+ *
+ * Normalizes query coordinates across active bounding envelope dimensions and evaluates
+ * the average path depth across all isolation trees in the ensemble. If the query point
+ * lies outside the training envelope bounding box, computes the Euclidean outer space distance
+ * d_out in scaled units for subsequent outer decay scoring.
+ *
+ * @param[in]  f         Pointer to the forest.
+ * @param[in]  point     Raw unscaled query point.
+ * @param[out] d_out_out Optional pointer to receive outer space Euclidean distance.
+ * @return Average continuous metric depth across ensemble.
+ */
 double geif_tree_evaluate_metric_depth(const geif_forest_t *f,
                                       const double *point,
                                       double *d_out_out)
@@ -278,8 +368,8 @@ double geif_tree_evaluate_metric_depth(const geif_forest_t *f,
     }
 
     uint32_t d = f->dimensions;
-    double stack_buf[64];
-    double *scaled_point = (d <= 64) ? stack_buf : (double *)malloc(d * sizeof(double));
+    double stack_buf[GEIF_STACK_BUFFER_DIMS];
+    double *scaled_point = (d <= GEIF_STACK_BUFFER_DIMS) ? stack_buf : (double *)malloc(d * sizeof(double));
     if (!scaled_point) {
         if (d_out_out) *d_out_out = 0.0;
         return 0.0;
@@ -326,6 +416,20 @@ double geif_tree_evaluate_metric_depth(const geif_forest_t *f,
     return H_avg;
 }
 
+/**
+ * @brief Computes calibrated anomaly score, metric depth, and outer space distance for a query point.
+ *
+ * Applies the canonical Isolation Forest exponential mapping s = 2^(-H / c(psi)), augmented by:
+ * 1. Outer space smooth asymptotic decay: s' = 1 - (1 - s) * exp(-GEIF_OUTER_DECAY_RATE * d_norm).
+ * 2. Zero Kelvin scale floor calibration: maps s_min (deepest observed training path) to 0.0.
+ *
+ * @param[in]  f               Pointer to the forest.
+ * @param[in]  point           Raw unscaled query coordinate vector of length d.
+ * @param[out] score_out       Pointer to receive anomaly score in [0..1).
+ * @param[out] metric_depth_out Optional pointer to receive evaluated continuous metric depth H.
+ * @param[out] d_out_out       Optional pointer to receive scaled Euclidean distance beyond envelope.
+ * @return GEIF_OK on success, or GEIF_ERR_INVALID_ARG if invalid pointers are supplied.
+ */
 geif_status_t geif_tree_score_point(const geif_forest_t *f,
                                    const double *point,
                                    double *score_out,
@@ -374,6 +478,18 @@ geif_status_t geif_tree_score_point(const geif_forest_t *f,
     return GEIF_OK;
 }
 
+/**
+ * @brief Recursively traverses an isolation tree to determine the maximum path depth.
+ *
+ * Explores all branches to the deepest terminal leaf node to find the theoretical
+ * maximum height H_max achievable by any point falling into this tree.
+ *
+ * @param[in]     f        Pointer to the forest.
+ * @param[in]     t        Pointer to the tree.
+ * @param[in]     node_idx Current node index.
+ * @param[in]     depth    Accumulated split depth from root.
+ * @param[in,out] max_h    Pointer tracking the maximum depth discovered so far.
+ */
 void geif_tree_find_max_height(const geif_forest_t *f,
                                const geif_tree_t *t,
                                int32_t node_idx,
@@ -411,6 +527,15 @@ void geif_tree_find_max_height(const geif_forest_t *f,
     }
 }
 
+/**
+ * @brief Calibrates "Zero Kelvin" baseline scale floor and ensemble average inlier score.
+ *
+ * Computes average maximum height H_train_max across all trained trees to establish
+ * min_score = 2^(-H_train_max / c(psi)). Evaluates all training points in the sample pool
+ * to compute the average baseline score and empirical dimension means.
+ *
+ * @param[in,out] f Pointer to the forest instance.
+ */
 void geif_tree_calibrate(geif_forest_t *f)
 {
     f->min_score = 0.0;

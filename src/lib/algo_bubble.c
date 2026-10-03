@@ -104,8 +104,8 @@ static int32_t build_bubble_node(geif_forest_t *f,
     node->leaf_sample_offset = 0;
 
     uint32_t d = f->dimensions;
-    double stack_center[64];
-    double *center = (d <= 64) ? stack_center : (double *)malloc(d * sizeof(double));
+    double stack_center[GEIF_STACK_BUFFER_DIMS];
+    double *center = (d <= GEIF_STACK_BUFFER_DIMS) ? stack_center : (double *)malloc(d * sizeof(double));
     if (!center) {
         node = &tree->nodes[node_idx];
         node->leaf_sample_offset = append_leaf_samples(tree, indices, count);
@@ -145,7 +145,7 @@ static int32_t build_bubble_node(geif_forest_t *f,
     size_t right_count = count - l;
 
     if (left_count == 0 || right_count == 0) {
-        if (d > 64) free(center);
+        if (d > GEIF_STACK_BUFFER_DIMS) free(center);
         node = &tree->nodes[node_idx];
         node->leaf_sample_offset = append_leaf_samples(tree, indices, count);
         return node_idx;
@@ -157,7 +157,7 @@ static int32_t build_bubble_node(geif_forest_t *f,
     node->step_weight = 1.0;
     node->leaf_sample_offset = 0;
 
-    if (d > 64) free(center);
+    if (d > GEIF_STACK_BUFFER_DIMS) free(center);
 
     int32_t left_child = -1;
     int32_t right_child = -1;
@@ -320,8 +320,8 @@ static geif_status_t geif_bubble_score(const geif_forest_t *f,
     if (!f || !point || !score_out) return GEIF_ERR_INVALID_ARG;
 
     uint32_t d = f->dimensions;
-    double stack_buf[64];
-    double *scaled_point = (d <= 64) ? stack_buf : (double *)malloc(d * sizeof(double));
+    double stack_buf[GEIF_STACK_BUFFER_DIMS];
+    double *scaled_point = (d <= GEIF_STACK_BUFFER_DIMS) ? stack_buf : (double *)malloc(d * sizeof(double));
     if (!scaled_point) return GEIF_ERR_OUT_OF_MEMORY;
 
     if (f->scale_range_idx >= 0 && f->envelope_span && f->envelope_min && f->envelope_max) {

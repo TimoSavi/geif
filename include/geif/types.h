@@ -27,6 +27,12 @@ extern "C" {
 #define NODE_MIN_SAMPLE                GEIF_NODE_MIN_SAMPLE
 #define GEIF_OUTER_DECAY_RATE          0.10     /**< Exponential approach rate to 1.0 in outer space */
 #define OUTER_DECAY_RATE               GEIF_OUTER_DECAY_RATE
+#define GEIF_STACK_BUFFER_DIMS         64U      /**< Maximum dimensions for stack-allocated scratch buffers */
+#define STACK_BUFFER_DIMS              GEIF_STACK_BUFFER_DIMS
+#define GEIF_MAX_LEAF_NEAREST_SAMPLES  32U      /**< Maximum nearest neighbor samples tracked in leaf rel_dist */
+#define MAX_LEAF_NEAREST_SAMPLES       GEIF_MAX_LEAF_NEAREST_SAMPLES
+#define GEIF_MAX_LEAF_NEAREST_DIM_CAP  5U       /**< Dimensionality threshold (2^5 = 32) for nearest neighbor cap */
+#define MAX_LEAF_NEAREST_DIM_CAP       GEIF_MAX_LEAF_NEAREST_DIM_CAP
 
 /**
  * @brief Selectable algorithm engines in GEIF.

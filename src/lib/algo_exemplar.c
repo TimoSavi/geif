@@ -166,8 +166,8 @@ static geif_status_t geif_exemplar_score(const geif_forest_t *f,
     }
 
     uint32_t d = f->dimensions;
-    double stack_buf[64];
-    double *scaled_point = (d <= 64) ? stack_buf : (double *)malloc(d * sizeof(double));
+    double stack_buf[GEIF_STACK_BUFFER_DIMS];
+    double *scaled_point = (d <= GEIF_STACK_BUFFER_DIMS) ? stack_buf : (double *)malloc(d * sizeof(double));
     if (!scaled_point) return GEIF_ERR_OUT_OF_MEMORY;
 
     if (f->scale_range_idx >= 0 && f->envelope_span && f->envelope_min && f->envelope_max) {

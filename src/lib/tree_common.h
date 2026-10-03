@@ -13,6 +13,13 @@
 extern "C" {
 #endif
 
+#define GEIF_INITIAL_TREE_NODES        64U      /**< Initial capacity for dynamic tree node allocation */
+#define INITIAL_TREE_NODES             GEIF_INITIAL_TREE_NODES
+#define GEIF_INITIAL_NORMALS_COUNT     64U      /**< Initial capacity multiplier for normal vector pool */
+#define INITIAL_NORMALS_COUNT          GEIF_INITIAL_NORMALS_COUNT
+#define GEIF_INITIAL_LEAF_SAMPLES      128U     /**< Initial capacity for leaf sample index buffer */
+#define INITIAL_LEAF_SAMPLES           GEIF_INITIAL_LEAF_SAMPLES
+
 /**
  * @brief Initialize dimension scales, bounding envelopes, and nominal distances.
  *
