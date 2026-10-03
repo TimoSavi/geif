@@ -17,9 +17,7 @@ USER_DOCS_TARGET = os.path.expanduser("~/docs/geif-api-reference.md")
 
 def sanitize_gfm_math(text):
     """Ensures math blocks comply with GitHub Flavored Markdown rules."""
-    # Replace \text{var_name} with var-name or subscripts
     text = re.sub(r'\\text\{([a-zA-Z0-9]+)_([a-zA-Z0-9]+)\}', r'\1_{\\text{\2}}', text)
-    # Remove \left\{ and \right\}
     text = text.replace(r'\left\{', '{').replace(r'\right\}', '}')
     text = text.replace(r'\{', '{').replace(r'\}', '}')
     return text
@@ -85,7 +83,6 @@ def parse_doxygen_block(doc_lines):
             notes.append(note_match.group(1))
             continue
 
-        # Continuation lines
         if current_mode == "brief":
             brief_lines.append(line)
         elif current_mode == "details":
@@ -133,9 +130,8 @@ def parse_c_file(filepath):
 
             # Look ahead for declaration or definition
             sig_lines = []
-            decl_start = i + 1
+            decl_start_line = None
             i += 1
-            brace_count = 0
             is_struct = False
             is_enum = False
             is_func = False
@@ -146,6 +142,8 @@ def parse_c_file(filepath):
                 if not l or l.startswith("//") or l.startswith("extern \"C\""):
                     i += 1
                     continue
+                if decl_start_line is None:
+                    decl_start_line = i + 1
                 if l.startswith("#define"):
                     sig_lines.append(l)
                     is_define = True
@@ -154,13 +152,11 @@ def parse_c_file(filepath):
                     if "struct" in l: is_struct = True
                     if "enum" in l: is_enum = True
                     sig_lines.append(l)
-                    # collect until closing semicolon
                     while i < n and ";" not in lines[i]:
                         i += 1
                         sig_lines.append(lines[i].strip())
                     break
                 if l.startswith("/**"):
-                    # New doc block without a preceding entity
                     i -= 1
                     break
 
@@ -171,7 +167,6 @@ def parse_c_file(filepath):
                 i += 1
 
             sig = " ".join(sig_lines).strip()
-            # Clean up function signature (remove trailing { or ;)
             if sig.endswith("{"):
                 sig = sig[:-1].strip()
             if sig.endswith(";"):
@@ -179,14 +174,12 @@ def parse_c_file(filepath):
 
             brief, details, params, returns, notes = parse_doxygen_block(doc_lines)
 
-            # Extract identifier name
             name = ""
             if is_func:
                 m = re.search(r'([a-zA-Z0-9_]+)\s*\([^\)]*?\)$', sig)
                 if m:
                     name = m.group(1)
                 else:
-                    # Multi-line args or pointer return
                     m2 = re.search(r'([a-zA-Z0-9_]+)\s*\(', sig)
                     if m2:
                         name = m2.group(1)
@@ -200,6 +193,13 @@ def parse_c_file(filepath):
                     name = m.group(1)
 
             if name and name not in ("if", "for", "while", "switch", "return"):
+                # Compute relative paths:
+                # - docs_rel_path: relative to docs/ (e.g. "../src/lib/algo_voronoi.c") for GitHub repo markdown
+                # - repo_rel_path: relative to repo root (e.g. "src/lib/algo_voronoi.c")
+                repo_rel = os.path.relpath(filepath, REPO_ROOT)
+                docs_rel = os.path.relpath(filepath, DOCS_DIR)
+                target_line = decl_start_line if decl_start_line else doc_start_line
+
                 entities.append({
                     "name": name,
                     "type": "function" if is_func else ("struct" if is_struct else ("enum" if is_enum else "define")),
@@ -209,8 +209,10 @@ def parse_c_file(filepath):
                     "params": params,
                     "returns": returns,
                     "notes": notes,
-                    "line": doc_start_line,
-                    "file": os.path.relpath(filepath, REPO_ROOT)
+                    "line": target_line,
+                    "repo_file": repo_rel,
+                    "docs_file": docs_rel,
+                    "abs_file": filepath
                 })
         else:
             i += 1
@@ -347,7 +349,8 @@ def main():
             file_anchor = fpath.replace("/", "").replace(".", "").lower()
             file_brief, entities = parse_c_file(abs_path)
 
-            out.append(f"### `{fpath}`\n\n")
+            docs_file_rel = os.path.relpath(abs_path, DOCS_DIR)
+            out.append(f"### [`{fpath}`]({docs_file_rel})\n\n")
             if file_brief:
                 out.append(f"**Module Purpose:** {file_brief}\n\n")
 
@@ -358,7 +361,9 @@ def main():
 
             for ent in entities:
                 total_funcs += 1
-                out.append(f"#### [`{ent['name']}`]({ent['file']}#L{ent['line']})\n\n")
+                # Use relative path from docs/ directory (e.g. ../src/lib/algo_voronoi.c#L28)
+                # so that GitHub web UI properly resolves to https://github.com/user/repo/blob/main/src/lib/algo_voronoi.c#L28
+                out.append(f"#### [`{ent['name']}`]({ent['docs_file']}#L{ent['line']})\n\n")
                 out.append("```c\n" + ent["signature"] + ";\n```\n\n")
 
                 if ent["brief"]:
@@ -392,10 +397,12 @@ def main():
 
     print(f"Generated {TARGET_FILE} ({total_funcs} documented functions/entities).")
 
-    # Copy to ~/docs/ per user guidelines
+    # Generate user copy for ~/docs/ with file:// links for IDE navigation
+    user_copy_content = final_content.replace("](../", f"](file://{REPO_ROOT}/")
     os.makedirs(os.path.dirname(USER_DOCS_TARGET), exist_ok=True)
-    shutil.copyfile(TARGET_FILE, USER_DOCS_TARGET)
-    print(f"Copied to {USER_DOCS_TARGET}.")
+    with open(USER_DOCS_TARGET, "w", encoding="utf-8") as f:
+        f.write(user_copy_content)
+    print(f"Copied user document to {USER_DOCS_TARGET} with local file:// links.")
 
 if __name__ == "__main__":
     main()

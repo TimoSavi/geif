@@ -358,7 +358,7 @@ The parser uses `strcasecmp` to match keys case-insensitively, trims comments (`
 
 ## 7. Model Migration Utility (`ceif2geif`)
 
-Located in [`src/cli/ceif2geif.c`](file:///home/timo_savinen_elisa_fi/git/geif/src/cli/ceif2geif.c) (compiled as `bin/ceif2geif`), this utility migrates legacy CEIF models to the modern GEIF-1.0 sparse JSON format:
+Located in [`src/cli/ceif2geif.c`](../src/cli/ceif2geif.c) (compiled as `bin/ceif2geif`), this utility migrates legacy CEIF models to the modern GEIF-1.0 sparse JSON format:
 
 ```bash
 # Ingest legacy model and output validated GEIF-1.0 JSON
@@ -374,7 +374,7 @@ Additionally, `bin/geif -r` automatically detects and transparently loads legacy
 
 ## 8. CLI Streaming Pipeline & Execution Modes
 
-The `geif` executable ([`src/cli/main.c`](file:///home/timo_savinen_elisa_fi/git/geif/src/cli/main.c)) is designed for high-throughput streaming in UNIX pipelines:
+The `geif` executable ([`src/cli/main.c`](../src/cli/main.c)) is designed for high-throughput streaming in UNIX pipelines:
 
 ```bash
 # 1. Training mode: Ingest CSV and emit sparse JSON model

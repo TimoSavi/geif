@@ -95,11 +95,11 @@
 
 Public interfaces, forest/ensemble lifecycle, training dispatch, scoring, JSON persistence, and diagnostics.
 
-### `include/geif/geif.h`
+### [`include/geif/geif.h`](../include/geif/geif.h)
 
 **Module Purpose:** Public C17 API for Geometric Extended Isolation Forest (GEIF).
 
-#### [`geif_config_default`](include/geif/geif.h#L21)
+#### [`geif_config_default`](../include/geif/geif.h#L24)
 
 ```c
 geif_config_t geif_config_default(void);
@@ -109,7 +109,7 @@ geif_config_t geif_config_default(void);
 
 ---
 
-#### [`geif_algo_name`](include/geif/geif.h#L26)
+#### [`geif_algo_name`](../include/geif/geif.h#L29)
 
 ```c
 const char *geif_algo_name(geif_algo_type_t algo);
@@ -119,7 +119,7 @@ const char *geif_algo_name(geif_algo_type_t algo);
 
 ---
 
-#### [`geif_algo_from_name`](include/geif/geif.h#L31)
+#### [`geif_algo_from_name`](../include/geif/geif.h#L35)
 
 ```c
 geif_algo_type_t geif_algo_from_name(const char *name);
@@ -129,7 +129,7 @@ geif_algo_type_t geif_algo_from_name(const char *name);
 
 ---
 
-#### [`geif_forest_create`](include/geif/geif.h#L37)
+#### [`geif_forest_create`](../include/geif/geif.h#L45)
 
 ```c
 geif_status_t geif_forest_create(geif_forest_t **forest_out, uint32_t dimensions, const geif_config_t *config);
@@ -149,7 +149,7 @@ geif_status_t geif_forest_create(geif_forest_t **forest_out, uint32_t dimensions
 
 ---
 
-#### [`geif_forest_destroy`](include/geif/geif.h#L49)
+#### [`geif_forest_destroy`](../include/geif/geif.h#L54)
 
 ```c
 void geif_forest_destroy(geif_forest_t *forest);
@@ -165,7 +165,7 @@ void geif_forest_destroy(geif_forest_t *forest);
 
 ---
 
-#### [`geif_forest_feed`](include/geif/geif.h#L56)
+#### [`geif_forest_feed`](../include/geif/geif.h#L63)
 
 ```c
 geif_status_t geif_forest_feed(geif_forest_t *forest, const double *point);
@@ -184,7 +184,7 @@ geif_status_t geif_forest_feed(geif_forest_t *forest, const double *point);
 
 ---
 
-#### [`geif_forest_train`](include/geif/geif.h#L65)
+#### [`geif_forest_train`](../include/geif/geif.h#L71)
 
 ```c
 geif_status_t geif_forest_train(geif_forest_t *forest);
@@ -202,7 +202,7 @@ geif_status_t geif_forest_train(geif_forest_t *forest);
 
 ---
 
-#### [`geif_forest_evaluate_metric_depth`](include/geif/geif.h#L73)
+#### [`geif_forest_evaluate_metric_depth`](../include/geif/geif.h#L81)
 
 ```c
 double geif_forest_evaluate_metric_depth(const geif_forest_t *f, const double *point, double *d_out_out);
@@ -222,7 +222,7 @@ double geif_forest_evaluate_metric_depth(const geif_forest_t *f, const double *p
 
 ---
 
-#### [`geif_forest_score`](include/geif/geif.h#L85)
+#### [`geif_forest_score`](../include/geif/geif.h#L99)
 
 ```c
 geif_status_t geif_forest_score(const geif_forest_t *forest, const double *point, double *score_out);
@@ -248,7 +248,7 @@ Score semantics:
 
 ---
 
-#### [`geif_forest_score_detailed`](include/geif/geif.h#L103)
+#### [`geif_forest_score_detailed`](../include/geif/geif.h#L113)
 
 ```c
 geif_status_t geif_forest_score_detailed(const geif_forest_t *forest, const double *point, double *score_out, double *metric_depth_out, double *d_out_out);
@@ -270,7 +270,7 @@ geif_status_t geif_forest_score_detailed(const geif_forest_t *forest, const doub
 
 ---
 
-#### [`geif_forest_get_averages`](include/geif/geif.h#L119)
+#### [`geif_forest_get_averages`](../include/geif/geif.h#L126)
 
 ```c
 geif_status_t geif_forest_get_averages(const geif_forest_t *forest, double *averages_out);
@@ -289,7 +289,7 @@ geif_status_t geif_forest_get_averages(const geif_forest_t *forest, double *aver
 
 ---
 
-#### [`geif_forest_dimension_attribution`](include/geif/geif.h#L129)
+#### [`geif_forest_dimension_attribution`](../include/geif/geif.h#L140)
 
 ```c
 geif_status_t geif_forest_dimension_attribution(const geif_forest_t *forest, const double *point, double *attr_scores_out);
@@ -312,7 +312,7 @@ vector with coordinate j taken from point and all other coordinates at category 
 
 ---
 
-#### [`geif_forest_calculate_percentile_score`](include/geif/geif.h#L144)
+#### [`geif_forest_calculate_percentile_score`](../include/geif/geif.h#L151)
 
 ```c
 double geif_forest_calculate_percentile_score(const geif_forest_t *forest, double percentile);
@@ -331,7 +331,7 @@ double geif_forest_calculate_percentile_score(const geif_forest_t *forest, doubl
 
 ---
 
-#### [`geif_forest_save_json`](include/geif/geif.h#L153)
+#### [`geif_forest_save_json`](../include/geif/geif.h#L160)
 
 ```c
 geif_status_t geif_forest_save_json(const geif_forest_t *forest, const char *path);
@@ -350,7 +350,7 @@ geif_status_t geif_forest_save_json(const geif_forest_t *forest, const char *pat
 
 ---
 
-#### [`geif_forest_load_json`](include/geif/geif.h#L162)
+#### [`geif_forest_load_json`](../include/geif/geif.h#L169)
 
 ```c
 geif_status_t geif_forest_load_json(geif_forest_t **forest_out, const char *path);
@@ -369,7 +369,7 @@ geif_status_t geif_forest_load_json(geif_forest_t **forest_out, const char *path
 
 ---
 
-#### [`geif_forest_summary`](include/geif/geif.h#L171)
+#### [`geif_forest_summary`](../include/geif/geif.h#L178)
 
 ```c
 void geif_forest_summary(const geif_forest_t *forest, char *buffer, size_t buffer_size);
@@ -387,7 +387,7 @@ void geif_forest_summary(const geif_forest_t *forest, char *buffer, size_t buffe
 
 ---
 
-#### [`geif_ensemble_create`](include/geif/geif.h#L184)
+#### [`geif_ensemble_create`](../include/geif/geif.h#L187)
 
 ```c
 geif_status_t geif_ensemble_create(geif_ensemble_t **ensemble_out, uint32_t dimensions, const geif_config_t *config);
@@ -397,7 +397,7 @@ geif_status_t geif_ensemble_create(geif_ensemble_t **ensemble_out, uint32_t dime
 
 ---
 
-#### [`geif_ensemble_destroy`](include/geif/geif.h#L191)
+#### [`geif_ensemble_destroy`](../include/geif/geif.h#L194)
 
 ```c
 void geif_ensemble_destroy(geif_ensemble_t *ensemble);
@@ -407,7 +407,7 @@ void geif_ensemble_destroy(geif_ensemble_t *ensemble);
 
 ---
 
-#### [`geif_ensemble_find`](include/geif/geif.h#L196)
+#### [`geif_ensemble_find`](../include/geif/geif.h#L199)
 
 ```c
 geif_forest_t *geif_ensemble_find(const geif_ensemble_t *ensemble, const char *category);
@@ -417,7 +417,7 @@ geif_forest_t *geif_ensemble_find(const geif_ensemble_t *ensemble, const char *c
 
 ---
 
-#### [`geif_ensemble_get_or_create`](include/geif/geif.h#L201)
+#### [`geif_ensemble_get_or_create`](../include/geif/geif.h#L204)
 
 ```c
 geif_forest_t *geif_ensemble_get_or_create(geif_ensemble_t *ensemble, const char *category);
@@ -427,7 +427,7 @@ geif_forest_t *geif_ensemble_get_or_create(geif_ensemble_t *ensemble, const char
 
 ---
 
-#### [`geif_ensemble_feed`](include/geif/geif.h#L206)
+#### [`geif_ensemble_feed`](../include/geif/geif.h#L209)
 
 ```c
 geif_status_t geif_ensemble_feed(geif_ensemble_t *ensemble, const char *category, const double *point);
@@ -437,7 +437,7 @@ geif_status_t geif_ensemble_feed(geif_ensemble_t *ensemble, const char *category
 
 ---
 
-#### [`geif_ensemble_prune_categories`](include/geif/geif.h#L213)
+#### [`geif_ensemble_prune_categories`](../include/geif/geif.h#L216)
 
 ```c
 geif_status_t geif_ensemble_prune_categories(geif_ensemble_t *ensemble, uint64_t min_rows);
@@ -447,7 +447,7 @@ geif_status_t geif_ensemble_prune_categories(geif_ensemble_t *ensemble, uint64_t
 
 ---
 
-#### [`geif_ensemble_prune_age`](include/geif/geif.h#L218)
+#### [`geif_ensemble_prune_age`](../include/geif/geif.h#L226)
 
 ```c
 geif_status_t geif_ensemble_prune_age(geif_ensemble_t *ensemble, time_t max_age_seconds, time_t now);
@@ -467,7 +467,7 @@ geif_status_t geif_ensemble_prune_age(geif_ensemble_t *ensemble, time_t max_age_
 
 ---
 
-#### [`geif_ensemble_train`](include/geif/geif.h#L230)
+#### [`geif_ensemble_train`](../include/geif/geif.h#L233)
 
 ```c
 geif_status_t geif_ensemble_train(geif_ensemble_t *ensemble);
@@ -477,7 +477,7 @@ geif_status_t geif_ensemble_train(geif_ensemble_t *ensemble);
 
 ---
 
-#### [`geif_ensemble_score_detailed`](include/geif/geif.h#L235)
+#### [`geif_ensemble_score_detailed`](../include/geif/geif.h#L238)
 
 ```c
 geif_status_t geif_ensemble_score_detailed(const geif_ensemble_t *ensemble, const char *category, const double *point, double *score_out, double *metric_depth_out, double *d_out_out);
@@ -487,7 +487,7 @@ geif_status_t geif_ensemble_score_detailed(const geif_ensemble_t *ensemble, cons
 
 ---
 
-#### [`geif_ensemble_save_json`](include/geif/geif.h#L245)
+#### [`geif_ensemble_save_json`](../include/geif/geif.h#L248)
 
 ```c
 geif_status_t geif_ensemble_save_json(const geif_ensemble_t *ensemble, const char *path);
@@ -497,7 +497,7 @@ geif_status_t geif_ensemble_save_json(const geif_ensemble_t *ensemble, const cha
 
 ---
 
-#### [`geif_ensemble_load_json`](include/geif/geif.h#L250)
+#### [`geif_ensemble_load_json`](../include/geif/geif.h#L253)
 
 ```c
 geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char *path);
@@ -507,7 +507,7 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
 
 ---
 
-#### [`geif_ensemble_summary`](include/geif/geif.h#L255)
+#### [`geif_ensemble_summary`](../include/geif/geif.h#L258)
 
 ```c
 void geif_ensemble_summary(const geif_ensemble_t *ensemble, char *buffer, size_t buffer_size);
@@ -517,7 +517,7 @@ void geif_ensemble_summary(const geif_ensemble_t *ensemble, char *buffer, size_t
 
 ---
 
-#### [`geif_forest_remove_outliers`](include/geif/geif.h#L260)
+#### [`geif_forest_remove_outliers`](../include/geif/geif.h#L267)
 
 ```c
 geif_status_t geif_forest_remove_outliers(geif_forest_t *f, uint32_t k);
@@ -536,7 +536,7 @@ geif_status_t geif_forest_remove_outliers(geif_forest_t *f, uint32_t k);
 
 ---
 
-#### [`geif_ensemble_remove_outliers`](include/geif/geif.h#L269)
+#### [`geif_ensemble_remove_outliers`](../include/geif/geif.h#L276)
 
 ```c
 geif_status_t geif_ensemble_remove_outliers(geif_ensemble_t *ensemble, uint32_t k);
@@ -555,11 +555,11 @@ geif_status_t geif_ensemble_remove_outliers(geif_ensemble_t *ensemble, uint32_t 
 
 ---
 
-### `include/geif/types.h`
+### [`include/geif/types.h`](../include/geif/types.h)
 
 **Module Purpose:** Core data structures and memory layouts for GEIF.
 
-#### [`geif_algo_type_t`](include/geif/types.h#L37)
+#### [`geif_algo_type_t`](../include/geif/types.h#L40)
 
 ```c
 typedef enum geif_algo_type { GEIF_ALGO_CEIF = 0,        /**< CEIF: Data-anchored isotropic Gaussian cuts with Zero Kelvin & outer decay */ GEIF_ALGO_BUBBLE,          /**< Hyperspherical Bubble Cavity Carving */ GEIF_ALGO_EXEMPLAR,        /**< Non-tree direct SIMD Cauchy density kernel */ GEIF_ALGO_VORONOI          /**< Pure Voronoi perpendicular bisector splits */ } geif_algo_type_t;
@@ -569,11 +569,11 @@ typedef enum geif_algo_type { GEIF_ALGO_CEIF = 0,        /**< CEIF: Data-anchore
 
 ---
 
-### `include/geif/error.h`
+### [`include/geif/error.h`](../include/geif/error.h)
 
 **Module Purpose:** Diagnostic error codes and status indicators for GEIF.
 
-#### [`geif_status_t`](include/geif/error.h#L13)
+#### [`geif_status_t`](../include/geif/error.h#L16)
 
 ```c
 typedef enum geif_status { GEIF_OK                  =  0,  /**< Operation completed successfully */ GEIF_ERR_INVALID_ARG     = -1,  /**< Invalid argument or null pointer */ GEIF_ERR_OUT_OF_MEMORY   = -2,  /**< Memory allocation failure */ GEIF_ERR_IO              = -3,  /**< File I/O read/write error */ GEIF_ERR_FORMAT_CORRUPT  = -4,  /**< Input format or model file corrupted */ GEIF_ERR_EMPTY_DATASET   = -5,  /**< Dataset is empty or insufficient samples */ GEIF_ERR_DIM_MISMATCH    = -6,  /**< Feature dimension count mismatch */ GEIF_ERR_DEGENERATE_DATA = -7,  /**< All data points are completely degenerate */ GEIF_ERR_NOT_SUPPORTED   = -8   /**< Requested algorithm or feature is not supported */ } geif_status_t;
@@ -583,7 +583,7 @@ typedef enum geif_status { GEIF_OK                  =  0,  /**< Operation comple
 
 ---
 
-#### [`geif_status_str`](include/geif/error.h#L28)
+#### [`geif_status_str`](../include/geif/error.h#L34)
 
 ```c
 const char *geif_status_str(geif_status_t status);
@@ -605,11 +605,11 @@ const char *geif_status_str(geif_status_t status);
 
 Pluggable algorithm operations vtable, geometric partition trees (Bubble, Voronoi, CEIF), Exemplar kernel density, and spatial metric depth traversal.
 
-### `src/lib/algo.h`
+### [`src/lib/algo.h`](../src/lib/algo.h)
 
 **Module Purpose:** Internal algorithm abstraction interface and registry for GEIF.
 
-#### [`geif_algo_get_ops`](src/lib/algo.h#L31)
+#### [`geif_algo_get_ops`](../src/lib/algo.h#L34)
 
 ```c
 const geif_algo_ops_t *geif_algo_get_ops(geif_algo_type_t algo);
@@ -619,11 +619,11 @@ const geif_algo_ops_t *geif_algo_get_ops(geif_algo_type_t algo);
 
 ---
 
-### `src/lib/algo_registry.c`
+### [`src/lib/algo_registry.c`](../src/lib/algo_registry.c)
 
 **Module Purpose:** Algorithm registry and dispatching table for GEIF.
 
-#### [`geif_algo_name`](src/lib/algo_registry.c#L10)
+#### [`geif_algo_name`](../src/lib/algo_registry.c#L16)
 
 ```c
 const char *geif_algo_name(geif_algo_type_t algo);
@@ -641,7 +641,7 @@ const char *geif_algo_name(geif_algo_type_t algo);
 
 ---
 
-#### [`geif_algo_from_name`](src/lib/algo_registry.c#L32)
+#### [`geif_algo_from_name`](../src/lib/algo_registry.c#L44)
 
 ```c
 geif_algo_type_t geif_algo_from_name(const char *name);
@@ -665,7 +665,7 @@ Supports canonical names and aliases (case-insensitive):
 
 ---
 
-#### [`geif_algo_get_ops`](src/lib/algo_registry.c#L71)
+#### [`geif_algo_get_ops`](../src/lib/algo_registry.c#L80)
 
 ```c
 const geif_algo_ops_t *geif_algo_get_ops(geif_algo_type_t algo);
@@ -686,11 +686,11 @@ for train, score, serialize, deserialize, and destroy.
 
 ---
 
-### `src/lib/algo_bubble.c`
+### [`src/lib/algo_bubble.c`](../src/lib/algo_bubble.c)
 
 **Module Purpose:** Bubble Algorithm: Hyperspherical cavity carving trees with empty void leaves.
 
-#### [`swap_doubles`](src/lib/algo_bubble.c#L13)
+#### [`swap_doubles`](../src/lib/algo_bubble.c#L16)
 
 ```c
 static inline void swap_doubles(double *a, double *b);
@@ -700,7 +700,7 @@ static inline void swap_doubles(double *a, double *b);
 
 ---
 
-#### [`quickselect_median`](src/lib/algo_bubble.c#L23)
+#### [`quickselect_median`](../src/lib/algo_bubble.c#L34)
 
 ```c
 static double quickselect_median(double *arr, size_t n, size_t k);
@@ -723,7 +723,7 @@ avoiding O(N log N) sorting and eliminating sqrt() operations entirely during tr
 
 ---
 
-#### [`build_bubble_node`](src/lib/algo_bubble.c#L56)
+#### [`build_bubble_node`](../src/lib/algo_bubble.c#L73)
 
 ```c
 static int32_t build_bubble_node(geif_forest_t *f, geif_tree_t *tree, uint32_t *indices, size_t count, uint32_t depth, uint32_t max_depth, double *dists_scratch);
@@ -752,7 +752,7 @@ Non-convex internal cavities terminate into empty void leaves.
 
 ---
 
-#### [`evaluate_bubble_tree`](src/lib/algo_bubble.c#L183)
+#### [`evaluate_bubble_tree`](../src/lib/algo_bubble.c#L194)
 
 ```c
 static double evaluate_bubble_tree(const geif_forest_t *f, const geif_tree_t *tree, const double *scaled_point);
@@ -775,7 +775,7 @@ branches outside. Applies leaf cavity relative distance damping at leaves.
 
 ---
 
-#### [`geif_bubble_train`](src/lib/algo_bubble.c#L236)
+#### [`geif_bubble_train`](../src/lib/algo_bubble.c#L245)
 
 ```c
 static geif_status_t geif_bubble_train(geif_forest_t *f);
@@ -796,7 +796,7 @@ trees with in-place median partitioning and Zero Kelvin universal calibration.
 
 ---
 
-#### [`geif_bubble_score`](src/lib/algo_bubble.c#L300)
+#### [`geif_bubble_score`](../src/lib/algo_bubble.c#L314)
 
 ```c
 static geif_status_t geif_bubble_score(const geif_forest_t *f, const double *point, double *score_out, double *metric_depth_out, double *d_out_out);
@@ -822,11 +822,11 @@ asymptotic exponential stadium attenuation: score = 1 - (1 - score)*exp(-0.10*d_
 
 ---
 
-### `src/lib/algo_voronoi.c`
+### [`src/lib/algo_voronoi.c`](../src/lib/algo_voronoi.c)
 
 **Module Purpose:** Voronoi Algorithm: Pure perpendicular bisector splits between sample pairs.
 
-#### [`build_voronoi_node`](src/lib/algo_voronoi.c#L13)
+#### [`build_voronoi_node`](../src/lib/algo_voronoi.c#L28)
 
 ```c
 static int32_t build_voronoi_node(geif_forest_t *f, geif_tree_t *tree, uint32_t *indices, size_t count, uint32_t depth, uint32_t max_depth);
@@ -853,7 +853,7 @@ p = (A + B) / 2), and partitions points based on the dot product sign.
 
 ---
 
-#### [`geif_voronoi_train`](src/lib/algo_voronoi.c#L172)
+#### [`geif_voronoi_train`](../src/lib/algo_voronoi.c#L181)
 
 ```c
 static geif_status_t geif_voronoi_train(geif_forest_t *f);
@@ -874,7 +874,7 @@ midpoint perpendicular bisector cuts.
 
 ---
 
-#### [`geif_voronoi_score`](src/lib/algo_voronoi.c#L230)
+#### [`geif_voronoi_score`](../src/lib/algo_voronoi.c#L240)
 
 ```c
 static geif_status_t geif_voronoi_score(const geif_forest_t *f, const double *point, double *score_out, double *metric_depth_out, double *d_out_out);
@@ -896,11 +896,11 @@ static geif_status_t geif_voronoi_score(const geif_forest_t *f, const double *po
 
 ---
 
-### `src/lib/algo_exemplar.c`
+### [`src/lib/algo_exemplar.c`](../src/lib/algo_exemplar.c)
 
 **Module Purpose:** Exemplar Algorithm: Non-tree direct SIMD Cauchy density kernel on reservoir samples.
 
-#### [`geif_exemplar_destroy`](src/lib/algo_exemplar.c#L21)
+#### [`geif_exemplar_destroy`](../src/lib/algo_exemplar.c#L26)
 
 ```c
 static void geif_exemplar_destroy(geif_forest_t *f);
@@ -916,7 +916,7 @@ static void geif_exemplar_destroy(geif_forest_t *f);
 
 ---
 
-#### [`geif_exemplar_train`](src/lib/algo_exemplar.c#L36)
+#### [`geif_exemplar_train`](../src/lib/algo_exemplar.c#L45)
 
 ```c
 static geif_status_t geif_exemplar_train(geif_forest_t *f);
@@ -937,7 +937,7 @@ finds its K-nearest neighbors and calculates local bandwidth sigma_i.
 
 ---
 
-#### [`geif_exemplar_score`](src/lib/algo_exemplar.c#L142)
+#### [`geif_exemplar_score`](../src/lib/algo_exemplar.c#L156)
 
 ```c
 static geif_status_t geif_exemplar_score(const geif_forest_t *f, const double *point, double *score_out, double *metric_depth_out, double *d_out_out);
@@ -963,11 +963,11 @@ Score is evaluated as 1.0 - D with outer space stadium attenuation.
 
 ---
 
-### `src/lib/algo_ceif.c`
+### [`src/lib/algo_ceif.c`](../src/lib/algo_ceif.c)
 
 **Module Purpose:** CEIF Algorithm: Data-anchored isotropic Gaussian hyperplanes with Zero Kelvin & outer decay.
 
-#### [`build_ceif_node`](src/lib/algo_ceif.c#L13)
+#### [`build_ceif_node`](../src/lib/algo_ceif.c#L28)
 
 ```c
 static int32_t build_ceif_node(geif_forest_t *f, geif_tree_t *tree, uint32_t *indices, size_t count, uint32_t depth, uint32_t max_depth);
@@ -994,7 +994,7 @@ Gaussian normal vector.
 
 ---
 
-#### [`geif_ceif_train`](src/lib/algo_ceif.c#L182)
+#### [`geif_ceif_train`](../src/lib/algo_ceif.c#L188)
 
 ```c
 static geif_status_t geif_ceif_train(geif_forest_t *f);
@@ -1012,7 +1012,7 @@ static geif_status_t geif_ceif_train(geif_forest_t *f);
 
 ---
 
-#### [`geif_ceif_score`](src/lib/algo_ceif.c#L237)
+#### [`geif_ceif_score`](../src/lib/algo_ceif.c#L247)
 
 ```c
 static geif_status_t geif_ceif_score(const geif_forest_t *f, const double *point, double *score_out, double *metric_depth_out, double *d_out_out);
@@ -1034,11 +1034,11 @@ static geif_status_t geif_ceif_score(const geif_forest_t *f, const double *point
 
 ---
 
-### `src/lib/tree_common.c`
+### [`src/lib/tree_common.c`](../src/lib/tree_common.c)
 
 **Module Purpose:** Implementation of common tree memory allocation, traversal, and calibration.
 
-#### [`init_dimension_scales`](src/lib/tree_common.c#L12)
+#### [`init_dimension_scales`](../src/lib/tree_common.c#L22)
 
 ```c
 void init_dimension_scales(geif_forest_t *f);
@@ -1059,7 +1059,7 @@ average sample spacing (delta_nominal) and harmonic correction factor c(psi).
 
 ---
 
-#### [`allocate_node`](src/lib/tree_common.c#L89)
+#### [`allocate_node`](../src/lib/tree_common.c#L97)
 
 ```c
 int32_t allocate_node(geif_tree_t *tree);
@@ -1079,7 +1079,7 @@ Doubles capacity as needed starting from GEIF_INITIAL_TREE_NODES. Initializes ch
 
 ---
 
-#### [`append_normal`](src/lib/tree_common.c#L113)
+#### [`append_normal`](../src/lib/tree_common.c#L123)
 
 ```c
 uint32_t append_normal(geif_tree_t *tree, const double *normal, uint32_t d);
@@ -1101,7 +1101,7 @@ Expands the tree->normals_pool buffer dynamically as needed.
 
 ---
 
-#### [`append_leaf_samples`](src/lib/tree_common.c#L139)
+#### [`append_leaf_samples`](../src/lib/tree_common.c#L150)
 
 ```c
 uint32_t append_leaf_samples(geif_tree_t *tree, const uint32_t *samples, size_t count);
@@ -1124,7 +1124,7 @@ tree->leaf_samples dynamically starting from GEIF_INITIAL_LEAF_SAMPLES.
 
 ---
 
-#### [`max_heap_sift_down`](src/lib/tree_common.c#L168)
+#### [`max_heap_sift_down`](../src/lib/tree_common.c#L178)
 
 ```c
 static inline void max_heap_sift_down(double *heap, uint32_t i, uint32_t n);
@@ -1145,7 +1145,7 @@ without heap allocations.
 
 ---
 
-#### [`geif_calc_leaf_rel_dist`](src/lib/tree_common.c#L193)
+#### [`geif_calc_leaf_rel_dist`](../src/lib/tree_common.c#L209)
 
 ```c
 double geif_calc_leaf_rel_dist(const geif_forest_t *f, const geif_tree_t *tree, const geif_node_t *node, const double *scaled_point);
@@ -1173,7 +1173,7 @@ squared distances without heap allocations.
 
 ---
 
-#### [`evaluate_tree`](src/lib/tree_common.c#L290)
+#### [`evaluate_tree`](../src/lib/tree_common.c#L302)
 
 ```c
 double evaluate_tree(const geif_forest_t *f, const geif_tree_t *tree, const double *scaled_point);
@@ -1197,7 +1197,7 @@ adjusted by relative leaf distance (rel_dist) and the harmonic function c(n).
 
 ---
 
-#### [`geif_tree_evaluate_metric_depth`](src/lib/tree_common.c#L348)
+#### [`geif_tree_evaluate_metric_depth`](../src/lib/tree_common.c#L361)
 
 ```c
 double geif_tree_evaluate_metric_depth(const geif_forest_t *f, const double *point, double *d_out_out);
@@ -1222,7 +1222,7 @@ d_out in scaled units for subsequent outer decay scoring.
 
 ---
 
-#### [`geif_tree_score_point`](src/lib/tree_common.c#L419)
+#### [`geif_tree_score_point`](../src/lib/tree_common.c#L433)
 
 ```c
 geif_status_t geif_tree_score_point(const geif_forest_t *f, const double *point, double *score_out, double *metric_depth_out, double *d_out_out);
@@ -1248,7 +1248,7 @@ Applies the canonical Isolation Forest exponential mapping s = 2^(-H / c(psi)), 
 
 ---
 
-#### [`geif_tree_find_max_height`](src/lib/tree_common.c#L481)
+#### [`geif_tree_find_max_height`](../src/lib/tree_common.c#L493)
 
 ```c
 void geif_tree_find_max_height(const geif_forest_t *f, const geif_tree_t *t, int32_t node_idx, double depth, double *max_h);
@@ -1271,7 +1271,7 @@ maximum height H_max achievable by any point falling into this tree.
 
 ---
 
-#### [`geif_tree_calibrate`](src/lib/tree_common.c#L530)
+#### [`geif_tree_calibrate`](../src/lib/tree_common.c#L539)
 
 ```c
 void geif_tree_calibrate(geif_forest_t *f);
@@ -1291,11 +1291,11 @@ to compute the average baseline score and empirical dimension means.
 
 ---
 
-### `src/lib/tree_common.h`
+### [`src/lib/tree_common.h`](../src/lib/tree_common.h)
 
 **Module Purpose:** Common tree manipulation, memory allocation, and evaluation utilities.
 
-#### [`init_dimension_scales`](src/lib/tree_common.h#L23)
+#### [`init_dimension_scales`](../src/lib/tree_common.h#L31)
 
 ```c
 void init_dimension_scales(geif_forest_t *f);
@@ -1314,7 +1314,7 @@ dimensions. Normalizes features across disparate aspect ratios.
 
 ---
 
-#### [`allocate_node`](src/lib/tree_common.h#L33)
+#### [`allocate_node`](../src/lib/tree_common.h#L41)
 
 ```c
 int32_t allocate_node(geif_tree_t *tree);
@@ -1334,7 +1334,7 @@ Grows tree->nodes buffer exponentially as needed.
 
 ---
 
-#### [`append_normal`](src/lib/tree_common.h#L43)
+#### [`append_normal`](../src/lib/tree_common.h#L51)
 
 ```c
 uint32_t append_normal(geif_tree_t *tree, const double *normal, uint32_t d);
@@ -1354,7 +1354,7 @@ uint32_t append_normal(geif_tree_t *tree, const double *normal, uint32_t d);
 
 ---
 
-#### [`append_leaf_samples`](src/lib/tree_common.h#L53)
+#### [`append_leaf_samples`](../src/lib/tree_common.h#L61)
 
 ```c
 uint32_t append_leaf_samples(geif_tree_t *tree, const uint32_t *samples, size_t count);
@@ -1374,7 +1374,7 @@ uint32_t append_leaf_samples(geif_tree_t *tree, const uint32_t *samples, size_t 
 
 ---
 
-#### [`geif_calc_leaf_rel_dist`](src/lib/tree_common.h#L63)
+#### [`geif_calc_leaf_rel_dist`](../src/lib/tree_common.h#L75)
 
 ```c
 double geif_calc_leaf_rel_dist(const geif_forest_t *f, const geif_tree_t *tree, const geif_node_t *node, const double *scaled_point);
@@ -1398,7 +1398,7 @@ subset) relative to nominal cluster density (avg_sample_dist) for cavity damping
 
 ---
 
-#### [`evaluate_tree`](src/lib/tree_common.h#L80)
+#### [`evaluate_tree`](../src/lib/tree_common.h#L88)
 
 ```c
 double evaluate_tree(const geif_forest_t *f, const geif_tree_t *tree, const double *scaled_point);
@@ -1418,7 +1418,7 @@ double evaluate_tree(const geif_forest_t *f, const geif_tree_t *tree, const doub
 
 ---
 
-#### [`geif_tree_evaluate_metric_depth`](src/lib/tree_common.h#L92)
+#### [`geif_tree_evaluate_metric_depth`](../src/lib/tree_common.h#L100)
 
 ```c
 double geif_tree_evaluate_metric_depth(const geif_forest_t *f, const double *point, double *d_out_out);
@@ -1438,7 +1438,7 @@ double geif_tree_evaluate_metric_depth(const geif_forest_t *f, const double *poi
 
 ---
 
-#### [`geif_tree_score_point`](src/lib/tree_common.h#L104)
+#### [`geif_tree_score_point`](../src/lib/tree_common.h#L114)
 
 ```c
 geif_status_t geif_tree_score_point(const geif_forest_t *f, const double *point, double *score_out, double *metric_depth_out, double *d_out_out);
@@ -1460,7 +1460,7 @@ geif_status_t geif_tree_score_point(const geif_forest_t *f, const double *point,
 
 ---
 
-#### [`geif_tree_find_max_height`](src/lib/tree_common.h#L120)
+#### [`geif_tree_find_max_height`](../src/lib/tree_common.h#L131)
 
 ```c
 void geif_tree_find_max_height(const geif_forest_t *f, const geif_tree_t *t, int32_t node_idx, double depth, double *max_h);
@@ -1482,7 +1482,7 @@ Used during Zero Kelvin calibration to determine the theoretical deepest path.
 
 ---
 
-#### [`geif_tree_calibrate`](src/lib/tree_common.h#L137)
+#### [`geif_tree_calibrate`](../src/lib/tree_common.h#L145)
 
 ```c
 void geif_tree_calibrate(geif_forest_t *f);
@@ -1501,11 +1501,11 @@ and ensemble average inlier baseline.
 
 ---
 
-### `src/lib/geometry.h`
+### [`src/lib/geometry.h`](../src/lib/geometry.h)
 
 **Module Purpose:** High-performance SIMD geometric routines for Voronoi bisectors and outer space stadium.
 
-#### [`geif_scale_value`](src/lib/geometry.h#L24)
+#### [`geif_scale_value`](../src/lib/geometry.h#L34)
 
 ```c
 static inline double geif_scale_value(double value, double range, double scale_min, double min, double max);
@@ -1527,7 +1527,7 @@ static inline double geif_scale_value(double value, double range, double scale_m
 
 ---
 
-#### [`geif_dist_sq`](src/lib/geometry.h#L40)
+#### [`geif_dist_sq`](../src/lib/geometry.h#L50)
 
 ```c
 static inline double geif_dist_sq(const double * restrict a, const double * restrict b, uint32_t d);
@@ -1549,7 +1549,7 @@ Provides specialized unrolled branches for 2D and 3D with compiler vectorization
 
 ---
 
-#### [`geif_gaussrand`](src/lib/geometry.h#L76)
+#### [`geif_gaussrand`](../src/lib/geometry.h#L81)
 
 ```c
 static inline double geif_gaussrand(void);
@@ -1561,7 +1561,7 @@ static inline double geif_gaussrand(void);
 
 ---
 
-#### [`geif_dot`](src/lib/geometry.h#L98)
+#### [`geif_dot`](../src/lib/geometry.h#L102)
 
 ```c
 static inline double geif_dot(const double * restrict a, const double * restrict b, uint32_t d);
@@ -1571,7 +1571,7 @@ static inline double geif_dot(const double * restrict a, const double * restrict
 
 ---
 
-#### [`geif_stadium_distance`](src/lib/geometry.h#L118)
+#### [`geif_stadium_distance`](../src/lib/geometry.h#L122)
 
 ```c
 static inline double geif_stadium_distance(const double * restrict x, const double * restrict env_min, const double * restrict env_max, const double * restrict effective_span, uint32_t d);
@@ -1581,7 +1581,7 @@ static inline double geif_stadium_distance(const double * restrict x, const doub
 
 ---
 
-#### [`geif_compute_bisector`](src/lib/geometry.h#L147)
+#### [`geif_compute_bisector`](../src/lib/geometry.h#L156)
 
 ```c
 static inline bool geif_compute_bisector(const double * restrict A, const double * restrict B, const double * restrict effective_span, const uint8_t * restrict dim_active, uint32_t d, double * restrict normal_out, double * restrict pdotn_out, double * restrict delta_out);
@@ -1597,7 +1597,7 @@ Returns false if points A and B are identical (delta < 1e-12).
 
 ---
 
-#### [`geif_residual_distance`](src/lib/geometry.h#L194)
+#### [`geif_residual_distance`](../src/lib/geometry.h#L197)
 
 ```c
 static inline double geif_residual_distance(const double * restrict x, const double * restrict P_leaf, const double * restrict effective_span, const uint8_t * restrict dim_active, uint32_t d);
@@ -1611,11 +1611,11 @@ static inline double geif_residual_distance(const double * restrict x, const dou
 
 Streaming reservoir ingestion, multi-category ensemble routing, calibration, inlier baselines, dimension attribution, and sparse JSON I/O.
 
-### `src/lib/forest.c`
+### [`src/lib/forest.c`](../src/lib/forest.c)
 
 **Module Purpose:** Lifecycle management, initialization, and deallocation for GEIF forests.
 
-#### [`geif_config_default`](src/lib/forest.c#L13)
+#### [`geif_config_default`](../src/lib/forest.c#L26)
 
 ```c
 geif_config_t geif_config_default(void);
@@ -1635,7 +1635,7 @@ Defaults:
 
 ---
 
-#### [`geif_forest_create`](src/lib/forest.c#L40)
+#### [`geif_forest_create`](../src/lib/forest.c#L52)
 
 ```c
 geif_status_t geif_forest_create(geif_forest_t **forest_out, uint32_t dimensions, const geif_config_t *config);
@@ -1659,7 +1659,7 @@ and individual tree structures. Seeds PRNG if seed is 0.
 
 ---
 
-#### [`geif_forest_destroy`](src/lib/forest.c#L121)
+#### [`geif_forest_destroy`](../src/lib/forest.c#L131)
 
 ```c
 void geif_forest_destroy(geif_forest_t *f);
@@ -1680,7 +1680,7 @@ and finally frees the forest container. Safe to invoke with NULL.
 
 ---
 
-#### [`geif_forest_summary`](src/lib/forest.c#L167)
+#### [`geif_forest_summary`](../src/lib/forest.c#L178)
 
 ```c
 void geif_forest_summary(const geif_forest_t *f, char *buf, size_t size);
@@ -1702,11 +1702,11 @@ the destination string buffer.
 
 ---
 
-### `src/lib/train.c`
+### [`src/lib/train.c`](../src/lib/train.c)
 
 **Module Purpose:** Unified training dispatcher for GEIF algorithms.
 
-#### [`geif_forest_train`](src/lib/train.c#L9)
+#### [`geif_forest_train`](../src/lib/train.c#L19)
 
 ```c
 geif_status_t geif_forest_train(geif_forest_t *f);
@@ -1728,11 +1728,11 @@ f->config.algo (e.g., bubble, voronoi, exemplar, ceif).
 
 ---
 
-### `src/lib/evaluate.c`
+### [`src/lib/evaluate.c`](../src/lib/evaluate.c)
 
 **Module Purpose:** Inference engine, continuous metric depth traversal, leaf void damping, and outer stadium decay.
 
-#### [`geif_init_c_cache`](src/lib/evaluate.c#L15)
+#### [`geif_init_c_cache`](../src/lib/evaluate.c#L21)
 
 ```c
 void geif_init_c_cache(void);
@@ -1745,7 +1745,7 @@ harmonic number accumulation to avoid expensive logarithmic approximations.
 
 ---
 
-#### [`geif_c`](src/lib/evaluate.c#L34)
+#### [`geif_c`](../src/lib/evaluate.c#L44)
 
 ```c
 double geif_c(double n);
@@ -1767,7 +1767,7 @@ c(n) = 2 * (ln(n-1) + 0.5772156649 + 1/(2*(n-1)) - 1/(12*(n-1)^2)) - 2*(n-1)/n.
 
 ---
 
-#### [`geif_forest_evaluate_metric_depth`](src/lib/evaluate.c#L60)
+#### [`geif_forest_evaluate_metric_depth`](../src/lib/evaluate.c#L71)
 
 ```c
 double geif_forest_evaluate_metric_depth(const geif_forest_t *f, const double *point, double *d_out_out);
@@ -1790,7 +1790,7 @@ computing continuous tree traversal depth and exterior bounding box Euclidean di
 
 ---
 
-#### [`geif_forest_score_detailed`](src/lib/evaluate.c#L89)
+#### [`geif_forest_score_detailed`](../src/lib/evaluate.c#L104)
 
 ```c
 geif_status_t geif_forest_score_detailed(const geif_forest_t *f, const double *point, double *score_out, double *metric_depth_out, double *d_out_out);
@@ -1817,7 +1817,7 @@ Dispatches to the active algorithm engine to compute:
 
 ---
 
-#### [`geif_forest_score`](src/lib/evaluate.c#L120)
+#### [`geif_forest_score`](../src/lib/evaluate.c#L130)
 
 ```c
 geif_status_t geif_forest_score(const geif_forest_t *f, const double *point, double *score_out);
@@ -1839,7 +1839,7 @@ Convenience wrapper around geif_forest_score_detailed().
 
 ---
 
-#### [`geif_forest_get_averages`](src/lib/evaluate.c#L137)
+#### [`geif_forest_get_averages`](../src/lib/evaluate.c#L147)
 
 ```c
 geif_status_t geif_forest_get_averages(const geif_forest_t *forest, double *averages_out);
@@ -1861,7 +1861,7 @@ reservoir pool samples, or takes the midpoint of the coordinate bounding envelop
 
 ---
 
-#### [`geif_forest_dimension_attribution`](src/lib/evaluate.c#L182)
+#### [`geif_forest_dimension_attribution`](../src/lib/evaluate.c#L194)
 
 ```c
 geif_status_t geif_forest_dimension_attribution(const geif_forest_t *forest, const double *point, double *attr_scores_out);
@@ -1885,7 +1885,7 @@ evaluating the resulting score.
 
 ---
 
-#### [`pscore_cmp`](src/lib/evaluate.c#L231)
+#### [`pscore_cmp`](../src/lib/evaluate.c#L234)
 
 ```c
 static int pscore_cmp(const void *a, const void *b);
@@ -1895,7 +1895,7 @@ static int pscore_cmp(const void *a, const void *b);
 
 ---
 
-#### [`geif_forest_calculate_percentile_score`](src/lib/evaluate.c#L243)
+#### [`geif_forest_calculate_percentile_score`](../src/lib/evaluate.c#L253)
 
 ```c
 double geif_forest_calculate_percentile_score(const geif_forest_t *forest, double percentile);
@@ -1917,11 +1917,11 @@ the score array ascendingly via qsort, and returns the score at rank (N - 1) * (
 
 ---
 
-### `src/lib/ensemble.c`
+### [`src/lib/ensemble.c`](../src/lib/ensemble.c)
 
 **Module Purpose:** Multi-category sub-forest ensemble management, dynamic routing, and lifecycle.
 
-#### [`ensemble_hash`](src/lib/ensemble.c#L15)
+#### [`ensemble_hash`](../src/lib/ensemble.c#L21)
 
 ```c
 static uint32_t ensemble_hash(const char *str);
@@ -1939,7 +1939,7 @@ static uint32_t ensemble_hash(const char *str);
 
 ---
 
-#### [`ensemble_rehash`](src/lib/ensemble.c#L32)
+#### [`ensemble_rehash`](../src/lib/ensemble.c#L37)
 
 ```c
 static void ensemble_rehash(geif_ensemble_t *ens);
@@ -1955,7 +1955,7 @@ static void ensemble_rehash(geif_ensemble_t *ens);
 
 ---
 
-#### [`geif_ensemble_create`](src/lib/ensemble.c#L60)
+#### [`geif_ensemble_create`](../src/lib/ensemble.c#L71)
 
 ```c
 geif_status_t geif_ensemble_create(geif_ensemble_t **ensemble_out, uint32_t dimensions, const geif_config_t *config);
@@ -1978,7 +1978,7 @@ sub-forest dispatching based on category labels.
 
 ---
 
-#### [`geif_ensemble_destroy`](src/lib/ensemble.c#L106)
+#### [`geif_ensemble_destroy`](../src/lib/ensemble.c#L114)
 
 ```c
 void geif_ensemble_destroy(geif_ensemble_t *ens);
@@ -1997,7 +1997,7 @@ and frees the ensemble container. Safe to invoke with NULL.
 
 ---
 
-#### [`geif_ensemble_find`](src/lib/ensemble.c#L145)
+#### [`geif_ensemble_find`](../src/lib/ensemble.c#L152)
 
 ```c
 geif_forest_t *geif_ensemble_find(const geif_ensemble_t *ens, const char *category);
@@ -2016,7 +2016,7 @@ geif_forest_t *geif_ensemble_find(const geif_ensemble_t *ens, const char *catego
 
 ---
 
-#### [`geif_ensemble_get_or_create`](src/lib/ensemble.c#L172)
+#### [`geif_ensemble_get_or_create`](../src/lib/ensemble.c#L183)
 
 ```c
 geif_forest_t *geif_ensemble_get_or_create(geif_ensemble_t *ens, const char *category);
@@ -2039,7 +2039,7 @@ specifications to the newly instantiated sub-forest.
 
 ---
 
-#### [`geif_ensemble_feed`](src/lib/ensemble.c#L242)
+#### [`geif_ensemble_feed`](../src/lib/ensemble.c#L254)
 
 ```c
 geif_status_t geif_ensemble_feed(geif_ensemble_t *ens, const char *category, const double *point);
@@ -2063,7 +2063,7 @@ streaming reservoir sampling.
 
 ---
 
-#### [`geif_ensemble_prune_categories`](src/lib/ensemble.c#L280)
+#### [`geif_ensemble_prune_categories`](../src/lib/ensemble.c#L290)
 
 ```c
 geif_status_t geif_ensemble_prune_categories(geif_ensemble_t *ens, uint64_t min_rows);
@@ -2085,7 +2085,7 @@ and rebuilds the category hash table.
 
 ---
 
-#### [`geif_ensemble_prune_age`](src/lib/ensemble.c#L336)
+#### [`geif_ensemble_prune_age`](../src/lib/ensemble.c#L344)
 
 ```c
 geif_status_t geif_ensemble_prune_age(geif_ensemble_t *ens, time_t max_age_seconds, time_t now);
@@ -2105,7 +2105,7 @@ geif_status_t geif_ensemble_prune_age(geif_ensemble_t *ens, time_t max_age_secon
 
 ---
 
-#### [`geif_ensemble_train`](src/lib/ensemble.c#L393)
+#### [`geif_ensemble_train`](../src/lib/ensemble.c#L402)
 
 ```c
 geif_status_t geif_ensemble_train(geif_ensemble_t *ens);
@@ -2126,7 +2126,7 @@ sub-forest with pool_count > 0.
 
 ---
 
-#### [`geif_ensemble_score_detailed`](src/lib/ensemble.c#L419)
+#### [`geif_ensemble_score_detailed`](../src/lib/ensemble.c#L434)
 
 ```c
 geif_status_t geif_ensemble_score_detailed(const geif_ensemble_t *ens, const char *category, const double *point, double *score_out, double *metric_depth_out, double *d_out_out);
@@ -2153,7 +2153,7 @@ training, returns maximum outlier score (1.0 - 1e-6) and GEIF_ERR_INVALID_ARG.
 
 ---
 
-#### [`geif_ensemble_summary`](src/lib/ensemble.c#L470)
+#### [`geif_ensemble_summary`](../src/lib/ensemble.c#L480)
 
 ```c
 void geif_ensemble_summary(const geif_ensemble_t *ens, char *buffer, size_t buffer_size);
@@ -2174,7 +2174,7 @@ for each sub-forest (rows seen, pool size, tree count, calibrated H_max, timesta
 
 ---
 
-#### [`geif_forest_remove_outliers`](src/lib/ensemble.c#L525)
+#### [`geif_forest_remove_outliers`](../src/lib/ensemble.c#L536)
 
 ```c
 geif_status_t geif_forest_remove_outliers(geif_forest_t *f, uint32_t k);
@@ -2197,7 +2197,7 @@ memmove, and retrains the trees to recalibrate spatial boundaries without outlie
 
 ---
 
-#### [`geif_ensemble_remove_outliers`](src/lib/ensemble.c#L576)
+#### [`geif_ensemble_remove_outliers`](../src/lib/ensemble.c#L583)
 
 ```c
 geif_status_t geif_ensemble_remove_outliers(geif_ensemble_t *ens, uint32_t k);
@@ -2216,11 +2216,11 @@ geif_status_t geif_ensemble_remove_outliers(geif_ensemble_t *ens, uint32_t k);
 
 ---
 
-### `src/lib/reservoir.c`
+### [`src/lib/reservoir.c`](../src/lib/reservoir.c)
 
 **Module Purpose:** Streaming reservoir sampling with adaptive ceiling factor.
 
-#### [`geif_forest_feed`](src/lib/reservoir.c#L10)
+#### [`geif_forest_feed`](../src/lib/reservoir.c#L25)
 
 ```c
 geif_status_t geif_forest_feed(geif_forest_t *f, const double *point);
@@ -2247,11 +2247,11 @@ existing sample in that slot is replaced.
 
 ---
 
-### `src/lib/json_io.c`
+### [`src/lib/json_io.c`](../src/lib/json_io.c)
 
 **Module Purpose:** JSON serialization and deserialization for GEIF models and ensembles.
 
-#### [`geif_clean_double_json`](src/lib/json_io.c#L16)
+#### [`geif_clean_double_json`](../src/lib/json_io.c#L26)
 
 ```c
 static struct json_object *geif_clean_double_json(double val, int decimals);
@@ -2273,7 +2273,7 @@ and removing trailing decimal zeros and negative zeros ("-0").
 
 ---
 
-#### [`geif_forest_to_json_object`](src/lib/json_io.c#L44)
+#### [`geif_forest_to_json_object`](../src/lib/json_io.c#L53)
 
 ```c
 struct json_object *geif_forest_to_json_object(const geif_forest_t *f);
@@ -2294,7 +2294,7 @@ calibration parameters, and the raw reservoir sample pool.
 
 ---
 
-#### [`geif_forest_from_json_object`](src/lib/json_io.c#L112)
+#### [`geif_forest_from_json_object`](../src/lib/json_io.c#L122)
 
 ```c
 geif_status_t geif_forest_from_json_object(geif_forest_t **forest_out, struct json_object *root);
@@ -2316,7 +2316,7 @@ builds and calibrates the tree structures in RAM.
 
 ---
 
-#### [`geif_forest_save_json`](src/lib/json_io.c#L333)
+#### [`geif_forest_save_json`](../src/lib/json_io.c#L340)
 
 ```c
 geif_status_t geif_forest_save_json(const geif_forest_t *f, const char *path);
@@ -2335,7 +2335,7 @@ geif_status_t geif_forest_save_json(const geif_forest_t *f, const char *path);
 
 ---
 
-#### [`geif_ensemble_save_json`](src/lib/json_io.c#L359)
+#### [`geif_ensemble_save_json`](../src/lib/json_io.c#L369)
 
 ```c
 geif_status_t geif_ensemble_save_json(const geif_ensemble_t *ens, const char *path);
@@ -2357,7 +2357,7 @@ of sub-forest objects with their respective sample pools and metadata.
 
 ---
 
-#### [`geif_ensemble_load_json`](src/lib/json_io.c#L427)
+#### [`geif_ensemble_load_json`](../src/lib/json_io.c#L437)
 
 ```c
 geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char *path);
@@ -2379,7 +2379,7 @@ model schemas, dynamically reconstructing memory structures and building trees.
 
 ---
 
-#### [`geif_forest_load_json`](src/lib/json_io.c#L657)
+#### [`geif_forest_load_json`](../src/lib/json_io.c#L667)
 
 ```c
 geif_status_t geif_forest_load_json(geif_forest_t **forest_out, const char *path);
@@ -2401,11 +2401,11 @@ and extracts its primary/first sub-forest.
 
 ---
 
-### `src/lib/error.c`
+### [`src/lib/error.c`](../src/lib/error.c)
 
 **Module Purpose:** Error code string formatting.
 
-#### [`geif_status_str`](src/lib/error.c#L8)
+#### [`geif_status_str`](../src/lib/error.c#L14)
 
 ```c
 const char *geif_status_str(geif_status_t status);
@@ -2427,11 +2427,11 @@ const char *geif_status_str(geif_status_t status);
 
 Command-line pipeline driver, streaming loops, OOM-safe memory allocation, column extraction, color companding, RC configuration parsing, and legacy model migration.
 
-### `src/cli/main.c`
+### [`src/cli/main.c`](../src/cli/main.c)
 
 **Module Purpose:** GEIF CLI frontend for training, inference, and model management.
 
-#### [`print_usage`](src/cli/main.c#L23)
+#### [`print_usage`](../src/cli/main.c#L28)
 
 ```c
 static void print_usage(const char *prog);
@@ -2447,7 +2447,7 @@ static void print_usage(const char *prog);
 
 ---
 
-#### [`tokenize_line`](src/cli/main.c#L75)
+#### [`tokenize_line`](../src/cli/main.c#L87)
 
 ```c
 static uint32_t tokenize_line(char *line, char delim, char **tokens, uint32_t max_tokens);
@@ -2471,7 +2471,7 @@ delimiters, and trims surrounding whitespace. Modifies the input line buffer in-
 
 ---
 
-#### [`parse_delete_interval`](src/cli/main.c#L132)
+#### [`parse_delete_interval`](../src/cli/main.c#L141)
 
 ```c
 static time_t parse_delete_interval(const char *s);
@@ -2492,7 +2492,7 @@ Supports units: 'y' (years), 'm'/'M' (months or minutes depending on context),
 
 ---
 
-#### [`process_scoring_row`](src/cli/main.c#L187)
+#### [`process_scoring_row`](../src/cli/main.c#L221)
 
 ```c
 static void process_scoring_row(geif_ensemble_t *ensemble, const geif_column_config_t *col_cfg, const cat_filter_t *cat_filter, char **tokens, uint32_t n_tok, const char *orig_line, uint64_t line_num, char list_sep, char cat_sep, double threshold, bool threshold_is_average, bool threshold_is_percentage, bool silent_outliers, const char *point_tmpl, const char *average_tmpl, const char *new_cat_tmpl, int decimals, const char *printf_format, const char *print_dimension, uint32_t low_rgb, uint32_t high_rgb, double *vec, uint32_t dims, FILE *out_fp, uint64_t *analyzed, uint64_t *total_outliers);
@@ -2537,7 +2537,7 @@ determines outlier status against threshold, and formats output via templates.
 
 ---
 
-#### [`process_categorize_row`](src/cli/main.c#L382)
+#### [`process_categorize_row`](../src/cli/main.c#L414)
 
 ```c
 static void process_categorize_row(geif_ensemble_t *ensemble, const geif_column_config_t *col_cfg, bool direct_feature_mapping, const cat_filter_t *cat_filter, char **tokens, uint32_t n_tok, const char *orig_line, uint64_t line_num, char list_sep, char cat_sep, double threshold, bool threshold_is_average, bool threshold_is_percentage, bool score_limit_given, const char *point_tmpl, int decimals, const char *printf_format, const char *print_dimension, uint32_t low_rgb, uint32_t high_rgb, double *vec, uint32_t dims, FILE *out_fp, uint64_t *analyzed);
@@ -2580,7 +2580,7 @@ checks outlier threshold limits, and outputs the assigned classification.
 
 ---
 
-#### [`update_ensemble_percentage_scores`](src/cli/main.c#L552)
+#### [`update_ensemble_percentage_scores`](../src/cli/main.c#L562)
 
 ```c
 static void update_ensemble_percentage_scores(geif_ensemble_t *ens, double pct, bool verbose);
@@ -2601,7 +2601,7 @@ to the given cumulative percentile (e.g. 80% or 95%).
 
 ---
 
-#### [`main`](src/cli/main.c#L578)
+#### [`main`](../src/cli/main.c#L589)
 
 ```c
 int main(int argc, char *argv[]);
@@ -2624,11 +2624,11 @@ synthetic test grid generation (-T), and real-time anomaly inference (-a/-c).
 
 ---
 
-### `src/cli/columns.c`
+### [`src/cli/columns.c`](../src/cli/columns.c)
 
 **Module Purpose:** Column range specification parsing and feature masking for GEIF CLI.
 
-#### [`trim_whitespace`](src/cli/columns.c#L14)
+#### [`trim_whitespace`](../src/cli/columns.c#L20)
 
 ```c
 static char *trim_whitespace(char *str);
@@ -2646,7 +2646,7 @@ static char *trim_whitespace(char *str);
 
 ---
 
-#### [`geif_parse_dim_spec`](src/cli/columns.c#L30)
+#### [`geif_parse_dim_spec`](../src/cli/columns.c#L41)
 
 ```c
 int geif_parse_dim_spec(const char *spec, uint32_t *indices, uint32_t max_indices);
@@ -2669,7 +2669,7 @@ Parses tokens such as "1,3,5-8" into an array of distinct 0-based indices
 
 ---
 
-#### [`geif_has_col_index`](src/cli/columns.c#L105)
+#### [`geif_has_col_index`](../src/cli/columns.c#L113)
 
 ```c
 bool geif_has_col_index(uint32_t col_idx, const uint32_t *list, uint32_t count);
@@ -2689,7 +2689,7 @@ bool geif_has_col_index(uint32_t col_idx, const uint32_t *list, uint32_t count);
 
 ---
 
-#### [`geif_column_config_init`](src/cli/columns.c#L122)
+#### [`geif_column_config_init`](../src/cli/columns.c#L134)
 
 ```c
 void geif_column_config_init(geif_column_config_t *cfg, const char *ignore_spec, const char *include_spec, const char *label_spec, const char *category_spec);
@@ -2712,7 +2712,7 @@ include (-U), label (-L), and category (-C).
 
 ---
 
-#### [`geif_column_config_free`](src/cli/columns.c#L165)
+#### [`geif_column_config_free`](../src/cli/columns.c#L170)
 
 ```c
 void geif_column_config_free(geif_column_config_t *cfg);
@@ -2728,7 +2728,7 @@ void geif_column_config_free(geif_column_config_t *cfg);
 
 ---
 
-#### [`geif_column_config_resolve`](src/cli/columns.c#L179)
+#### [`geif_column_config_resolve`](../src/cli/columns.c#L192)
 
 ```c
 bool geif_column_config_resolve(geif_column_config_t *cfg, uint32_t total_cols);
@@ -2753,7 +2753,7 @@ Determines the set of numerical feature columns by applying precedence:
 
 ---
 
-#### [`geif_extract_features`](src/cli/columns.c#L227)
+#### [`geif_extract_features`](../src/cli/columns.c#L239)
 
 ```c
 bool geif_extract_features(const geif_column_config_t *cfg, char **tokens, uint32_t total_cols, double *vec);
@@ -2777,7 +2777,7 @@ Replaces non-numeric tokens, NaNs, and infinities with 0.0.
 
 ---
 
-#### [`geif_extract_label`](src/cli/columns.c#L265)
+#### [`geif_extract_label`](../src/cli/columns.c#L277)
 
 ```c
 void geif_extract_label(const geif_column_config_t *cfg, char **tokens, uint32_t total_cols, char sep, char *out_buf, size_t max_len);
@@ -2800,7 +2800,7 @@ Joins label fields using the specified separator character.
 
 ---
 
-#### [`geif_extract_category`](src/cli/columns.c#L314)
+#### [`geif_extract_category`](../src/cli/columns.c#L327)
 
 ```c
 void geif_extract_category(const geif_column_config_t *cfg, char **tokens, uint32_t total_cols, char sep, char *out_buf, size_t max_len);
@@ -2824,11 +2824,11 @@ the lookup key for ensemble sub-forest dispatching.
 
 ---
 
-### `src/cli/columns.h`
+### [`src/cli/columns.h`](../src/cli/columns.h)
 
 **Module Purpose:** Column range specification parsing and feature masking for GEIF CLI.
 
-#### [`geif_parse_dim_spec`](src/cli/columns.h#L39)
+#### [`geif_parse_dim_spec`](../src/cli/columns.h#L44)
 
 ```c
 int geif_parse_dim_spec(const char *spec, uint32_t *indices, uint32_t max_indices);
@@ -2840,7 +2840,7 @@ int geif_parse_dim_spec(const char *spec, uint32_t *indices, uint32_t max_indice
 
 ---
 
-#### [`geif_column_config_init`](src/cli/columns.h#L46)
+#### [`geif_column_config_init`](../src/cli/columns.h#L49)
 
 ```c
 void geif_column_config_init(geif_column_config_t *cfg, const char *ignore_spec, const char *include_spec, const char *label_spec, const char *category_spec);
@@ -2850,7 +2850,7 @@ void geif_column_config_init(geif_column_config_t *cfg, const char *ignore_spec,
 
 ---
 
-#### [`geif_column_config_free`](src/cli/columns.h#L55)
+#### [`geif_column_config_free`](../src/cli/columns.h#L58)
 
 ```c
 void geif_column_config_free(geif_column_config_t *cfg);
@@ -2860,7 +2860,7 @@ void geif_column_config_free(geif_column_config_t *cfg);
 
 ---
 
-#### [`geif_column_config_resolve`](src/cli/columns.h#L60)
+#### [`geif_column_config_resolve`](../src/cli/columns.h#L65)
 
 ```c
 bool geif_column_config_resolve(geif_column_config_t *cfg, uint32_t total_cols);
@@ -2870,7 +2870,7 @@ bool geif_column_config_resolve(geif_column_config_t *cfg, uint32_t total_cols);
 
 ---
 
-#### [`geif_has_col_index`](src/cli/columns.h#L67)
+#### [`geif_has_col_index`](../src/cli/columns.h#L70)
 
 ```c
 bool geif_has_col_index(uint32_t col_idx, const uint32_t *list, uint32_t count);
@@ -2880,7 +2880,7 @@ bool geif_has_col_index(uint32_t col_idx, const uint32_t *list, uint32_t count);
 
 ---
 
-#### [`geif_extract_features`](src/cli/columns.h#L72)
+#### [`geif_extract_features`](../src/cli/columns.h#L76)
 
 ```c
 bool geif_extract_features(const geif_column_config_t *cfg, char **tokens, uint32_t total_cols, double *vec);
@@ -2890,7 +2890,7 @@ bool geif_extract_features(const geif_column_config_t *cfg, char **tokens, uint3
 
 ---
 
-#### [`geif_extract_label`](src/cli/columns.h#L81)
+#### [`geif_extract_label`](../src/cli/columns.h#L85)
 
 ```c
 void geif_extract_label(const geif_column_config_t *cfg, char **tokens, uint32_t total_cols, char sep, char *out_buf, size_t max_len);
@@ -2900,7 +2900,7 @@ void geif_extract_label(const geif_column_config_t *cfg, char **tokens, uint32_t
 
 ---
 
-#### [`geif_extract_category`](src/cli/columns.h#L92)
+#### [`geif_extract_category`](../src/cli/columns.h#L96)
 
 ```c
 void geif_extract_category(const geif_column_config_t *cfg, char **tokens, uint32_t total_cols, char sep, char *out_buf, size_t max_len);
@@ -2910,11 +2910,11 @@ void geif_extract_category(const geif_column_config_t *cfg, char **tokens, uint3
 
 ---
 
-### `src/cli/template.c`
+### [`src/cli/template.c`](../src/cli/template.c)
 
 **Module Purpose:** Full-featured output templating and attribution engine for GEIF CLI.
 
-#### [`srgb_companding`](src/cli/template.c#L11)
+#### [`srgb_companding`](../src/cli/template.c#L19)
 
 ```c
 static inline void srgb_companding(double *color);
@@ -2933,7 +2933,7 @@ to perception-corrected display RGB values.
 
 ---
 
-#### [`score_to_rgb`](src/cli/template.c#L29)
+#### [`score_to_rgb`](../src/cli/template.c#L40)
 
 ```c
 static uint32_t score_to_rgb(double score, uint32_t low_rgb, uint32_t high_rgb);
@@ -2956,7 +2956,7 @@ to produce visually uniform color gradients for UI/CLI output (%x).
 
 ---
 
-#### [`format_double`](src/cli/template.c#L68)
+#### [`format_double`](../src/cli/template.c#L78)
 
 ```c
 static int format_double(char *buf, size_t buf_sz, double val, int decimals, const char *fmt);
@@ -2978,7 +2978,7 @@ static int format_double(char *buf, size_t buf_sz, double val, int decimals, con
 
 ---
 
-#### [`geif_format_template`](src/cli/template.c#L90)
+#### [`geif_format_template`](../src/cli/template.c#L102)
 
 ```c
 size_t geif_format_template(char *out, size_t out_size, const char *tmpl, const geif_template_context_t *ctx);
@@ -3002,11 +3002,11 @@ Evaluates tokens such as %s (score), %l (label), %c (category), %m (metric depth
 
 ---
 
-### `src/cli/template.h`
+### [`src/cli/template.h`](../src/cli/template.h)
 
 **Module Purpose:** Output templating engine for GEIF CLI (-p, -v, -N, -M).
 
-#### [`geif_format_template`](src/cli/template.h#L46)
+#### [`geif_format_template`](../src/cli/template.h#L80)
 
 ```c
 size_t geif_format_template(char *out, size_t out_size, const char *tmpl, const geif_template_context_t *ctx);
@@ -3052,11 +3052,11 @@ Inside dimension template (-j, expanded by %m):
 
 ---
 
-### `src/cli/rcfile.c`
+### [`src/cli/rcfile.c`](../src/cli/rcfile.c)
 
 **Module Purpose:** Run-command (RC) configuration file parser for GEIF.
 
-#### [`geif_rc_config_init`](src/cli/rcfile.c#L12)
+#### [`geif_rc_config_init`](../src/cli/rcfile.c#L17)
 
 ```c
 void geif_rc_config_init(geif_rc_config_t *rc);
@@ -3072,7 +3072,7 @@ void geif_rc_config_init(geif_rc_config_t *rc);
 
 ---
 
-#### [`expand_path`](src/cli/rcfile.c#L24)
+#### [`expand_path`](../src/cli/rcfile.c#L31)
 
 ```c
 static void expand_path(const char *in, char *out, size_t out_size);
@@ -3090,7 +3090,7 @@ static void expand_path(const char *in, char *out, size_t out_size);
 
 ---
 
-#### [`extract_value`](src/cli/rcfile.c#L44)
+#### [`extract_value`](../src/cli/rcfile.c#L54)
 
 ```c
 static char *extract_value(char *line, const char *key);
@@ -3112,7 +3112,7 @@ and double quotes around string values.
 
 ---
 
-#### [`geif_rc_parse_file`](src/cli/rcfile.c#L83)
+#### [`geif_rc_parse_file`](../src/cli/rcfile.c#L93)
 
 ```c
 bool geif_rc_parse_file(geif_rc_config_t *rc, const char *filepath);
@@ -3134,7 +3134,7 @@ and hex color codes. Ignores comments ('#') and blank lines.
 
 ---
 
-#### [`geif_rc_load_default`](src/cli/rcfile.c#L156)
+#### [`geif_rc_load_default`](../src/cli/rcfile.c#L166)
 
 ```c
 bool geif_rc_load_default(geif_rc_config_t *rc);
@@ -3156,11 +3156,11 @@ Checks in priority order:
 
 ---
 
-### `src/cli/rcfile.h`
+### [`src/cli/rcfile.h`](../src/cli/rcfile.h)
 
 **Module Purpose:** Run-command (RC) configuration file parser for GEIF.
 
-#### [`geif_rc_config_init`](src/cli/rcfile.h#L45)
+#### [`geif_rc_config_init`](../src/cli/rcfile.h#L48)
 
 ```c
 void geif_rc_config_init(geif_rc_config_t *rc);
@@ -3170,7 +3170,7 @@ void geif_rc_config_init(geif_rc_config_t *rc);
 
 ---
 
-#### [`geif_rc_parse_file`](src/cli/rcfile.h#L50)
+#### [`geif_rc_parse_file`](../src/cli/rcfile.h#L54)
 
 ```c
 bool geif_rc_parse_file(geif_rc_config_t *rc, const char *filepath);
@@ -3180,7 +3180,7 @@ bool geif_rc_parse_file(geif_rc_config_t *rc, const char *filepath);
 
 ---
 
-#### [`geif_rc_load_default`](src/cli/rcfile.h#L56)
+#### [`geif_rc_load_default`](../src/cli/rcfile.h#L60)
 
 ```c
 bool geif_rc_load_default(geif_rc_config_t *rc);
@@ -3190,11 +3190,11 @@ bool geif_rc_load_default(geif_rc_config_t *rc);
 
 ---
 
-### `src/cli/test_grid.c`
+### [`src/cli/test_grid.c`](../src/cli/test_grid.c)
 
 **Module Purpose:** Population drift visualization and test grid generator for GEIF.
 
-#### [`geif_cat_filter_add`](src/cli/test_grid.c#L15)
+#### [`geif_cat_filter_add`](../src/cli/test_grid.c#L25)
 
 ```c
 bool geif_cat_filter_add(cat_filter_t *cf, const char *arg);
@@ -3216,7 +3216,7 @@ Matching categories are filtered out by default.
 
 ---
 
-#### [`geif_cat_filter_allows`](src/cli/test_grid.c#L60)
+#### [`geif_cat_filter_allows`](../src/cli/test_grid.c#L67)
 
 ```c
 bool geif_cat_filter_allows(const cat_filter_t *cf, const char *category);
@@ -3235,7 +3235,7 @@ bool geif_cat_filter_allows(const cat_filter_t *cf, const char *category);
 
 ---
 
-#### [`geif_cat_filter_free`](src/cli/test_grid.c#L87)
+#### [`geif_cat_filter_free`](../src/cli/test_grid.c#L92)
 
 ```c
 void geif_cat_filter_free(cat_filter_t *cf);
@@ -3251,7 +3251,7 @@ void geif_cat_filter_free(cat_filter_t *cf);
 
 ---
 
-#### [`geif_generate_test_grid`](src/cli/test_grid.c#L105)
+#### [`geif_generate_test_grid`](../src/cli/test_grid.c#L127)
 
 ```c
 void geif_generate_test_grid(const geif_ensemble_t *ens, double test_extension_factor, int test_sample_interval, const cat_filter_t *filter, double threshold, bool threshold_is_average, bool threshold_is_percentage, const char *point_tmpl, int decimals, char list_sep, uint32_t low_rgb, uint32_t high_rgb, const char *printf_format, const char *print_dimension, FILE *out_fp);
@@ -3284,11 +3284,11 @@ visualize decision manifolds, population drift, and cluster contours.
 
 ---
 
-### `src/cli/test_grid.h`
+### [`src/cli/test_grid.h`](../src/cli/test_grid.h)
 
 **Module Purpose:** Population drift visualization and test grid generator for GEIF.
 
-#### [`geif_generate_test_grid`](src/cli/test_grid.h#L38)
+#### [`geif_generate_test_grid`](../src/cli/test_grid.h#L57)
 
 ```c
 void geif_generate_test_grid(const geif_ensemble_t *ens, double test_extension_factor, int test_sample_interval, const cat_filter_t *filter, double threshold, bool threshold_is_average, bool threshold_is_percentage, const char *point_tmpl, int decimals, char list_sep, uint32_t low_rgb, uint32_t high_rgb, const char *printf_format, const char *print_dimension, FILE *out_fp);
@@ -3317,11 +3317,11 @@ void geif_generate_test_grid(const geif_ensemble_t *ens, double test_extension_f
 
 ---
 
-### `src/cli/xmalloc.c`
+### [`src/cli/xmalloc.c`](../src/cli/xmalloc.c)
 
 **Module Purpose:** Memory allocation and stream wrappers with out-of-memory checking.
 
-#### [`panic_oom`](src/cli/xmalloc.c#L28)
+#### [`panic_oom`](../src/cli/xmalloc.c#L33)
 
 ```c
 static void panic_oom(size_t n);
@@ -3337,7 +3337,7 @@ static void panic_oom(size_t n);
 
 ---
 
-#### [`xmalloc`](src/cli/xmalloc.c#L39)
+#### [`xmalloc`](../src/cli/xmalloc.c#L45)
 
 ```c
 void *xmalloc(size_t n);
@@ -3355,7 +3355,7 @@ void *xmalloc(size_t n);
 
 ---
 
-#### [`xcalloc`](src/cli/xmalloc.c#L60)
+#### [`xcalloc`](../src/cli/xmalloc.c#L67)
 
 ```c
 void *xcalloc(size_t count, size_t size);
@@ -3374,7 +3374,7 @@ void *xcalloc(size_t count, size_t size);
 
 ---
 
-#### [`xrealloc`](src/cli/xmalloc.c#L85)
+#### [`xrealloc`](../src/cli/xmalloc.c#L92)
 
 ```c
 void *xrealloc(void *ptr, size_t n);
@@ -3393,7 +3393,7 @@ void *xrealloc(void *ptr, size_t n);
 
 ---
 
-#### [`xstrdup`](src/cli/xmalloc.c#L113)
+#### [`xstrdup`](../src/cli/xmalloc.c#L119)
 
 ```c
 char *xstrdup(const char *s);
@@ -3411,7 +3411,7 @@ char *xstrdup(const char *s);
 
 ---
 
-#### [`xfree`](src/cli/xmalloc.c#L128)
+#### [`xfree`](../src/cli/xmalloc.c#L133)
 
 ```c
 void xfree(void *ptr);
@@ -3427,7 +3427,7 @@ void xfree(void *ptr);
 
 ---
 
-#### [`xfopen`](src/cli/xmalloc.c#L143)
+#### [`xfopen`](../src/cli/xmalloc.c#L153)
 
 ```c
 FILE *xfopen(const char *path, const char *mode);
@@ -3449,7 +3449,7 @@ descriptive errno messages if fopen fails.
 
 ---
 
-#### [`xfclose`](src/cli/xmalloc.c#L184)
+#### [`xfclose`](../src/cli/xmalloc.c#L190)
 
 ```c
 int xfclose(FILE *fp);
@@ -3467,7 +3467,7 @@ int xfclose(FILE *fp);
 
 ---
 
-#### [`xget_total_allocated`](src/cli/xmalloc.c#L209)
+#### [`xget_total_allocated`](../src/cli/xmalloc.c#L214)
 
 ```c
 size_t xget_total_allocated(void);
@@ -3479,7 +3479,7 @@ size_t xget_total_allocated(void);
 
 ---
 
-#### [`xreset_total_allocated`](src/cli/xmalloc.c#L219)
+#### [`xreset_total_allocated`](../src/cli/xmalloc.c#L222)
 
 ```c
 void xreset_total_allocated(void);
@@ -3489,11 +3489,11 @@ void xreset_total_allocated(void);
 
 ---
 
-### `src/cli/xmalloc.h`
+### [`src/cli/xmalloc.h`](../src/cli/xmalloc.h)
 
 **Module Purpose:** Memory allocation and file stream wrappers with OOM checking for GEIF.
 
-#### [`xmalloc`](src/cli/xmalloc.h#L12)
+#### [`xmalloc`](../src/cli/xmalloc.h#L15)
 
 ```c
 void *xmalloc(size_t n);
@@ -3503,7 +3503,7 @@ void *xmalloc(size_t n);
 
 ---
 
-#### [`xcalloc`](src/cli/xmalloc.h#L17)
+#### [`xcalloc`](../src/cli/xmalloc.h#L20)
 
 ```c
 void *xcalloc(size_t count, size_t size);
@@ -3513,7 +3513,7 @@ void *xcalloc(size_t count, size_t size);
 
 ---
 
-#### [`xrealloc`](src/cli/xmalloc.h#L22)
+#### [`xrealloc`](../src/cli/xmalloc.h#L25)
 
 ```c
 void *xrealloc(void *ptr, size_t n);
@@ -3523,7 +3523,7 @@ void *xrealloc(void *ptr, size_t n);
 
 ---
 
-#### [`xstrdup`](src/cli/xmalloc.h#L27)
+#### [`xstrdup`](../src/cli/xmalloc.h#L30)
 
 ```c
 char *xstrdup(const char *s);
@@ -3533,7 +3533,7 @@ char *xstrdup(const char *s);
 
 ---
 
-#### [`xfree`](src/cli/xmalloc.h#L32)
+#### [`xfree`](../src/cli/xmalloc.h#L35)
 
 ```c
 void  xfree(void *ptr);
@@ -3543,7 +3543,7 @@ void  xfree(void *ptr);
 
 ---
 
-#### [`xfopen`](src/cli/xmalloc.h#L37)
+#### [`xfopen`](../src/cli/xmalloc.h#L40)
 
 ```c
 FILE *xfopen(const char *path, const char *mode);
@@ -3553,7 +3553,7 @@ FILE *xfopen(const char *path, const char *mode);
 
 ---
 
-#### [`xfclose`](src/cli/xmalloc.h#L42)
+#### [`xfclose`](../src/cli/xmalloc.h#L45)
 
 ```c
 int   xfclose(FILE *fp);
@@ -3563,7 +3563,7 @@ int   xfclose(FILE *fp);
 
 ---
 
-#### [`xget_total_allocated`](src/cli/xmalloc.h#L47)
+#### [`xget_total_allocated`](../src/cli/xmalloc.h#L50)
 
 ```c
 size_t xget_total_allocated(void);
@@ -3573,7 +3573,7 @@ size_t xget_total_allocated(void);
 
 ---
 
-#### [`xreset_total_allocated`](src/cli/xmalloc.h#L52)
+#### [`xreset_total_allocated`](../src/cli/xmalloc.h#L55)
 
 ```c
 void   xreset_total_allocated(void);
@@ -3583,11 +3583,11 @@ void   xreset_total_allocated(void);
 
 ---
 
-### `src/cli/ceif2geif.c`
+### [`src/cli/ceif2geif.c`](../src/cli/ceif2geif.c)
 
 **Module Purpose:** CEIF JSON model to GEIF-1.0 JSON model migration tool.
 
-#### [`print_usage`](src/cli/ceif2geif.c#L17)
+#### [`print_usage`](../src/cli/ceif2geif.c#L22)
 
 ```c
 static void print_usage(const char *prog);
@@ -3603,7 +3603,7 @@ static void print_usage(const char *prog);
 
 ---
 
-#### [`main`](src/cli/ceif2geif.c#L39)
+#### [`main`](../src/cli/ceif2geif.c#L49)
 
 ```c
 int main(int argc, char *argv[]);
