@@ -46,9 +46,12 @@ SHARED_LIB = $(LIB_DIR)/libgeif.so
 CLI_BIN    = $(BIN_DIR)/geif
 MIGRATE_BIN = $(BIN_DIR)/ceif2geif
 
-.PHONY: all clean test test-prod test-all dirs
+.PHONY: all clean test test-prod test-all dirs doc
 
 all: dirs $(STATIC_LIB) $(SHARED_LIB) $(CLI_BIN) $(MIGRATE_BIN)
+
+doc:
+	@python3 scripts/gen_api_reference.py
 
 dirs:
 	@mkdir -p $(BIN_DIR) $(LIB_DIR)

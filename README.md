@@ -449,6 +449,7 @@ int main(void) {
 ## Documentation & Deep Dives
 
 Detailed technical documentation is available in [`docs/`](file:///home/timo_savinen_elisa_fi/git/geif/docs/README.md):
+- [**`api_reference.md`**](file:///home/timo_savinen_elisa_fi/git/geif/docs/api_reference.md): Comprehensive C17 API and function reference generated directly from in-code Doxygen comments.
 - [**`algorithm.md`**](file:///home/timo_savinen_elisa_fi/git/geif/docs/algorithm.md): Mathematical derivations, Zero Kelvin calibration, and per-algorithm mechanics.
 - [**`heatmaps.md`**](file:///home/timo_savinen_elisa_fi/git/geif/docs/heatmaps.md): Empirical 2D decision boundary heatmaps and statistical threshold tables ($0, 0.35, 0.50, 0.60$).
 - [**`implementation.md`**](file:///home/timo_savinen_elisa_fi/git/geif/docs/implementation.md): ISO C17 codebase architecture, SIMD vectorization, and data structures.
