@@ -97,16 +97,31 @@ $$
 
 ---
 
-### 2.3 Nearest Bounding-Box Calculation ($2^D$ Nodes & Leaf Proximity)
+### 2.3 Dynamic Dimensional Leaf Sizing & Nearest Neighbor Bounding
+
+In earlier Isolation Forest variants, node partitioning stopped at a hardcoded sample threshold (e.g. $N_{\text{leaf}} < 3$). GEIF introduces a dimension-dependent minimum leaf sample count:
+
+$$
+N_{\text{min-leaf}}(D) = \begin{cases} 2^D & \text{if } D < 4 \\ 8 & \text{if } D \ge 4 \end{cases}
+$$
+
+**Geometric & Algorithmic Rationale:**
+- **$D = 1$ ($2^1 = 2$):** A 1D point is framed by exactly 2 bounding samples (left and right), forming the minimal bilateral boundary.
+- **$D = 2$ ($2^2 = 4$):** An interior 2D query point is framed in all four quadrants ($++$, $+-$, $-+$, $--$). Leaves with 4 samples ensure query points can be completely surrounded on all sides.
+- **$D = 3$ ($2^3 = 8$):** Provides samples across all 8 spatial octants.
+- **Dimension Cap at $D = 4$ ($8$ samples):** Capping at 8 samples prevents exponential tree starvation for higher dimensions (where $2^{10} = 1024$ would exceed the sub-sample size $\psi = 256$).
+
+**Computational Advantage:**
+By avoiding excessive fine splits down to 1–3 sample leaves, trees remain shallower by 1–2 levels, cutting node allocations and tree construction time. Fine-grained local density resolution is naturally shifted to the continuous Euclidean relative distance evaluation ($d_{\text{rel}}(x)$), eliminating artificial hyperplane slicing artifacts and sharply carving out interior topological cavities (such as donut holes).
 
 To evaluate local cluster density and detect interior voids without constructing an expensive global $k$-d tree, GEIF computes leaf relative distances using a bounding-box projection:
 
 For a test point $x$ falling into a leaf node:
 1. The leaf identifies the bounding hyper-rectangle formed by its bounding data points.
-2. In $D$-dimensional space, the distance to the $2^D$ bounding corners is evaluated:
+2. In $D$-dimensional space, the distance to the nearest bounding samples is evaluated:
 
 $$
-d_{\text{rel}}(x) = \frac{1}{2^D} \sum_{k=1}^{2^D} \frac{\Vert x - p_k \Vert_{\text{scaled}}}{\delta_{\text{nominal}}}
+d_{\text{rel}}(x) = \frac{1}{K} \sum_{k=1}^K \frac{\Vert x - p_k \Vert_{\text{scaled}}}{\delta_{\text{nominal}}}
 $$
 
 3. When $x$ is well-centered among the leaf samples, $d_{\text{rel}}(x) \approx 0$, preserving full metric depth.

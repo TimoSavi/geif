@@ -59,6 +59,9 @@
 | `GEIF_DEFAULT_SAMPLES_PER_TREE` | `256` | Sub-sample size $\psi$ drawn without replacement per tree. |
 | `GEIF_DEFAULT_KAPPA` | `1.25` | Headroom factor for Zero Kelvin baseline depth ($H_{\max} = 1.25 \times H_{\text{train-max}}$). |
 | `GEIF_MIN_REL_DIST` | `0.05` | Minimum relative Euclidean distance floor for leaf neighbor adjustment. |
+| `GEIF_MIN_LEAF_SAMPLE_DIM_CAP` | `4U` | Dimensionality threshold ($D < 4$) for $2^D$ theoretical surrounding leaf samples. |
+| `GEIF_MIN_LEAF_SAMPLE_HIGH_DIM` | `8U` | Capped minimum leaf sample count for higher dimensions ($D \ge 4$). |
+| `GEIF_NODE_MIN_SAMPLE(d)` | `$2^d$ or $8$` | Dynamic minimum samples on leaves before terminating splits: frames queries by surrounding orthants. |
 | `GEIF_OUTER_DECAY_RATE` | `0.10` | Exponential approach rate towards asymptotic 1.0 ceiling in outer space. |
 | `GEIF_STACK_BUFFER_DIMS` | `64U` | Maximum dimension count for zero-allocation stack scratch buffers. |
 | `GEIF_MAX_LEAF_NEAREST_SAMPLES` | `32U` | Maximum nearest leaf neighbors tracked via stack max-heap for relative distance. |
@@ -559,7 +562,7 @@ geif_status_t geif_ensemble_remove_outliers(geif_ensemble_t *ensemble, uint32_t 
 
 **Module Purpose:** Core data structures and memory layouts for GEIF.
 
-#### [`geif_algo_type_t`](../include/geif/types.h#L40)
+#### [`geif_algo_type_t`](../include/geif/types.h#L42)
 
 ```c
 typedef enum geif_algo_type { GEIF_ALGO_CEIF = 0,        /**< CEIF: Data-anchored isotropic Gaussian cuts with Zero Kelvin & outer decay */ GEIF_ALGO_BUBBLE,          /**< Hyperspherical Bubble Cavity Carving */ GEIF_ALGO_EXEMPLAR,        /**< Non-tree direct SIMD Cauchy density kernel */ GEIF_ALGO_VORONOI          /**< Pure Voronoi perpendicular bisector splits */ } geif_algo_type_t;
@@ -1659,7 +1662,7 @@ and individual tree structures. Seeds PRNG if seed is 0.
 
 ---
 
-#### [`geif_forest_destroy`](../src/lib/forest.c#L131)
+#### [`geif_forest_destroy`](../src/lib/forest.c#L132)
 
 ```c
 void geif_forest_destroy(geif_forest_t *f);
@@ -1680,7 +1683,7 @@ and finally frees the forest container. Safe to invoke with NULL.
 
 ---
 
-#### [`geif_forest_summary`](../src/lib/forest.c#L178)
+#### [`geif_forest_summary`](../src/lib/forest.c#L179)
 
 ```c
 void geif_forest_summary(const geif_forest_t *f, char *buf, size_t size);

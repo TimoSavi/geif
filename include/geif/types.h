@@ -23,8 +23,10 @@ extern "C" {
 #define GEIF_DEFAULT_CEILING_FACTOR    3        /**< Extra rows factor for reservoir ceiling */
 #define GEIF_MIN_REL_DIST              0.05     /**< Minimum relative distance for nearest neighbor */
 #define MIN_REL_DIST                   GEIF_MIN_REL_DIST
-#define GEIF_NODE_MIN_SAMPLE           3        /**< Minimum samples required to split a node */
-#define NODE_MIN_SAMPLE                GEIF_NODE_MIN_SAMPLE
+#define GEIF_MIN_LEAF_SAMPLE_DIM_CAP   4U       /**< Dimensionality threshold (D < 4) for 2^D minimum leaf samples */
+#define GEIF_MIN_LEAF_SAMPLE_HIGH_DIM  8U       /**< Fixed minimum leaf sample count for D >= 4 */
+#define GEIF_NODE_MIN_SAMPLE(d)        (((d) < GEIF_MIN_LEAF_SAMPLE_DIM_CAP) ? (1U << (d)) : GEIF_MIN_LEAF_SAMPLE_HIGH_DIM)
+#define NODE_MIN_SAMPLE(d)             GEIF_NODE_MIN_SAMPLE(d)
 #define GEIF_OUTER_DECAY_RATE          0.10     /**< Exponential approach rate to 1.0 in outer space */
 #define OUTER_DECAY_RATE               GEIF_OUTER_DECAY_RATE
 #define GEIF_STACK_BUFFER_DIMS         64U      /**< Maximum dimensions for stack-allocated scratch buffers */
@@ -95,10 +97,11 @@ typedef struct geif_tree {
  * @brief The complete Geometric Extended Isolation Forest.
  */
 typedef struct geif_forest {
-    uint32_t      dimensions;      /**< Dimensionality of feature space D */
-    uint32_t      tree_count;      /**< Number of trees T */
-    geif_config_t config;          /**< Forest configuration */
-    geif_tree_t  *trees;           /**< Array of trees [tree_count] */
+    uint32_t      dimensions;            /**< Dimensionality of feature space D */
+    uint32_t      tree_count;            /**< Number of trees T */
+    uint32_t      min_leaf_sample_count; /**< Minimum samples required to split a node (NODE_MIN_SAMPLE(D)) */
+    geif_config_t config;                /**< Forest configuration */
+    geif_tree_t  *trees;                 /**< Array of trees [tree_count] */
 
     // Geometric Envelope (Bounding Box & Scaling)
     double       *envelope_min;    /**< Minimum coordinate observed per dimension [dimensions] */

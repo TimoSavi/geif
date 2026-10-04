@@ -78,7 +78,7 @@ static int32_t build_bubble_node(geif_forest_t *f,
                                 uint32_t max_depth,
                                 double *dists_scratch)
 {
-    if (count < NODE_MIN_SAMPLE || depth >= max_depth) {
+    if (count < f->min_leaf_sample_count || depth >= max_depth) {
         if (depth == 0) {
             int32_t node_idx = allocate_node(tree);
             if (node_idx < 0) return -1;

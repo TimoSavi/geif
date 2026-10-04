@@ -63,6 +63,7 @@ geif_status_t geif_forest_create(geif_forest_t **forest_out,
     }
 
     f->dimensions = dimensions;
+    f->min_leaf_sample_count = GEIF_NODE_MIN_SAMPLE(dimensions);
     f->config = config ? *config : geif_config_default();
 
     if (f->config.tree_count == 0) f->config.tree_count = GEIF_DEFAULT_TREE_COUNT;
