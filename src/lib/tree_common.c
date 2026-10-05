@@ -204,7 +204,7 @@ static inline void max_heap_sift_down(double *heap, uint32_t i, uint32_t n)
  * @param[in] tree         Pointer to the isolation tree.
  * @param[in] node         Leaf node containing sample indices.
  * @param[in] scaled_point Query point in normalized coordinate space.
- * @return Normalized relative distance factor (>= MIN_REL_DIST).
+ * @return Normalized relative distance factor (>= GEIF_REL_DIST_MULTIPLIER * GEIF_MIN_REL_DIST).
  */
 double geif_calc_leaf_rel_dist(const geif_forest_t *f,
                               const geif_tree_t *tree,
@@ -237,7 +237,9 @@ double geif_calc_leaf_rel_dist(const geif_forest_t *f,
         }
         if (valid == 0) return 1.0;
         double mean_d = sum_d / (double)valid;
-        return (sqrt(mean_d) / f->avg_sample_dist) + MIN_REL_DIST;
+        double rel_dist = sqrt(mean_d) / f->avg_sample_dist;
+        rel_dist = (rel_dist < GEIF_MIN_REL_DIST) ? GEIF_MIN_REL_DIST : rel_dist;
+        return GEIF_REL_DIST_MULTIPLIER * rel_dist;
     }
 
     /* Heap path: maintain K smallest squared distances using a stack-allocated max-heap */
@@ -259,7 +261,9 @@ double geif_calc_leaf_rel_dist(const geif_forest_t *f,
         double sum_d = 0.0;
         for (uint32_t j = 0; j < filled; j++) sum_d += heap[j];
         double mean_d = sum_d / (double)filled;
-        return (sqrt(mean_d) / f->avg_sample_dist) + MIN_REL_DIST;
+        double rel_dist = sqrt(mean_d) / f->avg_sample_dist;
+        rel_dist = (rel_dist < GEIF_MIN_REL_DIST) ? GEIF_MIN_REL_DIST : rel_dist;
+        return GEIF_REL_DIST_MULTIPLIER * rel_dist;
     }
 
     /* Build max-heap */
@@ -284,7 +288,9 @@ double geif_calc_leaf_rel_dist(const geif_forest_t *f,
     double sum_d = 0.0;
     for (uint32_t j = 0; j < max_nearest; j++) sum_d += heap[j];
     double mean_d = sum_d / (double)max_nearest;
-    return (sqrt(mean_d) / f->avg_sample_dist) + MIN_REL_DIST;
+    double rel_dist = sqrt(mean_d) / f->avg_sample_dist;
+    rel_dist = (rel_dist < GEIF_MIN_REL_DIST) ? GEIF_MIN_REL_DIST : rel_dist;
+    return GEIF_REL_DIST_MULTIPLIER * rel_dist;
 }
 
 /**
@@ -502,7 +508,7 @@ void geif_tree_find_max_height(const geif_forest_t *f,
     if (node->left_child == -1 && node->right_child == -1) {
         double leaf_c = 0.0;
         if (f->avg_sample_dist > 0.0 && node->sample_count > 0 && t->leaf_samples) {
-            double rel_dist = MIN_REL_DIST;
+            double rel_dist = GEIF_REL_DIST_MULTIPLIER * GEIF_MIN_REL_DIST;
             double adjusted_n = (double)node->sample_count / rel_dist;
             leaf_c = geif_c(adjusted_n);
         } else if (node->sample_count > 1) {

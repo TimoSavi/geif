@@ -21,8 +21,10 @@ extern "C" {
 #define GEIF_DEFAULT_KAPPA             1.25     /**< Headroom for "Zero Kelvin" calibration */
 #define GEIF_DEFAULT_ALPHA             1.0      /**< Metric depth density sensitivity */
 #define GEIF_DEFAULT_CEILING_FACTOR    3        /**< Extra rows factor for reservoir ceiling */
-#define GEIF_MIN_REL_DIST              0.05     /**< Minimum relative distance for nearest neighbor */
+#define GEIF_MIN_REL_DIST              0.033333 /**< Minimum relative distance floor for nearest neighbor */
 #define MIN_REL_DIST                   GEIF_MIN_REL_DIST
+#define GEIF_REL_DIST_MULTIPLIER       2.0      /**< Boundary half-space relative distance multiplier */
+#define REL_DIST_MULTIPLIER            GEIF_REL_DIST_MULTIPLIER
 #define GEIF_MIN_LEAF_SAMPLE_FLOOR     4U       /**< Floor on minimum leaf samples / nearest neighbors (1D stabilization) */
 #define MIN_LEAF_FLOOR_SAMPLES         GEIF_MIN_LEAF_SAMPLE_FLOOR
 #define GEIF_MIN_LEAF_SAMPLE_DIM_CAP   4U       /**< Dimensionality threshold (D < 4) for 2^D minimum leaf samples */

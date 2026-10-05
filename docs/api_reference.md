@@ -58,7 +58,8 @@
 | `GEIF_DEFAULT_TREE_COUNT` | `100` | Default number of isolation trees per ensemble. |
 | `GEIF_DEFAULT_SAMPLES_PER_TREE` | `256` | Sub-sample size $\psi$ drawn without replacement per tree. |
 | `GEIF_DEFAULT_KAPPA` | `1.25` | Headroom factor for Zero Kelvin baseline depth ($H_{\max} = 1.25 \times H_{\text{train-max}}$). |
-| `GEIF_MIN_REL_DIST` | `0.05` | Minimum relative Euclidean distance floor for leaf neighbor adjustment. |
+| `GEIF_MIN_REL_DIST` | `0.033333` | Minimum relative Euclidean distance floor for leaf neighbor adjustment. |
+| `GEIF_REL_DIST_MULTIPLIER` | `2.0` | Boundary half-space geometric multiplier for relative distance calibration. |
 | `GEIF_MIN_LEAF_SAMPLE_DIM_CAP` | `4U` | Dimensionality threshold ($D < 4$) for $2^D$ theoretical surrounding leaf samples. |
 | `GEIF_MIN_LEAF_SAMPLE_HIGH_DIM` | `8U` | Capped minimum leaf sample count for higher dimensions ($D \ge 4$). |
 | `GEIF_NODE_MIN_SAMPLE(d)` | `$2^d$ or $8$` | Dynamic minimum samples on leaves before terminating splits: frames queries by surrounding orthants. |
@@ -562,7 +563,7 @@ geif_status_t geif_ensemble_remove_outliers(geif_ensemble_t *ensemble, uint32_t 
 
 **Module Purpose:** Core data structures and memory layouts for GEIF.
 
-#### [`geif_algo_type_t`](../include/geif/types.h#L42)
+#### [`geif_algo_type_t`](../include/geif/types.h#L46)
 
 ```c
 typedef enum geif_algo_type { GEIF_ALGO_CEIF = 0,        /**< CEIF: Data-anchored isotropic Gaussian cuts with Zero Kelvin & outer decay */ GEIF_ALGO_BUBBLE,          /**< Hyperspherical Bubble Cavity Carving */ GEIF_ALGO_EXEMPLAR,        /**< Non-tree direct SIMD Cauchy density kernel */ GEIF_ALGO_VORONOI          /**< Pure Voronoi perpendicular bisector splits */ } geif_algo_type_t;
@@ -1158,7 +1159,7 @@ double geif_calc_leaf_rel_dist(const geif_forest_t *f, const geif_tree_t *tree, 
 
 In GEIF, relative leaf distance (rel_dist) scales effective sample density in leaf nodes
 to prevent false positives in high-density regions and detect sparse interior voids/cavities.
-For low dimensions (d < 5), it searches up to 2^d samples (the number of hypercube orthants);
+For low dimensions (d < 5), it searches up to 2^d samples (with floor GEIF_MIN_LEAF_SAMPLE_FLOOR);
 for d >= 5, it caps the nearest neighbor set at GEIF_MAX_LEAF_NEAREST_SAMPLES (32) to bound
 computational complexity. Uses a stack-allocated binary max-heap to maintain the K smallest
 squared distances without heap allocations.
@@ -1172,11 +1173,11 @@ squared distances without heap allocations.
 | `node` | `[in]` | Leaf node containing sample indices. |
 | `scaled_point` | `[in]` | Query point in normalized coordinate space. |
 
-**Returns:** Normalized relative distance factor (>= MIN_REL_DIST).
+**Returns:** Normalized relative distance factor (>= GEIF_REL_DIST_MULTIPLIER * GEIF_MIN_REL_DIST).
 
 ---
 
-#### [`evaluate_tree`](../src/lib/tree_common.c#L302)
+#### [`evaluate_tree`](../src/lib/tree_common.c#L308)
 
 ```c
 double evaluate_tree(const geif_forest_t *f, const geif_tree_t *tree, const double *scaled_point);
@@ -1200,7 +1201,7 @@ adjusted by relative leaf distance (rel_dist) and the harmonic function c(n).
 
 ---
 
-#### [`geif_tree_evaluate_metric_depth`](../src/lib/tree_common.c#L361)
+#### [`geif_tree_evaluate_metric_depth`](../src/lib/tree_common.c#L367)
 
 ```c
 double geif_tree_evaluate_metric_depth(const geif_forest_t *f, const double *point, double *d_out_out);
@@ -1225,7 +1226,7 @@ d_out in scaled units for subsequent outer decay scoring.
 
 ---
 
-#### [`geif_tree_score_point`](../src/lib/tree_common.c#L433)
+#### [`geif_tree_score_point`](../src/lib/tree_common.c#L439)
 
 ```c
 geif_status_t geif_tree_score_point(const geif_forest_t *f, const double *point, double *score_out, double *metric_depth_out, double *d_out_out);
@@ -1251,7 +1252,7 @@ Applies the canonical Isolation Forest exponential mapping s = 2^(-H / c(psi)), 
 
 ---
 
-#### [`geif_tree_find_max_height`](../src/lib/tree_common.c#L493)
+#### [`geif_tree_find_max_height`](../src/lib/tree_common.c#L499)
 
 ```c
 void geif_tree_find_max_height(const geif_forest_t *f, const geif_tree_t *t, int32_t node_idx, double depth, double *max_h);
@@ -1274,7 +1275,7 @@ maximum height H_max achievable by any point falling into this tree.
 
 ---
 
-#### [`geif_tree_calibrate`](../src/lib/tree_common.c#L539)
+#### [`geif_tree_calibrate`](../src/lib/tree_common.c#L545)
 
 ```c
 void geif_tree_calibrate(geif_forest_t *f);
@@ -1397,7 +1398,7 @@ subset) relative to nominal cluster density (avg_sample_dist) for cavity damping
 | `node` | `[in]` | Leaf node containing sample indices. |
 | `scaled_point` | `[in]` | Query point in normalized coordinate space. |
 
-**Returns:** Relative distance factor (>= MIN_REL_DIST).
+**Returns:** Relative distance factor (>= GEIF_REL_DIST_MULTIPLIER * GEIF_MIN_REL_DIST).
 
 ---
 

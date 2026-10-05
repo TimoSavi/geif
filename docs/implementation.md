@@ -151,7 +151,7 @@ void geif_tree_find_max_height(const geif_forest_t *f,
     if (node->left_child == -1 && node->right_child == -1) {
         double leaf_c = 0.0;
         if (f->avg_sample_dist > 0.0 && node->sample_count > 0 && t->leaf_samples) {
-            double rel_dist = MIN_REL_DIST;
+            double rel_dist = GEIF_REL_DIST_MULTIPLIER * GEIF_MIN_REL_DIST;
             double adjusted_n = (double)node->sample_count / rel_dist;
             leaf_c = geif_c(adjusted_n);
         } else if (node->sample_count > 1) {
@@ -234,7 +234,9 @@ double geif_calc_leaf_rel_dist(const geif_forest_t *f,
         }
         if (valid == 0) return 1.0;
         double mean_d = sum_d / (double)valid;
-        return (sqrt(mean_d) / f->avg_sample_dist) + MIN_REL_DIST;
+        double rel_dist = sqrt(mean_d) / f->avg_sample_dist;
+        rel_dist = (rel_dist < GEIF_MIN_REL_DIST) ? GEIF_MIN_REL_DIST : rel_dist;
+        return GEIF_REL_DIST_MULTIPLIER * rel_dist;
     }
 
     // Heap path: maintain K smallest squared distances without heap allocations
@@ -250,7 +252,7 @@ double geif_calc_leaf_rel_dist(const geif_forest_t *f,
         }
     }
     // Sift down to maintain max-heap and track K nearest points...
-    // (returns normalized relative distance factor >= MIN_REL_DIST)
+    // (returns normalized relative distance factor >= GEIF_REL_DIST_MULTIPLIER * GEIF_MIN_REL_DIST)
 }
 ```
 

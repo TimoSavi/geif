@@ -70,7 +70,7 @@ uint32_t append_leaf_samples(geif_tree_t *tree, const uint32_t *samples, size_t 
  * @param tree         Pointer to the isolation tree.
  * @param node         Leaf node containing sample indices.
  * @param scaled_point Query point in normalized coordinate space.
- * @return Relative distance factor (>= MIN_REL_DIST).
+ * @return Relative distance factor (>= GEIF_REL_DIST_MULTIPLIER * GEIF_MIN_REL_DIST).
  */
 double geif_calc_leaf_rel_dist(const geif_forest_t *f,
                               const geif_tree_t *tree,
