@@ -195,7 +195,7 @@ static inline void max_heap_sift_down(double *heap, uint32_t i, uint32_t n)
  *
  * In GEIF, relative leaf distance (rel_dist) scales effective sample density in leaf nodes
  * to prevent false positives in high-density regions and detect sparse interior voids/cavities.
- * For low dimensions (d < 5), it searches up to 2^d samples (the number of hypercube orthants);
+ * For low dimensions (d < 5), it searches up to 2^d samples (with floor GEIF_MIN_LEAF_SAMPLE_FLOOR);
  * for d >= 5, it caps the nearest neighbor set at GEIF_MAX_LEAF_NEAREST_SAMPLES (32) to bound
  * computational complexity. Uses a stack-allocated binary max-heap to maintain the K smallest
  * squared distances without heap allocations.
@@ -217,7 +217,7 @@ double geif_calc_leaf_rel_dist(const geif_forest_t *f,
     }
 
     uint32_t d = f->dimensions;
-    uint32_t max_nearest = (d < GEIF_MAX_LEAF_NEAREST_DIM_CAP) ? (1U << d) : GEIF_MAX_LEAF_NEAREST_SAMPLES;
+    uint32_t max_nearest = ((1U << d) < GEIF_MIN_LEAF_SAMPLE_FLOOR) ? GEIF_MIN_LEAF_SAMPLE_FLOOR : ((d < GEIF_MAX_LEAF_NEAREST_DIM_CAP) ? (1U << d) : GEIF_MAX_LEAF_NEAREST_SAMPLES);
     const uint32_t *leaf_s = &tree->leaf_samples[node->leaf_sample_offset];
     int32_t n_samples = node->sample_count;
 

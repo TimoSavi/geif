@@ -23,9 +23,11 @@ extern "C" {
 #define GEIF_DEFAULT_CEILING_FACTOR    3        /**< Extra rows factor for reservoir ceiling */
 #define GEIF_MIN_REL_DIST              0.05     /**< Minimum relative distance for nearest neighbor */
 #define MIN_REL_DIST                   GEIF_MIN_REL_DIST
+#define GEIF_MIN_LEAF_SAMPLE_FLOOR     4U       /**< Floor on minimum leaf samples / nearest neighbors (1D stabilization) */
+#define MIN_LEAF_FLOOR_SAMPLES         GEIF_MIN_LEAF_SAMPLE_FLOOR
 #define GEIF_MIN_LEAF_SAMPLE_DIM_CAP   4U       /**< Dimensionality threshold (D < 4) for 2^D minimum leaf samples */
 #define GEIF_MIN_LEAF_SAMPLE_HIGH_DIM  8U       /**< Fixed minimum leaf sample count for D >= 4 */
-#define GEIF_NODE_MIN_SAMPLE(d)        (((d) < GEIF_MIN_LEAF_SAMPLE_DIM_CAP) ? (1U << (d)) : GEIF_MIN_LEAF_SAMPLE_HIGH_DIM)
+#define GEIF_NODE_MIN_SAMPLE(d)        (((1U << (d)) < GEIF_MIN_LEAF_SAMPLE_FLOOR) ? GEIF_MIN_LEAF_SAMPLE_FLOOR : (((d) < GEIF_MIN_LEAF_SAMPLE_DIM_CAP) ? (1U << (d)) : GEIF_MIN_LEAF_SAMPLE_HIGH_DIM))
 #define NODE_MIN_SAMPLE(d)             GEIF_NODE_MIN_SAMPLE(d)
 #define GEIF_OUTER_DECAY_RATE          0.10     /**< Exponential approach rate to 1.0 in outer space */
 #define OUTER_DECAY_RATE               GEIF_OUTER_DECAY_RATE
