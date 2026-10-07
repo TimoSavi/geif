@@ -39,6 +39,7 @@ static void print_usage(const char *prog)
     printf("  -c <file>      Categorize / classify samples against all categories and assign best match\n");
     printf("  -w <file>      Save trained model to JSON file (use '-' for stdout)\n");
     printf("  -r <file>      Load trained model from JSON file (use '-' for stdin)\n");
+    printf("  -z <file>      In-place model update (load from file, update with new data, save back)\n");
     printf("  -o <file>      Output file for scores (default: stdout, '-' for stdout)\n");
     printf("  -O <thresh>    Outlier threshold: float [0..1] (scaled by default), 'average', or percentage (e.g. '80%%')\n");
     printf("  -B, --algo <s> Algorithm engine: bubble (default), ceif, exemplar, voronoi\n");
@@ -559,16 +560,20 @@ static void process_categorize_row(geif_ensemble_t *ensemble,
  * @param[in]     pct     Percentile value (0.0 to 100.0).
  * @param[in]     verbose True to print per-category percentile diagnostics.
  */
-static void update_ensemble_percentage_scores(geif_ensemble_t *ens, double pct, bool verbose)
+static void update_ensemble_percentage_scores(geif_ensemble_t *ens, double pct, const cat_filter_t *filter, bool verbose)
 {
     if (!ens) return;
     for (size_t c = 0; c < ens->count; c++) {
+        const char *cat_name = ens->entries[c].category;
+        if (filter && !geif_cat_filter_allows(filter, cat_name)) {
+            continue;
+        }
         geif_forest_t *sf = ens->entries[c].forest;
         if (sf) {
             sf->percentage_score = geif_forest_calculate_percentile_score(sf, pct);
             if (verbose) {
                 printf("Percentage score for '%s': %.6f (%.2f%% of samples have lower score)\n",
-                       ens->entries[c].category[0] ? ens->entries[c].category : "(default)",
+                       cat_name[0] ? cat_name : "(default)",
                        sf->percentage_score, pct);
             }
         }
@@ -651,13 +656,15 @@ int main(int argc, char *argv[])
         {"trees",        required_argument, 0, 't'},
         {"samples",      required_argument, 0, 's'},
         {"output",       required_argument, 0, 'o'},
+        {"inplace",      required_argument, 0, 'z'},
+        {"inplace-forest", required_argument, 0, 'z'},
         {"help",         no_argument,       0, 'h'},
         {"version",      no_argument,       0, 'v'},
         {0, 0, 0, 0}
     };
 
     int opt;
-    while ((opt = getopt_long(argc, argv, "l:a:c:w:r:o:T::O:t:i:s:m:f:e:HqvhI:U:L:C:F:R:N:M:p:SD:d:j:v::WAkg:B:", long_options, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "l:a:c:w:r:z:o:T::O:t:i:s:m:f:e:HqvhI:U:L:C:F:R:N:M:p:SD:d:j:v::WAkg:B:", long_options, NULL)) != -1) {
         switch (opt) {
         case 'B': config.algo = geif_algo_from_name(optarg); break;
         case 'l': learn_file = optarg; break;
@@ -665,6 +672,10 @@ int main(int argc, char *argv[])
         case 'c': categorize_file = optarg; break;
         case 'w': save_file = optarg; break;
         case 'r': load_file = optarg; break;
+        case 'z':
+            load_file = optarg;
+            save_file = optarg;
+            break;
         case 'o': output_file = optarg; break;
         case 'k': kill_outliers_count++; break;
         case 'T':
@@ -876,8 +887,21 @@ int main(int argc, char *argv[])
                 }
             }
         }
+
+        if (!learn_file && !query_mode) {
+            for (size_t i = 0; i < ensemble->count; i++) {
+                const char *cat_name = ensemble->entries[i].category;
+                if (!geif_cat_filter_allows(&cat_filter, cat_name)) {
+                    continue;
+                }
+                geif_forest_t *sf = ensemble->entries[i].forest;
+                if (sf && sf->pool_count > 0 && !sf->is_trained) {
+                    geif_forest_train(sf);
+                }
+            }
+        }
         if (threshold_is_percentage) {
-            update_ensemble_percentage_scores(ensemble, outlier_percentage, verbose);
+            update_ensemble_percentage_scores(ensemble, outlier_percentage, &cat_filter, verbose);
         }
         if (cli_decimals_given || rc_cfg.decimals_set) {
             ensemble->decimals = decimals;
@@ -927,7 +951,7 @@ int main(int argc, char *argv[])
                 return 1;
             }
             if (threshold_is_percentage) {
-                update_ensemble_percentage_scores(ensemble, outlier_percentage, verbose);
+                update_ensemble_percentage_scores(ensemble, outlier_percentage, &cat_filter, verbose);
             }
         }
         if (save_file) {
@@ -1137,7 +1161,7 @@ int main(int argc, char *argv[])
         }
 
         if (threshold_is_percentage) {
-            update_ensemble_percentage_scores(ensemble, outlier_percentage, verbose);
+            update_ensemble_percentage_scores(ensemble, outlier_percentage, &cat_filter, verbose);
         }
 
         // Save trained model if requested
@@ -1184,7 +1208,7 @@ int main(int argc, char *argv[])
                 return 1;
             }
             if (threshold_is_percentage) {
-                update_ensemble_percentage_scores(ensemble, outlier_percentage, verbose);
+                update_ensemble_percentage_scores(ensemble, outlier_percentage, &cat_filter, verbose);
             }
         }
 
@@ -1403,7 +1427,7 @@ int main(int argc, char *argv[])
                 return 1;
             }
             if (threshold_is_percentage) {
-                update_ensemble_percentage_scores(ensemble, outlier_percentage, verbose);
+                update_ensemble_percentage_scores(ensemble, outlier_percentage, &cat_filter, verbose);
             }
         }
 

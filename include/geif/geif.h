@@ -204,6 +204,25 @@ geif_forest_t *geif_ensemble_find(const geif_ensemble_t *ensemble, const char *c
 geif_forest_t *geif_ensemble_get_or_create(geif_ensemble_t *ensemble, const char *category);
 
 /**
+ * @brief Directly registers a pre-constructed sub-forest into an ensemble.
+ *
+ * Transfers ownership of forest to the ensemble. If the category already exists,
+ * the previous forest is destroyed and replaced.
+ *
+ * @param[in,out] ensemble     Ensemble instance.
+ * @param[in]     category     Category name string.
+ * @param[in]     forest       Forest instance to add (ownership transferred).
+ * @param[in]     total_rows   Total rows observed for this category.
+ * @param[in]     last_updated Last modification timestamp.
+ * @return GEIF_OK on success, or an error status code.
+ */
+geif_status_t geif_ensemble_add_forest(geif_ensemble_t *ensemble,
+                                       const char *category,
+                                       geif_forest_t *forest,
+                                       uint64_t total_rows,
+                                       time_t last_updated);
+
+/**
  * @brief Feeds an observation vector into the sub-forest for category.
  */
 geif_status_t geif_ensemble_feed(geif_ensemble_t *ensemble,

@@ -146,6 +146,7 @@ typedef struct geif_forest {
     char          category_dims_spec[128];/**< Category columns spec (e.g. "12") */
     int           decimals;               /**< Decimal precision for serialization (-d, default: 6) */
     bool          scale_score;            /**< Flag indicating if anomaly scores are scaled [0..1] via min/max */
+    bool          is_trained;             /**< Flag indicating whether trees have been built */
     void         *algo_data;              /**< Optional algorithm-specific auxiliary state */
 } geif_forest_t;
 

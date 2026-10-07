@@ -76,6 +76,9 @@ double geif_forest_evaluate_metric_depth(const geif_forest_t *f,
         if (d_out_out) *d_out_out = 0.0;
         return 0.0;
     }
+    if (!f->is_trained && f->pool_count > 0) {
+        geif_forest_train((geif_forest_t *)f);
+    }
     double depth = 0.0;
     double score = 0.0;
     const geif_algo_ops_t *ops = geif_algo_get_ops(f->config.algo);
@@ -109,6 +112,12 @@ geif_status_t geif_forest_score_detailed(const geif_forest_t *f,
 {
     if (!f || !point || !score_out) {
         return GEIF_ERR_INVALID_ARG;
+    }
+    if (!f->is_trained && f->pool_count > 0) {
+        geif_status_t train_st = geif_forest_train((geif_forest_t *)f);
+        if (train_st != GEIF_OK) {
+            return train_st;
+        }
     }
     const geif_algo_ops_t *ops = geif_algo_get_ops(f->config.algo);
     if (!ops || !ops->score) {

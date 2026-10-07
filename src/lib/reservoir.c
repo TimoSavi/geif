@@ -30,6 +30,10 @@ geif_status_t geif_forest_feed(geif_forest_t *f, const double *point)
 
     uint32_t d = f->dimensions;
     f->total_rows_seen++;
+    f->is_trained = false;
+    f->H_max = 0.0;
+    f->min_score = 0.0;
+    f->average_score = 0.0;
 
     // Update bounding box coordinates
     for (uint32_t j = 0; j < d; j++) {

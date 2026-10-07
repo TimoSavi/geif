@@ -70,13 +70,6 @@ struct json_object *geif_forest_to_json_object(const geif_forest_t *f)
     json_object_object_add(root, "seed", json_object_new_int64((int64_t)f->config.seed));
     json_object_object_add(root, "total_rows_seen", json_object_new_int64((int64_t)f->total_rows_seen));
     json_object_object_add(root, "decimals", json_object_new_int(dec));
-    json_object_object_add(root, "H_train_max", json_object_new_double(f->H_train_max));
-    json_object_object_add(root, "H_max", json_object_new_double(f->H_max));
-    json_object_object_add(root, "min_score", json_object_new_double(f->min_score));
-    json_object_object_add(root, "max_score", json_object_new_double(f->max_score));
-    json_object_object_add(root, "average_score", json_object_new_double(f->average_score));
-    json_object_object_add(root, "percentage_score", json_object_new_double(f->percentage_score));
-    json_object_object_add(root, "delta_nominal", json_object_new_double(f->delta_nominal));
 
     // Metadata & Column Configuration
     if (f->category[0] != '\0') {
@@ -152,14 +145,9 @@ geif_status_t geif_forest_from_json_object(geif_forest_t **forest_out, struct js
         return status;
     }
 
-    if (json_object_object_get_ex(root, "H_train_max", &j_val)) f->H_train_max = json_object_get_double(j_val);
-    if (json_object_object_get_ex(root, "H_max", &j_val)) f->H_max = json_object_get_double(j_val);
-    if (json_object_object_get_ex(root, "average_score", &j_val)) f->average_score = json_object_get_double(j_val);
-    if (json_object_object_get_ex(root, "percentage_score", &j_val)) f->percentage_score = json_object_get_double(j_val);
-    if (json_object_object_get_ex(root, "min_score", &j_val)) f->min_score = json_object_get_double(j_val);
-    if (json_object_object_get_ex(root, "max_score", &j_val)) f->max_score = json_object_get_double(j_val);
-    if (json_object_object_get_ex(root, "delta_nominal", &j_val)) f->delta_nominal = json_object_get_double(j_val);
-    if (json_object_object_get_ex(root, "total_rows_seen", &j_val)) f->total_rows_seen = (uint64_t)json_object_get_int64(j_val);
+    if (json_object_object_get_ex(root, "total_rows_seen", &j_val)) {
+        f->total_rows_seen = (uint64_t)json_object_get_int64(j_val);
+    }
 
     // Metadata & Column Configuration
     if (json_object_object_get_ex(root, "category", &j_val)) {
@@ -223,108 +211,18 @@ geif_status_t geif_forest_from_json_object(geif_forest_t **forest_out, struct js
         (void)os;
     }
 
-    // Load envelopes
-    struct json_object *j_arr;
-    if (json_object_object_get_ex(root, "envelope_min", &j_arr)) {
-        for (uint32_t j = 0; j < dimensions; j++) {
-            f->envelope_min[j] = json_object_get_double(json_object_array_get_idx(j_arr, j));
-        }
-    }
-    if (json_object_object_get_ex(root, "envelope_max", &j_arr)) {
-        for (uint32_t j = 0; j < dimensions; j++) {
-            f->envelope_max[j] = json_object_get_double(json_object_array_get_idx(j_arr, j));
-            f->envelope_span[j] = f->envelope_max[j] - f->envelope_min[j];
-        }
-    }
-    if (json_object_object_get_ex(root, "effective_span", &j_arr)) {
-        for (uint32_t j = 0; j < dimensions; j++) {
-            f->effective_span[j] = json_object_get_double(json_object_array_get_idx(j_arr, j));
-        }
-    }
-    if (json_object_object_get_ex(root, "dim_active", &j_arr)) {
-        for (uint32_t j = 0; j < dimensions; j++) {
-            f->dim_active[j] = (uint8_t)json_object_get_int(json_object_array_get_idx(j_arr, j));
-        }
-    }
-
-    // Load dimension averages
-    if (json_object_object_get_ex(root, "averages", &j_arr) && f->averages) {
-        for (uint32_t j = 0; j < dimensions && j < (uint32_t)json_object_array_length(j_arr); j++) {
-            f->averages[j] = json_object_get_double(json_object_array_get_idx(j_arr, j));
-        }
-    }
-
     // Load sample pool
-    if (json_object_object_get_ex(root, "pool_count", &j_val)) f->pool_count = (size_t)json_object_get_int(j_val);
+    struct json_object *j_arr = NULL;
+    if (json_object_object_get_ex(root, "pool_count", &j_val)) {
+        f->pool_count = (size_t)json_object_get_int(j_val);
+    }
     if (json_object_object_get_ex(root, "sample_pool", &j_arr)) {
         size_t len = (size_t)json_object_array_length(j_arr);
         for (size_t i = 0; i < len && i < f->pool_capacity * dimensions; i++) {
             f->sample_pool[i] = json_object_get_double(json_object_array_get_idx(j_arr, i));
         }
     }
-
-    // Load calibration metrics
-    if (json_object_object_get_ex(root, "min_score", &j_val)) f->min_score = json_object_get_double(j_val);
-    if (json_object_object_get_ex(root, "max_score", &j_val)) f->max_score = json_object_get_double(j_val);
-    if (json_object_object_get_ex(root, "avg_sample_dist", &j_val)) f->avg_sample_dist = json_object_get_double(j_val);
-    if (json_object_object_get_ex(root, "c_factor", &j_val)) f->c_factor = json_object_get_double(j_val);
-    if (json_object_object_get_ex(root, "scale_range_idx", &j_val)) f->scale_range_idx = json_object_get_int(j_val);
-
-    // If sample pool is present, build trees dynamically in RAM (taking < 0.05s)
-    if (f->pool_count > 0) {
-        geif_forest_train(f);
-    } else {
-        // Fallback: Load legacy trees if present in older model files
-        struct json_object *j_trees;
-        if (json_object_object_get_ex(root, "trees", &j_trees)) {
-            int t_len = json_object_array_length(j_trees);
-            for (int t = 0; t < t_len && t < (int)f->tree_count; t++) {
-                struct json_object *j_tree = json_object_array_get_idx(j_trees, t);
-                geif_tree_t *tree = &f->trees[t];
-
-                struct json_object *j_nodes;
-                if (json_object_object_get_ex(j_tree, "nodes", &j_nodes)) {
-                    size_t n_len = (size_t)json_object_array_length(j_nodes);
-                    tree->node_count = n_len;
-                    tree->node_capacity = n_len;
-                    tree->nodes = (geif_node_t *)malloc(n_len * sizeof(geif_node_t));
-
-                    for (size_t n = 0; n < n_len; n++) {
-                        struct json_object *j_node = json_object_array_get_idx(j_nodes, n);
-                        struct json_object *jv;
-                        geif_node_t *node = &tree->nodes[n];
-
-                        json_object_object_get_ex(j_node, "left", &jv); node->left_child = json_object_get_int(jv);
-                        json_object_object_get_ex(j_node, "right", &jv); node->right_child = json_object_get_int(jv);
-                        json_object_object_get_ex(j_node, "offset", &jv); node->normal_offset = (uint32_t)json_object_get_int(jv);
-                        json_object_object_get_ex(j_node, "pdotn", &jv); node->pdotn = json_object_get_double(jv);
-                        json_object_object_get_ex(j_node, "weight", &jv); node->step_weight = json_object_get_double(jv);
-                        json_object_object_get_ex(j_node, "delta", &jv); node->delta_AB = json_object_get_double(jv);
-                        json_object_object_get_ex(j_node, "samples", &jv); node->sample_count = json_object_get_int(jv);
-                        json_object_object_get_ex(j_node, "leaf_idx", &jv); node->leaf_point_idx = (uint32_t)json_object_get_int(jv);
-                    }
-                }
-
-                struct json_object *j_normals;
-                if (json_object_object_get_ex(j_tree, "normals", &j_normals)) {
-                    size_t norm_len = (size_t)json_object_array_length(j_normals);
-                    tree->normals_capacity = norm_len;
-                    if (norm_len > 0) {
-                        tree->normals_pool = (double *)malloc(norm_len * sizeof(double));
-                        for (size_t k = 0; k < norm_len; k++) {
-                            tree->normals_pool[k] = json_object_get_double(json_object_array_get_idx(j_normals, k));
-                        }
-                    } else {
-                        tree->normals_pool = NULL;
-                    }
-                }
-            }
-        }
-    }
-
-    if (f->trees && f->tree_count > 0 && (f->min_score <= 0.0 || f->max_score <= 0.0)) {
-        geif_tree_calibrate(f);
-    }
+    f->is_trained = false;
 
     *forest_out = f;
     return GEIF_OK;
@@ -592,34 +490,22 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
                     if (json_object_object_get_ex(jf, "extraRows", &j_val)) {
                         sub->total_rows_seen += (uint64_t)json_object_get_int64(j_val);
                     }
-                    geif_forest_train(sub);
                 }
             }
 
             if (sub) {
                 const char *cat_str = sub->category;
-                geif_forest_t *target = geif_ensemble_get_or_create(ens, cat_str);
-                if (target) {
-                    for (size_t e = 0; e < ens->count; e++) {
-                        if (ens->entries[e].forest == target) {
-                            geif_forest_destroy(target);
-                            ens->entries[e].forest = sub;
-                            if (json_object_object_get_ex(jf, "last_updated", &j_val)) {
-                                ens->entries[e].last_updated = (time_t)json_object_get_int64(j_val);
-                            } else if (json_object_object_get_ex(jf, "lastUpdated", &j_val)) {
-                                ens->entries[e].last_updated = (time_t)json_object_get_int64(j_val);
-                            }
-                            if (json_object_object_get_ex(jf, "total_rows", &j_val)) {
-                                ens->entries[e].total_rows = (uint64_t)json_object_get_int64(j_val);
-                            } else {
-                                ens->entries[e].total_rows = sub->total_rows_seen;
-                            }
-                            break;
-                        }
-                    }
-                } else {
-                    geif_forest_destroy(sub);
+                time_t last_updated = time(NULL);
+                if (json_object_object_get_ex(jf, "last_updated", &j_val)) {
+                    last_updated = (time_t)json_object_get_int64(j_val);
+                } else if (json_object_object_get_ex(jf, "lastUpdated", &j_val)) {
+                    last_updated = (time_t)json_object_get_int64(j_val);
                 }
+                uint64_t total_rows = sub->total_rows_seen;
+                if (json_object_object_get_ex(jf, "total_rows", &j_val)) {
+                    total_rows = (uint64_t)json_object_get_int64(j_val);
+                }
+                geif_ensemble_add_forest(ens, cat_str, sub, total_rows, last_updated);
             }
         }
     } else {
@@ -627,19 +513,7 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
         geif_forest_t *sub = NULL;
         if (geif_forest_from_json_object(&sub, root) == GEIF_OK && sub) {
             const char *cat_str = sub->category;
-            geif_forest_t *target = geif_ensemble_get_or_create(ens, cat_str);
-            if (target) {
-                for (size_t e = 0; e < ens->count; e++) {
-                    if (ens->entries[e].forest == target) {
-                        geif_forest_destroy(target);
-                        ens->entries[e].forest = sub;
-                        ens->entries[e].total_rows = sub->total_rows_seen;
-                        break;
-                    }
-                }
-            } else {
-                geif_forest_destroy(sub);
-            }
+            geif_ensemble_add_forest(ens, cat_str, sub, sub->total_rows_seen, time(NULL));
         }
     }
 

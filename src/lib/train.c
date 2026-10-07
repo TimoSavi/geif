@@ -5,6 +5,7 @@
 
 #include "geif/geif.h"
 #include "algo.h"
+#include <stdlib.h>
 
 /**
  * @brief Trains all trees in the forest using the algorithm configured in forest config.
@@ -21,8 +22,15 @@ geif_status_t geif_forest_train(geif_forest_t *f)
     if (!f) {
         return GEIF_ERR_INVALID_ARG;
     }
+    if (f->is_trained) {
+        return GEIF_OK;
+    }
     if (f->pool_count == 0) {
         return GEIF_ERR_EMPTY_DATASET;
+    }
+
+    if (f->config.seed != 0) {
+        srand(f->config.seed);
     }
 
     const geif_algo_ops_t *ops = geif_algo_get_ops(f->config.algo);
@@ -30,5 +38,9 @@ geif_status_t geif_forest_train(geif_forest_t *f)
         return GEIF_ERR_NOT_SUPPORTED;
     }
 
-    return ops->train(f);
+    geif_status_t status = ops->train(f);
+    if (status == GEIF_OK) {
+        f->is_trained = true;
+    }
+    return status;
 }

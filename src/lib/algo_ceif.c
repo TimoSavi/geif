@@ -58,16 +58,14 @@ static int32_t build_ceif_node(geif_forest_t *f,
     node->leaf_sample_offset = 0;
 
     uint32_t d = f->dimensions;
-    double *p = (double *)malloc(d * sizeof(double));
-    double *n = (double *)malloc(d * sizeof(double));
-    uint32_t *left_indices = (uint32_t *)malloc(count * sizeof(uint32_t));
-    uint32_t *right_indices = (uint32_t *)malloc(count * sizeof(uint32_t));
+    double stack_p[GEIF_STACK_BUFFER_DIMS];
+    double stack_n[GEIF_STACK_BUFFER_DIMS];
+    double *p = (d <= GEIF_STACK_BUFFER_DIMS) ? stack_p : (double *)malloc(d * sizeof(double));
+    double *n = (d <= GEIF_STACK_BUFFER_DIMS) ? stack_n : (double *)malloc(d * sizeof(double));
 
-    if (!p || !n || !left_indices || !right_indices) {
-        if (p) free(p);
-        if (n) free(n);
-        if (left_indices) free(left_indices);
-        if (right_indices) free(right_indices);
+    if (!p || !n) {
+        if (p && p != stack_p) free(p);
+        if (n && n != stack_n) free(n);
         node = &tree->nodes[node_idx];
         node->leaf_sample_offset = append_leaf_samples(tree, indices, count);
         return node_idx;
@@ -84,8 +82,6 @@ static int32_t build_ceif_node(geif_forest_t *f,
     double height_ratio = (max_depth > 0) ? (1.0 - ((double)depth / (double)max_depth)) : 1.0;
     if (height_ratio < 0.0) height_ratio = 0.0;
 
-    size_t left_count = 0;
-    size_t right_count = 0;
     double best_pdotn = 0.0;
     bool split_found = false;
 
@@ -118,18 +114,18 @@ static int32_t build_ceif_node(geif_forest_t *f,
 
         double pdotn = geif_dot(p, n, d);
 
-        left_count = 0;
-        right_count = 0;
+        size_t l_cnt = 0;
+        size_t r_cnt = 0;
         for (size_t i = 0; i < count; i++) {
             const double *x = &f->scaled_pool[indices[i] * d];
             if (geif_dot(x, n, d) < pdotn) {
-                left_indices[left_count++] = indices[i];
+                l_cnt++;
             } else {
-                right_indices[right_count++] = indices[i];
+                r_cnt++;
             }
         }
 
-        if (left_count > 0 && right_count > 0) {
+        if (l_cnt > 0 && r_cnt > 0) {
             split_found = true;
             best_pdotn = pdotn;
             break;
@@ -137,14 +133,29 @@ static int32_t build_ceif_node(geif_forest_t *f,
     }
 
     if (!split_found) {
-        free(p);
-        free(n);
-        free(left_indices);
-        free(right_indices);
+        if (p != stack_p) free(p);
+        if (n != stack_n) free(n);
         node = &tree->nodes[node_idx];
         node->leaf_sample_offset = append_leaf_samples(tree, indices, count);
         return node_idx;
     }
+
+    // In-place partition indices using two-pointer swap
+    size_t l = 0;
+    size_t r = count;
+    while (l < r) {
+        const double *x = &f->scaled_pool[indices[l] * d];
+        if (geif_dot(x, n, d) < best_pdotn) {
+            l++;
+        } else {
+            r--;
+            uint32_t tmp = indices[l];
+            indices[l] = indices[r];
+            indices[r] = tmp;
+        }
+    }
+    size_t left_count = l;
+    size_t right_count = count - l;
 
     node = &tree->nodes[node_idx];
     node->normal_offset = append_normal(tree, n, d);
@@ -152,21 +163,18 @@ static int32_t build_ceif_node(geif_forest_t *f,
     node->step_weight = 1.0;
     node->leaf_sample_offset = 0;
 
-    free(p);
-    free(n);
+    if (p != stack_p) free(p);
+    if (n != stack_n) free(n);
 
     int32_t left_child = -1;
     int32_t right_child = -1;
 
     if (left_count > 1) {
-        left_child = build_ceif_node(f, tree, left_indices, left_count, depth + 1, max_depth);
+        left_child = build_ceif_node(f, tree, indices, left_count, depth + 1, max_depth);
     }
     if (right_count > 1) {
-        right_child = build_ceif_node(f, tree, right_indices, right_count, depth + 1, max_depth);
+        right_child = build_ceif_node(f, tree, indices + left_count, right_count, depth + 1, max_depth);
     }
-
-    free(left_indices);
-    free(right_indices);
 
     node = &tree->nodes[node_idx];
     node->left_child = left_child;

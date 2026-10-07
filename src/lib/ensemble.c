@@ -240,6 +240,101 @@ geif_forest_t *geif_ensemble_get_or_create(geif_ensemble_t *ens, const char *cat
 }
 
 /**
+ * @brief Directly registers a pre-constructed sub-forest into an ensemble.
+ *
+ * Transfers ownership of forest to the ensemble. If the category already exists,
+ * the previous forest is destroyed and replaced.
+ *
+ * @param[in,out] ens          Ensemble instance.
+ * @param[in]     category     Category name string.
+ * @param[in]     forest       Forest instance to add (ownership transferred).
+ * @param[in]     total_rows   Total rows observed for this category.
+ * @param[in]     last_updated Last modification timestamp.
+ * @return GEIF_OK on success, or an error status code.
+ */
+geif_status_t geif_ensemble_add_forest(geif_ensemble_t *ens,
+                                       const char *category,
+                                       geif_forest_t *forest,
+                                       uint64_t total_rows,
+                                       time_t last_updated)
+{
+    if (!ens || !forest) return GEIF_ERR_INVALID_ARG;
+
+    const char *cat_key = (category && category[0] != '\0') ? category : "";
+
+    // Propagate ensemble metadata if not already set on forest
+    if (forest->category[0] == '\0') {
+        strncpy(forest->category, cat_key, sizeof(forest->category) - 1);
+        forest->category[sizeof(forest->category) - 1] = '\0';
+    }
+    if (forest->total_input_cols == 0) forest->total_input_cols = ens->total_input_cols;
+    if (forest->label_dims_spec[0] == '\0') {
+        strncpy(forest->label_dims_spec, ens->label_dims_spec, sizeof(forest->label_dims_spec) - 1);
+    }
+    if (forest->include_dims_spec[0] == '\0') {
+        strncpy(forest->include_dims_spec, ens->include_dims_spec, sizeof(forest->include_dims_spec) - 1);
+    }
+    if (forest->ignore_dims_spec[0] == '\0') {
+        strncpy(forest->ignore_dims_spec, ens->ignore_dims_spec, sizeof(forest->ignore_dims_spec) - 1);
+    }
+    if (forest->category_dims_spec[0] == '\0') {
+        strncpy(forest->category_dims_spec, ens->category_dims_spec, sizeof(forest->category_dims_spec) - 1);
+    }
+    if (ens->decimals > 0 && forest->decimals <= 0) forest->decimals = ens->decimals;
+    forest->scale_score = ens->scale_score;
+
+    // Check if category already exists in hash table
+    uint32_t h = ensemble_hash(cat_key);
+    size_t b = (size_t)(h % ens->hash_size);
+    geif_cat_hash_node_t *node = ens->hash_buckets[b];
+    while (node) {
+        uint32_t idx = node->entry_idx;
+        if (strcmp(ens->entries[idx].category, cat_key) == 0) {
+            if (ens->entries[idx].forest && ens->entries[idx].forest != forest) {
+                geif_forest_destroy(ens->entries[idx].forest);
+            }
+            ens->entries[idx].forest = forest;
+            ens->entries[idx].total_rows = total_rows;
+            ens->entries[idx].last_updated = last_updated;
+            return GEIF_OK;
+        }
+        node = node->next;
+    }
+
+    // Expand entries array if needed
+    if (ens->count >= ens->capacity) {
+        size_t new_cap = ens->capacity * 2;
+        geif_category_entry_t *new_entries = (geif_category_entry_t *)realloc(ens->entries, new_cap * sizeof(geif_category_entry_t));
+        if (!new_entries) return GEIF_ERR_OUT_OF_MEMORY;
+        memset(new_entries + ens->capacity, 0, (new_cap - ens->capacity) * sizeof(geif_category_entry_t));
+        ens->entries = new_entries;
+        ens->capacity = new_cap;
+    }
+
+    // Rehash table if load factor is high
+    if (ens->count >= ens->hash_size * 3 / 4) {
+        ensemble_rehash(ens);
+        b = (size_t)(h % ens->hash_size);
+    }
+
+    uint32_t entry_idx = (uint32_t)ens->count++;
+    geif_category_entry_t *entry = &ens->entries[entry_idx];
+    strncpy(entry->category, cat_key, sizeof(entry->category) - 1);
+    entry->category[sizeof(entry->category) - 1] = '\0';
+    entry->forest = forest;
+    entry->last_updated = last_updated;
+    entry->total_rows = total_rows;
+
+    geif_cat_hash_node_t *new_node = (geif_cat_hash_node_t *)malloc(sizeof(geif_cat_hash_node_t));
+    if (!new_node) return GEIF_ERR_OUT_OF_MEMORY;
+    new_node->entry_idx = entry_idx;
+    new_node->next = ens->hash_buckets[b];
+    ens->hash_buckets[b] = new_node;
+
+    return GEIF_OK;
+}
+
+/**
  * @brief Feeds an observation vector into a category's sub-forest.
  *
  * Looks up or instantiates the sub-forest for category, updates the sub-forest's
@@ -405,7 +500,7 @@ geif_status_t geif_ensemble_train(geif_ensemble_t *ens)
 
     for (size_t i = 0; i < ens->count; i++) {
         geif_forest_t *forest = ens->entries[i].forest;
-        if (forest && forest->pool_count > 0) {
+        if (forest && forest->pool_count > 0 && !forest->is_trained) {
             geif_status_t status = geif_forest_train(forest);
             if (status != GEIF_OK) {
                 return status;
@@ -462,6 +557,13 @@ geif_status_t geif_ensemble_score_detailed(const geif_ensemble_t *ens,
         if (metric_depth_out) *metric_depth_out = 0.0;
         if (d_out_out) *d_out_out = 999.0;
         return GEIF_ERR_INVALID_ARG;
+    }
+
+    if (forest->pool_count > 0 && !forest->is_trained) {
+        geif_status_t status = geif_forest_train(forest);
+        if (status != GEIF_OK) {
+            return status;
+        }
     }
 
     return geif_forest_score_detailed(forest, point, score_out, metric_depth_out, d_out_out);
@@ -568,6 +670,10 @@ geif_status_t geif_forest_remove_outliers(geif_forest_t *f, uint32_t k)
     }
 
     if (removed > 0) {
+        f->H_max = 0.0;
+        f->min_score = 0.0;
+        f->average_score = 0.0;
+        f->is_trained = false;
         return geif_forest_train(f);
     }
     return GEIF_OK;
