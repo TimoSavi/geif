@@ -58,6 +58,7 @@ Input data is expected to be character-delimited ASCII/UTF-8 records (default co
 | `-c` | `FILE` | Categorize observations against all sub-forest categories and assign best fit. |
 | `-w` | `FILE` | Write trained model ensemble to a JSON file (use `-` for stdout). |
 | `-r` | `FILE` | Read model ensemble from a JSON file (supports GEIF-1.0 and legacy formats). |
+| `-z` | `FILE` | Update model in-place: read model from `FILE`, update with streaming data, and rewrite to `FILE`. |
 | `-o` | `FILE` | Output file path for scoring results (default: stdout, `-` for stdout). |
 | `-O` | `THRESH` | Anomaly threshold: float in $[0.0, 1.0]$ (default 0.50), percentage (e.g. `90%`), or `average`. |
 | `-t` | `INT` | Number of isolation trees per sub-forest (default: 100). |
@@ -112,7 +113,8 @@ The `-p` (outlier) and `-v` (inlier) options accept formatting directives:
 | :--- | :--- |
 | `%s` | Calibrated anomaly score (e.g. `0.8421`). |
 | `%l` | Concatenated label string extracted from `-L` columns. |
-| `%c` | Category string extracted from `-C` columns. |
+| `%c` | Assigned / predicted category string (when classifying with `-c`). |
+| `%C` | True category string from input observation (from `-C` columns). |
 | `%d` | Vector of raw numerical feature values (comma-separated). |
 | `%m` | Dimension attribution metrics expanded via `-j` template. |
 | `%e` | Single-dimension attribute indices contributing to anomaly. |
@@ -124,7 +126,10 @@ The `-p` (outlier) and `-v` (inlier) options accept formatting directives:
 ### Example Template Usage:
 ```bash
 ./bin/geif -r model.json -a stream.csv -p "row=%l;score=%s;category=%c;rgb=%rgb"
+./bin/geif -r model.json -c test.csv -p "%C -> %c (score: %s)"
 ```
+
+For comprehensive guidance on engine selection (`bubble`, `ceif`, `exemplar`, `voronoi`), visual heatmaps, population drift coverage, categorization accuracy, and throughput benchmarks, see [**`docs/algorithm_selection.md`**](algorithm_selection.md).
 
 ---
 

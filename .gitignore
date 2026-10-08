@@ -17,6 +17,7 @@
 *.geif
 *.ceif
 *.png
+!docs/pics/**
 test/plot_*.csv
 test/*.json
 test/dist_bubble.csv

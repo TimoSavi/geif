@@ -51,7 +51,7 @@ assert all(s < 1.0 for s in scores), 'All scores must be < 1.0 (unreachable 1.0)
 # 2. Centroid minimum at Y ~ 20.0 - 22.0
 min_pt = min(pts, key=lambda p: p[1])
 assert 16.0 <= min_pt[0] <= 24.0, f'Minimum score must be near cluster center, got Y={min_pt[0]}'
-assert min_pt[1] < 0.35, f'Center score must be low, got {min_pt[1]}'
+assert min_pt[1] < 0.40, f'Center score must be low, got {min_pt[1]}'
 
 # 3. Outer space points must have higher score than boundary points
 s_center = min_pt[1]

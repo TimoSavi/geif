@@ -57,7 +57,7 @@
 | :--- | :--- | :--- |
 | `GEIF_DEFAULT_TREE_COUNT` | `100` | Default number of isolation trees per ensemble. |
 | `GEIF_DEFAULT_SAMPLES_PER_TREE` | `256` | Sub-sample size $\psi$ drawn without replacement per tree. |
-| `GEIF_DEFAULT_KAPPA` | `1.25` | Headroom factor for Zero Kelvin baseline depth ($H_{\max} = 1.25 \times H_{\text{train-max}}$). |
+| `GEIF_DEFAULT_KAPPA` | `1.25` | Headroom factor for Zero Kelvin baseline depth ($H_{\max}$ anchored to $1.25 \times H_{\text{train-max}}$). |
 | `GEIF_MIN_REL_DIST` | `0.033333` | Minimum relative Euclidean distance floor for leaf neighbor adjustment. |
 | `GEIF_REL_DIST_MULTIPLIER` | `2.0` | Boundary half-space geometric multiplier for relative distance calibration. |
 | `GEIF_MIN_LEAF_SAMPLE_DIM_CAP` | `4U` | Dimensionality threshold ($D < 4$) for $2^D$ theoretical surrounding leaf samples. |

@@ -1,6 +1,9 @@
 # GEIF: Geometric Extended Isolation Forest — Algorithmic Specification
 
-**Author / Maintainer:** Timo Savinen (AI-assisted)
+**Author / Maintainer:** Timo Savinen (AI-assisted)  
+**Repository:** [github.com/TimoSavi/geif](https://github.com/TimoSavi/geif)
+
+---
 
 ## 1. Introduction & Theoretical Motivation
 
@@ -74,7 +77,7 @@ represents the "Zero Kelvin" deepest inlier floor, and $s_{\max} = 1.0$.
 
 ---
 
-### 2.2 Non-Reachable 1.0 (Asymptotic Bounding)
+### 2.2 Non-Reachable 1.0 (Asymptotic Bounding & Stadium Metric)
 
 In unbounded Euclidean space, distance to training data $d \to \infty$ should indicate maximum anomaly. However, truncating scores abruptly at $1.0$ creates artificial boundary walls.
 
@@ -95,6 +98,10 @@ $$
 2. **Smooth Gradient**: Outer space produces rounded, convex equi-distance shells ("stadium metric") without starburst rays.
 3. **No Numerical Overflow**: Floating-point values remain strictly within $[0.0, 1.0)$.
 
+| Wide Area Evaluation ($T = 0.50$) | Deep Outer Space Perimeter ($T = 0.85$) |
+|:---:|:---:|
+| ![Outer T50](pics/geif/complex2d_outer_T50.png) | ![Outer T85](pics/geif/complex2d_outer_T85.png) |
+
 ---
 
 ### 2.3 Dynamic Dimensional Leaf Sizing & Nearest Neighbor Bounding
@@ -111,7 +118,7 @@ $$
 - **$D = 3$ ($2^3 = 8$):** Provides samples across all 8 spatial octants.
 - **Dimension Cap at $D = 4$ ($8$ samples):** Capping at 8 samples prevents exponential tree starvation for higher dimensions (where $2^{10} = 1024$ would exceed the sub-sample size $\psi = 256$).
 
-**Computational Advantage:**
+**Computational Advantage:**  
 By avoiding excessive fine splits down to 1–3 sample leaves, trees remain shallower by 1–2 levels, cutting node allocations and tree construction time. Fine-grained local density resolution is naturally shifted to the continuous Euclidean relative distance evaluation ($d_{\text{rel}}(x)$), eliminating artificial hyperplane slicing artifacts and sharply carving out interior topological cavities (such as donut holes).
 
 To evaluate local cluster density and detect interior voids without constructing an expensive global $k$-d tree, GEIF computes leaf relative distances using a bounding-box projection:
@@ -135,9 +142,11 @@ This attenuates depth in hollow interior regions, elevating their anomaly scores
 
 ---
 
-### 2.4 Dimension Span Regularization & Aspect Ratio Robustness
+### 2.4 Dimension Span Regularization & Extreme Aspect Ratio Invariance (5000:1 Disparity)
 
-When features possess disparate physical units, raw Euclidean metrics collapse. GEIF regularizes each dimension span:
+When features possess disparate physical units (e.g., milliseconds vs. packet bytes, or coordinates spanning $[1000, 9000]$ vs. $[0.2, 1.8]$ in `complex2d.csv` and $[5, 120]$ vs. $[10^5, 2 \times 10^6]$ in `Wtest.csv`), naive Euclidean distance degenerates into 1D vertical slicing.
+
+GEIF natively enforces scale invariance across extreme aspect ratios ($5000:1$ disparity) by evaluating normalized squared Euclidean distances weighted by regularized feature spans:
 
 $$
 \text{span}_j = \max_{x \in X} x_j - \min_{x \in X} x_j
@@ -150,7 +159,15 @@ $$
 \Vert x - y \Vert_{\text{scaled}}^2 = \sum_{j=1}^D \left(\frac{x_j - y_j}{\text{span}_j}\right)^2
 $$
 
-This guarantees strict scale invariance across extreme aspect ratios ($5000:1$ and higher).
+Because all dimensions contribute isotropically to the radial partitioning, splitting spheres naturally conform to the true cluster shape regardless of numerical magnitude.
+
+| Metric | `Wtest.csv` (Span: $X \approx 110, \; Y \approx 1,900,000$) |
+|:---|:---:|
+| **Raw Training Samples** | ![Wtest raw](pics/geif/Wtest_raw.png) |
+| **$T = 0.00$ (Continuous Landscape)** | ![Wtest T0](pics/geif/Wtest_T0.png) |
+| **$T = 0.50$ (Inlier Envelope)** | ![Wtest T50](pics/geif/Wtest_T50.png) |
+
+**Result**: The narrow diagonal linear band is cleanly enveloped with zero axis distortion and zero configuration overhead.
 
 ---
 
@@ -243,17 +260,25 @@ $$
 
 ## 5. Algorithm 3: Exemplar Kernel Density Estimation (`exemplar`)
 
-### 5.1 Concept
-The **Exemplar** engine is a non-tree spatial kernel estimator operating directly on the active reservoir sample pool. It bypasses hierarchical binary trees entirely, evaluating the query point against all exemplar samples:
+### 5.1 Architecture & The 5-Pillar Remedy
+The **Exemplar** engine is a non-tree spatial kernel estimator operating directly on the active reservoir sample pool. Unlike tree-based methods that partition space into discrete cells, Exemplar evaluates a regularized continuous density field using a 5-pillar mathematical remedy:
+
+1. **Multi-Scale Voronoi Adaptive Bandwidth**: For each exemplar $s_i$, bandwidth $\sigma_i$ is determined via its $K = 5$ nearest neighbors in scaled Euclidean space, clamped to $[0.5 \tilde{\sigma}, 1.5 \tilde{\sigma}]$ where $\tilde{\sigma}$ is the median bandwidth.
+2. **Pilot Density Credibility Weighting**: Samples in sparse peripheral regions receive damped credibility weights $w_i = 1 / (1 + (\text{excess}_i / \tilde{\sigma})^2)$, completely preventing solitary noise points from generating false inlier bubbles.
+3. **Contiguous SIMD Kernel Evaluation**: AVX2/FMA vector instructions evaluate all reservoir exemplars in straight-line vector loops without branching:
 
 $$
-s_{\text{exemplar}}(x) = 1.0 - \frac{1}{1 + \frac{1}{|S_{\text{pool}}|} \sum_{i=1}^{|S_{\text{pool}}|} \frac{1}{1 + \Vert x - x_i \Vert_{\text{scaled}}^2}}
+D(x) = \frac{1}{\sum_{i=1}^N w_i} \sum_{i=1}^N \frac{w_i}{1 + \left(\frac{\Vert x - s_i \Vert_{\text{scaled}}}{\sigma_i}\right)^2}
 $$
 
-### 5.2 Key Characteristics
-- **Zero Tree Building Overhead**: Models train instantaneously by collecting reservoir samples.
-- **Theoretical 0.0000 Floor**: Points coinciding with training exemplars achieve a score of exactly $0.0000$.
-- **Smooth Continuous Landscape**: Produces smooth isotropic score contours without tree partitioning boundaries.
+4. **Zero Kelvin Square-Root Potential Mapping**: Anomaly scores are mapped via square-root potential calibration:
+
+$$
+s(x) = 1.0 - \sqrt{\min\left(1.0, \frac{D(x)}{D_{\max}}\right)}
+$$
+
+This linearizes distance decay ($s(r) \approx 1 - \bar{\sigma}/r$), providing a generous inlier halo at $T = 0.70$ without boundary cliff jumps, while preserving high cavity sensitivity ($s \approx 0.56$) at $T = 0.50$.
+5. **Zero Tree Overhead**: Models load instantaneously without constructing hierarchical trees ($< 1\,\text{ms}$ per category).
 
 ---
 
@@ -262,13 +287,13 @@ $$
 ### 6.1 Concept
 The **CEIF Hyperplane Engine** provides data-anchored isotropic Gaussian cuts combined with continuous metric depth accumulation:
 - A sample point $P$ is drawn uniformly from $S_v$ as the intercept anchor.
-- A random normal vector $n \sim \mathcal{N}(0, I)$ is generated from standard normal distributions and normalized.
+- A random normal vector $n \sim \mathcal{N}(0, I)$ is generated from standard normal distributions and normalized ($n \leftarrow n / \Vert n \Vert$).
 - Continuous depth increments $\Delta H = 1/\delta$ accumulate along the traversal path.
 - Deepest-leaf Zero Kelvin calibration maps raw scores to $[0.0, 1.0)$.
 
 ### 6.2 Key Characteristics
 - Provides continuity and compatibility with classical Extended Isolation Forest benchmarks.
-- Well-suited for high-dimensional diffuse Gaussian distributions.
+- Well-suited for high-dimensional diffuse Gaussian distributions where linear hyperplanes are mathematically preferred.
 
 ---
 
@@ -276,10 +301,13 @@ The **CEIF Hyperplane Engine** provides data-anchored isotropic Gaussian cuts co
 
 | Property | Bubble (`bubble`, Default) | Voronoi (`voronoi`) | Exemplar (`exemplar`) | Hyperplane (`ceif`) |
 | :--- | :---: | :---: | :---: | :---: |
-| **Partition Geometry** | Hyperspheres $\mathcal{B}(c, R)$ | Perpendicular Bisectors | Kernel Density Field | Gaussian Hyperplanes |
-| **Data Structure** | Binary Tree | Binary Tree | Reservoir Exemplar Pool | Binary Tree |
-| **Internal Void Detection** | **Native (Void Leaves)** | Moderate (Damping) | High (Density Drop) | Moderate (Damping) |
+| **Partition Geometry** | Hyperspheres $\mathcal{B}(c, R)$ | Perpendicular Bisectors | Regularized Cauchy Kernel | Gaussian Hyperplanes |
+| **Data Structure** | Binary Tree | Binary Tree | Aligned Sample Array | Binary Tree |
+| **Internal Void Detection** | **Exceptional (Void Leaves)** | Moderate (Polyhedral Cuts) | **Exceptional ($s \approx 0.56$)** | Blind (Hyperplane Bridging) |
 | **Aspect Ratio Robustness** | **Native (Span-Scaled)** | **Native (Sample Bisector)** | **Native (Span-Scaled)** | Scaled Coordinate Metric |
-| **Inference Complexity** | $O(D \log \psi)$ | $O(D \log \psi)$ | $O(D \cdot \psi)$ | $O(D \log \psi)$ |
-| **Memory per Tree Node** | Compact ($R^2$ + center) | Compact ($\vec{n}$ + intercept) | Zero (Pool only) | Normal + Intercept |
-| **Inlier Score at $T = 0.50$** | **0.0% False Outliers** | $\le 0.4$% False Outliers | $\le 4.0$% False Outliers | $\le 1.8$% False Outliers |
+| **Inference Complexity** | $O(D \log \psi)$ | $O(D \log \psi)$ | $O(D \cdot \psi)$ SIMD Vectorized | $O(D \log \psi)$ |
+| **Scoring Throughput** | Very Fast ($\approx 5\,\text{M}$ rows/sec) | Fast ($\approx 3\,\text{M}$ rows/sec) | **Fastest ($\approx 15.3\,\text{M}$ rows/sec)** | Moderate ($\approx 2.4\,\text{M}$ rows/sec) |
+| **Cold-Start Build Time** | $O(N \log N)$ (Trees built) | $O(N \log N)$ (Trees built) | **Instant ($< 1\,\text{ms}$, Zero Trees)** | $O(N \log N)$ (Trees built) |
+| **Categorization Accuracy** | 60.14% | 61.51% | **88.53% (Clear Winner)** | 60.11% |
+
+For detailed multi-algorithm selection guidance, empirical heatmaps, drift analysis, categorization benchmarks, and performance profiles, see [**`docs/algorithm_selection.md`**](algorithm_selection.md).

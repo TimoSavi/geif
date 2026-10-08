@@ -305,19 +305,27 @@ Partitions space using perpendicular bisector hyperplanes between two randomly s
 2. Bisector normal vector: $n = b - a$.
 3. Midpoint intercept: $m = 0.5(a + b)$.
 4. Threshold: $p_{\text{dot}} = m \cdot n$.
-5. Fast branch test during traversal: $\text{scaled\_point} \cdot n < p_{\text{dot}} \implies \text{left} : \text{right}$.
+5. Fast branch test during traversal:
+
+$$
+p_{\text{scaled}} \cdot n < p_{\text{dot}} \implies \text{left} : \text{right}
+$$
 
 ---
 
 ### 5.3 Exemplar Kernel Density (`algo_exemplar.c`)
 
-Non-tree spatial density kernel evaluating adaptive Cauchy kernel distances across the reservoir pool:
-1. **Training Phase (`geif_exemplar_train`)**: For each sample $i$ in the pool, finds its $K$-nearest neighbors (`EXEMPLAR_K = 5`) and calculates local adaptive bandwidth $\sigma_i$.
-2. **Inference Phase (`geif_exemplar_score`)**: For a query point, aggregates Cauchy density:
+Non-parametric spatial density kernel evaluating regularized Cauchy kernel distances across the reservoir pool:
+1. **Training Phase (`geif_exemplar_train`)**: For each sample $i$ in the reservoir pool, finds its $K$-nearest neighbors ($K = 5$), calculates local adaptive bandwidth $\sigma_i$ clamped to $[0.5 \tilde{\sigma}, 1.5 \tilde{\sigma}]$, and assigns credibility pilot weights $w_i$.
+2. **Inference Phase (`geif_exemplar_score`)**: Unrolled AVX2/FMA vector loop aggregates weighted Cauchy kernel density across the entire sample pool:
 
-$$D = \frac{1}{K} \sum_{i \in \text{NN}_K} \frac{1}{1 + (d_i / \sigma_i)^2}$$
+$$D(x) = \frac{1}{\sum_i w_i} \sum_{i=1}^N \frac{w_i}{1 + (\Vert x - s_i \Vert / \sigma_i)^2}$$
 
-Score is evaluated as $s = 1.0 - D$, attenuated by outer space decay when beyond the training envelope.
+Score is evaluated using Zero Kelvin Square-Root Potential Mapping:
+
+$$s(x) = 1.0 - \sqrt{\min\left(1.0, \frac{D(x)}{D_{\max}}\right)}$$
+
+Linearizing radial decay ($s(r) \approx 1 - \bar{\sigma}/r$) and attenuating monotonically into outer space via stadium metrics without boundary cliff jumps.
 
 ---
 
@@ -325,7 +333,7 @@ Score is evaluated as $s = 1.0 - D$, attenuated by outer space decay when beyond
 
 The classic Extended Isolation Forest engine:
 1. Generates data-anchored isotropic Gaussian cuts using Box-Muller normal vectors (`geif_gaussrand`).
-2. Normalizes vector $n$ to unit length: $n \leftarrow n / \|n\|$.
+2. Normalizes vector $n$ to unit length: $n \leftarrow n / \Vert n \Vert$.
 3. Chooses intercept $p_{\text{dot}} \sim \text{Uniform}(\min_i x_i \cdot n, \max_i x_i \cdot n)$.
 4. Traversal evaluates dot product test vs $p_{\text{dot}}$ and accumulates metric depth.
 

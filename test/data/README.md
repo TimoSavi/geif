@@ -31,5 +31,5 @@ The datasets in this directory (`paddydataset.csv` and `winequality-red.csv`) ar
 ### 2. Paddy Crop Agricultural Dataset (`paddydataset.csv`)
 - **Dimensions:** 45 mixed categorical, meteorological, soil, and agricultural feature columns (comma-delimited `,`).
 - **Rows:** 2,790 observations across multiple administrative blocks (`Agriblock`), varieties (`Variety`), and soil types (`Soil Types`).
-- **Usage in GEIF:** Used for multi-column categorical ensemble routing (`-C 2-4`), category regex filtering (`-F`), label isolation (`-L 1`), and high-dimensional streaming ingest.
+- **Usage in GEIF:** Used for multi-column categorical ensemble routing (`-C 2-4`), category regex filtering (`-F`), label isolation (`-L 1`), ignoring fields (`-I 35-39`) and high-dimensional streaming ingest.
 - **License:** Creative Commons Attribution 4.0 International (CC BY 4.0).
