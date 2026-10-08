@@ -357,11 +357,12 @@ static geif_status_t geif_exemplar_score(const geif_forest_t *f,
 
     if (scaled_point != stack_buf) free(scaled_point);
 
-    // Pillar 5: Zero Kelvin Baseline Calibration
+    // Pillar 5: Zero Kelvin Baseline Calibration with Square-Root Potential Mapping
     double max_core = (st->max_core_density > 1e-12) ? st->max_core_density : 1.0;
-    double raw_score = (max_core - D) / max_core;
-    if (raw_score < 0.0) raw_score = 0.0;
-    if (raw_score > 1.0) raw_score = 1.0;
+    double ratio = D / max_core;
+    if (ratio < 0.0) ratio = 0.0;
+    if (ratio > 1.0) ratio = 1.0;
+    double raw_score = 1.0 - sqrt(ratio);
 
     double score = raw_score;
 
