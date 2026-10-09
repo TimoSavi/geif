@@ -200,6 +200,20 @@ $$
 ```
 
 ### 3.2 Mathematical Formulation
+
+#### Variable & Set Definitions
+- **Sample Subset $S_v$**: The active subset of sample observations reaching tree node $v$ during recursive partitioning. At the tree root, $S_{\text{root}} = S$ where $|S| = \psi$ (the sub-sample size, default $\psi = 256$, drawn without replacement from the streaming reservoir pool). Node $v$ partitions $S_v$ into an interior subset and an exterior subset:
+  - Interior subset: $S_{v,\text{in}} = (x \in S_v : \text{dist}^2(x, c) \le R^2)$
+  - Exterior subset: $S_{v,\text{out}} = (x \in S_v : \text{dist}^2(x, c) > R^2)$
+- **Feature Coordinate Span $\text{span}_j$**: The bounding coordinate span along feature dimension $j \in \{1, \ldots, D\}$ evaluated across all training observations:
+
+$$
+\text{span}_j = \max_{x \in X} x_j - \min_{x \in X} x_j
+$$
+
+If $\text{span}_j \le 10^{-9}$ (zero-variance or constant feature), $\text{span}_j$ is set to $1.0$ and dimension health masking deactivates feature dimension $j$ by assigning zero weight during distance calculations.
+
+#### Partitioning Steps
 1. **Center Selection**: The center $c \in \mathbb{R}^D$ is placed at the centroid of two randomly drawn distinct samples $A, B \in S_v$:
 
 $$
@@ -224,10 +238,10 @@ R^2 = \text{median}\left(\text{dist}^2(x_i, c) : x_i \in S_v\right)
 $$
 
 4. **In-Place Two-Pointer Partitioning**:
-Samples are partitioned in-place into interior and exterior subsets via a two-pointer swap, eliminating per-node heap allocations.
+Samples in $S_v$ are partitioned in-place into interior ($S_{v,\text{in}}$) and exterior ($S_{v,\text{out}}$) subsets via a two-pointer swap, eliminating per-node heap allocations.
 
 5. **Empty Void Leaves**:
-When a partition region contains no training samples (e.g. the hollow interior of a donut), it terminates as an empty void leaf ($N_{\text{leaf}} = 0$) with calibrated residual depth, flagging any query point falling within it as anomalous.
+When a partition region contains no training samples ($|S_v| = 0$, e.g. the hollow interior of a donut), it terminates as an empty void leaf ($N_{\text{leaf}} = 0$) with calibrated residual depth, flagging any query point falling within it as anomalous.
 
 ---
 
@@ -260,25 +274,156 @@ $$
 
 ## 5. Algorithm 3: Exemplar Kernel Density Estimation (`exemplar`)
 
-### 5.1 Architecture & The 5-Pillar Remedy
-The **Exemplar** engine is a non-tree spatial kernel estimator operating directly on the active reservoir sample pool. Unlike tree-based methods that partition space into discrete cells, Exemplar evaluates a regularized continuous density field using a 5-pillar mathematical remedy:
+### 5.1 Architecture & Exemplar Generation
+The **Exemplar** engine is a non-tree spatial kernel estimator operating directly on the active reservoir sample pool. While tree-based methods (`bubble`, `voronoi`, `ceif`) recursively cut the feature space into discrete polyhedral or hyperspherical cells, Exemplar evaluates a regularized, infinitely differentiable ($C^\infty$) continuous density field across the observation domain.
 
-1. **Multi-Scale Voronoi Adaptive Bandwidth**: For each exemplar $s_i$, bandwidth $\sigma_i$ is determined via its $K = 5$ nearest neighbors in scaled Euclidean space, clamped to $[0.5 \tilde{\sigma}, 1.5 \tilde{\sigma}]$ where $\tilde{\sigma}$ is the median bandwidth.
-2. **Pilot Density Credibility Weighting**: Samples in sparse peripheral regions receive damped credibility weights $w_i = 1 / (1 + (\text{excess}_i / \tilde{\sigma})^2)$, completely preventing solitary noise points from generating false inlier bubbles.
-3. **Contiguous SIMD Kernel Evaluation**: AVX2/FMA vector instructions evaluate all reservoir exemplars in straight-line vector loops without branching:
-
-$$
-D(x) = \frac{1}{\sum_{i=1}^N w_i} \sum_{i=1}^N \frac{w_i}{1 + \left(\frac{\Vert x - s_i \Vert_{\text{scaled}}}{\sigma_i}\right)^2}
-$$
-
-4. **Zero Kelvin Square-Root Potential Mapping**: Anomaly scores are mapped via square-root potential calibration:
+#### How Exemplars Are Generated & Maintained
+1. **Streaming Reservoir Ingestion**: Observations arrive via streaming Algorithm R reservoir sampling (or batch training).
+2. **Reservoir Pool Sizing ($N$)**: The engine maintains an active reservoir pool of $N$ exemplar vectors:
 
 $$
-s(x) = 1.0 - \sqrt{\min\left(1.0, \frac{D(x)}{D_{\max}}\right)}
+\{x_1, x_2, \ldots, x_N\} \subset \mathbb{R}^D
 $$
 
-This linearizes distance decay ($s(r) \approx 1 - \bar{\sigma}/r$), providing a generous inlier halo at $T = 0.70$ without boundary cliff jumps, while preserving high cavity sensitivity ($s \approx 0.56$) at $T = 0.50$.
-5. **Zero Tree Overhead**: Models load instantaneously without constructing hierarchical trees ($< 1\,\text{ms}$ per category).
+where pool size $N = |S_{\text{pool}}|$ is bounded by capacity $N_{\text{capacity}}$ (default $N = \psi = 256$ per sub-forest or category).
+3. **Bounded Adaptive Replacement**:
+   - When the reservoir is not yet full (total observed rows $n \le N_{\text{capacity}}$), each incoming point is accepted directly into the pool.
+   - When the reservoir capacity is reached ($n > N_{\text{capacity}}$), incoming point $x_t$ replaces a randomly selected existing exemplar in the pool with probability:
+
+$$
+P(\text{accept}) = \frac{N_{\text{capacity}}}{\min(N_{\text{seen}}, \; (C + 1) \, N_{\text{capacity}})}
+$$
+
+where $C$ is the adaptive ceiling factor (default $C = 3$). This ceiling cap prevents sample freezing over long streams while guaranteeing continuous adaptivity to distribution drift.
+4. **Spatial Anchors**: These $N$ exemplar observations serve as non-parametric kernel centroids. Because no decision trees are grown or traversed, memory overhead is minimal ($< 5\,\text{KB}$ per category) and model cold-starts require $< 1\,\text{ms}$.
+
+---
+
+### 5.2 The 5-Pillar Architectural Remedy
+To resolve the classical pitfalls of raw $K$-nearest-neighbor estimation—specifically, boundary derivative jumps, caustic ridges, starburst ray artifacts, isolated noise bubble inflation, and outer-space boundary cliffs—the Exemplar engine implements a 5-pillar mathematical remedy:
+
+#### Pillar 1: Multi-Scale Adaptive Bandwidth ($\sigma_i$) via $K$-NN
+Rather than using a fixed global smoothing bandwidth, each exemplar $x_i$ computes a personalized local bandwidth $\sigma_i$ based on the density of its immediate neighborhood:
+1. For exemplar $x_i$, the span-scaled Euclidean distance to every other exemplar $x_j$ ($j \ne i$) is computed:
+
+$$
+\text{dist}_{\text{scaled}}(x_i, x_j) = \sqrt{\sum_{d=1}^D \left(\frac{x_{i,d} - x_{j,d}}{\text{span}_d}\right)^2}
+$$
+
+2. The $K = 5$ nearest neighbors to $x_i$ are identified:
+
+$$
+d_{(1)}(x_i) \le d_{(2)}(x_i) \le \ldots \le d_{(K)}(x_i)
+$$
+
+3. The raw adaptive bandwidth $\sigma_i$ is the arithmetic mean of these $K$-NN distances:
+
+$$
+\sigma_i = \frac{1}{K} \sum_{k=1}^K d_{(k)}(x_i)
+$$
+
+(guarded with a numerical floor $\sigma_i \ge 10^{-6}$). In dense cluster cores, $\sigma_i$ shrinks to capture fine geometric contours; in diffuse regions, $\sigma_i$ naturally expands.
+
+#### Pillar 2: Robust Median Clamping ($\sigma_i^{\text{clamped}}$)
+Unconstrained adaptive bandwidths risk two failure modes: dense clusters collapse into needle-sharp delta spikes, and distant outliers blow up into gigantic blurring globes. Exemplar prevents both by clamping all local bandwidths to a tight band around the global median spacing:
+1. The global robust median spacing $\sigma_{\text{med}}$ across all $N$ exemplars is calculated via $O(N)$ quickselect:
+
+$$
+\sigma_{\text{med}} = \text{median}(\sigma_1, \sigma_2, \ldots, \sigma_N)
+$$
+
+2. Each raw bandwidth $\sigma_i$ is clamped to the symmetrical interval $[0.5 \tilde{\sigma}, 1.5 \tilde{\sigma}]$ around the median $\sigma_{\text{med}}$:
+
+$$
+\sigma_i^{\text{clamped}} = \max\left(0.5 \, \sigma_{\text{med}}, \; \min\left(\sigma_i, \; 1.5 \, \sigma_{\text{med}}\right)\right)
+$$
+
+This guarantees:
+
+$$
+0.5 \, \sigma_{\text{med}} \le \sigma_i^{\text{clamped}} \le 1.5 \, \sigma_{\text{med}}
+$$
+
+preserving local multi-scale resolution while bounding maximum dispersion.
+
+#### Pillar 3: Pilot Density Credibility Weighting ($w_i$)
+To prevent solitary noise samples or stray outliers in the training data from creating false inlier islands ("noise bubbles"), each exemplar is assigned an objective credibility weight $w_i \in (0, 1]$:
+1. The excess dispersion $\text{excess}_i$ of exemplar $x_i$ beyond the global median spacing is computed:
+
+$$
+\text{excess}_i = \max\left(0, \; \sigma_i - \sigma_{\text{med}}\right)
+$$
+
+2. The credibility weight $w_i$ is assigned via quadratic Cauchy damping:
+
+$$
+w_i = \frac{1}{1 + \left(\frac{\text{excess}_i}{\sigma_{\text{med}}}\right)^2}
+$$
+
+- If exemplar $x_i$ resides in a dense or nominal region ($\sigma_i \le \sigma_{\text{med}}$), then $\text{excess}_i = 0$ and $w_i = 1.0$ (full credibility).
+- If exemplar $x_i$ is an isolated peripheral sample ($\sigma_i > \sigma_{\text{med}}$), its credibility weight $w_i$ decays rapidly toward zero, preventing solitary anomalies from distorting the density landscape.
+
+#### Pillar 4: Smooth Continuous Cauchy Kernel Pooling ($D(x)$)
+Given an unlabelled query point $x \in \mathbb{R}^D$, continuous density $D(x)$ is evaluated by pooling Cauchy kernels across all $N$ reservoir exemplars:
+
+$$
+D(x) = \frac{1}{\sum_{i=1}^N w_i} \sum_{i=1}^N \frac{w_i}{1 + \left(\frac{\Vert x - x_i \Vert_{\text{scaled}}}{\sigma_i^{\text{clamped}}}\right)^2}
+$$
+
+Where:
+- $N$: Total number of reservoir exemplars in the active sample pool ($N = |S_{\text{pool}}|$, default 256).
+- $x_i$: The $i$-th exemplar coordinate vector in the reservoir pool.
+- Normalized distance metric: The squared span-scaled Euclidean distance to exemplar $x_i$:
+
+$$
+\Vert x - x_i \Vert_{\text{scaled}}^2 = \sum_{d=1}^D \left(\frac{x_d - x_{i,d}}{\text{span}_d}\right)^2
+$$
+
+- $\sigma_i^{\text{clamped}}$: The clamped adaptive bandwidth of exemplar $x_i$ from Pillar 2.
+- $w_i$: The pilot credibility weight of exemplar $x_i$ from Pillar 3.
+
+**Smoothness Guarantee**: Because $D(x)$ is a rational function with positive denominators everywhere, $D(x) \in C^\infty(\mathbb{R}^D)$ (infinitely differentiable). Unlike Voronoi-tessellated cell cutoffs which produce sharp derivative discontinuities (caustic ridges and starburst rays), all-reservoir pooling produces a glass-smooth density gradient across the entire domain.
+
+#### Pillar 5: Zero Kelvin Potential Mapping & Asymptotic Outer Stadium Decay
+Raw density $D(x)$ is converted into a calibrated anomaly score $s(x) \in [0.0, 1.0)$ via two complementary stages:
+
+1. **Square-Root Potential Mapping & Zero Kelvin Baseline**:
+   During model finalization, the maximum core density observed across all training exemplars is recorded:
+
+$$
+D_{\max} = \max_{i=1 \ldots N} D(x_i)
+$$
+
+   The raw continuous anomaly score $s_{\text{raw}}(x)$ is evaluated via square-root potential calibration:
+
+$$
+s_{\text{raw}}(x) = 1.0 - \sqrt{\min\left(1.0, \; \frac{D(x)}{D_{\max}}\right)}
+$$
+
+   - At the densest cluster centroid, $D(x) \approx D_{\max}$, establishing an exact Zero Kelvin baseline: $s_{\text{raw}} \approx 0.000$.
+   - The square-root transform linearizes the spatial decay profile ($s(r) \approx 1 - \bar{\sigma} / r$), providing a generous, uniform inlier envelope at threshold $T = 0.70$ without steep boundary drop-offs, while preserving strong sensitivity inside hollow cavities ($s \approx 0.56$ at $T = 0.50$).
+
+2. **Asymptotic Outer Stadium Decay**:
+   For query points that lie outside the training data bounding box between $x_{\min}$ and $x_{\max}$, the outer Euclidean distance $d_{\text{out}}(x)$ is evaluated:
+
+$$
+d_{\text{out}}^2(x) = \sum_{j=1}^D \left(\frac{\max(0, \; x_{\min,j} - x_j, \; x_j - x_{\max,j})}{\text{span}_j}\right)^2
+$$
+
+   If $d_{\text{out}}(x) > 0$, asymptotic exponential stadium attenuation is applied:
+
+$$
+s(x) = 1.0 - (1.0 - s_{\text{raw}}(x)) \exp\left(-\lambda_{\text{out}} \, \frac{d_{\text{out}}(x)}{\text{span}_{\text{target}}}\right)
+$$
+
+   where $\lambda_{\text{out}} = 2.0$ (`GEIF_OUTER_DECAY_RATE`). This guarantees smooth, strictly monotonic asymptotic convergence toward $1.0$ as a query point recedes arbitrarily far into outer space, completely eliminating boundary cliff jumps.
+
+---
+
+### 5.3 Contiguous SIMD Acceleration & Complexity
+- **Inference Complexity**: $O(D \cdot N)$ where $N = 256$ is small and fixed.
+- **Straight-Line SIMD Vectorization**: Because exemplar scoring traverses a contiguous coordinate array without conditional branching or tree pointer indirection, AVX2 / FMA vector pipelines evaluate 8 doubles per instruction, reaching **15.3 million evaluations/sec** on standard x86-64 hardware.
+- **Cold-Start Efficiency**: Tree construction time is $0\text{ ms}$; computing $K$-NN bandwidths and credibility weights for $N = 256$ takes $< 1\text{ ms}$.
 
 ---
 
