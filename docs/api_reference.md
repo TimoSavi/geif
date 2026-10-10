@@ -57,12 +57,13 @@
 | :--- | :--- | :--- |
 | `GEIF_DEFAULT_TREE_COUNT` | `100` | Default number of isolation trees per ensemble. |
 | `GEIF_DEFAULT_SAMPLES_PER_TREE` | `256` | Sub-sample size $\psi$ drawn without replacement per tree. |
-| `GEIF_DEFAULT_KAPPA` | `1.25` | Headroom factor for Zero Kelvin baseline depth ($H_{\max}$ anchored to $1.25 \times H_{\text{train-max}}$). |
+| `GEIF_DEFAULT_KAPPA` | `1.25` | Headroom factor for Zero Kelvin baseline depth: anchors $H_{\max}$ to $1.25 \times \text{maximum training depth}$. |
 | `GEIF_MIN_REL_DIST` | `0.033333` | Minimum relative Euclidean distance floor for leaf neighbor adjustment. |
 | `GEIF_REL_DIST_MULTIPLIER` | `2.0` | Boundary half-space geometric multiplier for relative distance calibration. |
+| `GEIF_MIN_LEAF_SAMPLE_FLOOR` | `4U` | Floor on minimum leaf samples / nearest neighbors (1D stabilization). |
 | `GEIF_MIN_LEAF_SAMPLE_DIM_CAP` | `4U` | Dimensionality threshold ($D < 4$) for $2^D$ theoretical surrounding leaf samples. |
 | `GEIF_MIN_LEAF_SAMPLE_HIGH_DIM` | `8U` | Capped minimum leaf sample count for higher dimensions ($D \ge 4$). |
-| `GEIF_NODE_MIN_SAMPLE(d)` | `$2^d$ or $8$` | Dynamic minimum samples on leaves before terminating splits: frames queries by surrounding orthants. |
+| `GEIF_NODE_MIN_SAMPLE(d)` | `$\max(4, \min(2^d, 8))$` | Dynamic minimum samples on leaves before terminating splits: 4 for $D \le 2$, 8 for $D \ge 3$. |
 | `GEIF_OUTER_DECAY_RATE` | `0.10` | Exponential approach rate towards asymptotic 1.0 ceiling in outer space. |
 | `GEIF_STACK_BUFFER_DIMS` | `64U` | Maximum dimension count for zero-allocation stack scratch buffers. |
 | `GEIF_MAX_LEAF_NEAREST_SAMPLES` | `32U` | Maximum nearest leaf neighbors tracked via stack max-heap for relative distance. |
@@ -431,7 +432,32 @@ geif_forest_t *geif_ensemble_get_or_create(geif_ensemble_t *ensemble, const char
 
 ---
 
-#### [`geif_ensemble_feed`](../include/geif/geif.h#L209)
+#### [`geif_ensemble_add_forest`](../include/geif/geif.h#L219)
+
+```c
+geif_status_t geif_ensemble_add_forest(geif_ensemble_t *ensemble, const char *category, geif_forest_t *forest, uint64_t total_rows, time_t last_updated);
+```
+
+**Description:** Directly registers a pre-constructed sub-forest into an ensemble.
+
+Transfers ownership of forest to the ensemble. If the category already exists,
+the previous forest is destroyed and replaced.
+
+**Parameters:**
+
+| Parameter | Direction | Description |
+| :--- | :--- | :--- |
+| `ensemble` | `[in,out]` | Ensemble instance. |
+| `category` | `[in]` | Category name string. |
+| `forest` | `[in]` | Forest instance to add (ownership transferred). |
+| `total_rows` | `[in]` | Total rows observed for this category. |
+| `last_updated` | `[in]` | Last modification timestamp. |
+
+**Returns:** GEIF_OK on success, or an error status code.
+
+---
+
+#### [`geif_ensemble_feed`](../include/geif/geif.h#L228)
 
 ```c
 geif_status_t geif_ensemble_feed(geif_ensemble_t *ensemble, const char *category, const double *point);
@@ -441,7 +467,7 @@ geif_status_t geif_ensemble_feed(geif_ensemble_t *ensemble, const char *category
 
 ---
 
-#### [`geif_ensemble_prune_categories`](../include/geif/geif.h#L216)
+#### [`geif_ensemble_prune_categories`](../include/geif/geif.h#L235)
 
 ```c
 geif_status_t geif_ensemble_prune_categories(geif_ensemble_t *ensemble, uint64_t min_rows);
@@ -451,7 +477,7 @@ geif_status_t geif_ensemble_prune_categories(geif_ensemble_t *ensemble, uint64_t
 
 ---
 
-#### [`geif_ensemble_prune_age`](../include/geif/geif.h#L226)
+#### [`geif_ensemble_prune_age`](../include/geif/geif.h#L245)
 
 ```c
 geif_status_t geif_ensemble_prune_age(geif_ensemble_t *ensemble, time_t max_age_seconds, time_t now);
@@ -471,7 +497,7 @@ geif_status_t geif_ensemble_prune_age(geif_ensemble_t *ensemble, time_t max_age_
 
 ---
 
-#### [`geif_ensemble_train`](../include/geif/geif.h#L233)
+#### [`geif_ensemble_train`](../include/geif/geif.h#L252)
 
 ```c
 geif_status_t geif_ensemble_train(geif_ensemble_t *ensemble);
@@ -481,7 +507,7 @@ geif_status_t geif_ensemble_train(geif_ensemble_t *ensemble);
 
 ---
 
-#### [`geif_ensemble_score_detailed`](../include/geif/geif.h#L238)
+#### [`geif_ensemble_score_detailed`](../include/geif/geif.h#L257)
 
 ```c
 geif_status_t geif_ensemble_score_detailed(const geif_ensemble_t *ensemble, const char *category, const double *point, double *score_out, double *metric_depth_out, double *d_out_out);
@@ -491,7 +517,7 @@ geif_status_t geif_ensemble_score_detailed(const geif_ensemble_t *ensemble, cons
 
 ---
 
-#### [`geif_ensemble_save_json`](../include/geif/geif.h#L248)
+#### [`geif_ensemble_save_json`](../include/geif/geif.h#L267)
 
 ```c
 geif_status_t geif_ensemble_save_json(const geif_ensemble_t *ensemble, const char *path);
@@ -501,7 +527,7 @@ geif_status_t geif_ensemble_save_json(const geif_ensemble_t *ensemble, const cha
 
 ---
 
-#### [`geif_ensemble_load_json`](../include/geif/geif.h#L253)
+#### [`geif_ensemble_load_json`](../include/geif/geif.h#L272)
 
 ```c
 geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char *path);
@@ -511,7 +537,7 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
 
 ---
 
-#### [`geif_ensemble_summary`](../include/geif/geif.h#L258)
+#### [`geif_ensemble_summary`](../include/geif/geif.h#L277)
 
 ```c
 void geif_ensemble_summary(const geif_ensemble_t *ensemble, char *buffer, size_t buffer_size);
@@ -521,7 +547,7 @@ void geif_ensemble_summary(const geif_ensemble_t *ensemble, char *buffer, size_t
 
 ---
 
-#### [`geif_forest_remove_outliers`](../include/geif/geif.h#L267)
+#### [`geif_forest_remove_outliers`](../include/geif/geif.h#L286)
 
 ```c
 geif_status_t geif_forest_remove_outliers(geif_forest_t *f, uint32_t k);
@@ -540,7 +566,7 @@ geif_status_t geif_forest_remove_outliers(geif_forest_t *f, uint32_t k);
 
 ---
 
-#### [`geif_ensemble_remove_outliers`](../include/geif/geif.h#L276)
+#### [`geif_ensemble_remove_outliers`](../include/geif/geif.h#L295)
 
 ```c
 geif_status_t geif_ensemble_remove_outliers(geif_ensemble_t *ensemble, uint32_t k);
@@ -563,7 +589,17 @@ geif_status_t geif_ensemble_remove_outliers(geif_ensemble_t *ensemble, uint32_t 
 
 **Module Purpose:** Core data structures and memory layouts for GEIF.
 
-#### [`geif_algo_type_t`](../include/geif/types.h#L46)
+#### [`GEIF_REL_DIST_MULTIPLIER`](../include/geif/types.h#L30)
+
+```c
+#define GEIF_REL_DIST_MULTIPLIER       2.0;
+```
+
+**Description:** Boundary half-space geometric calibration multiplier. Doubling relative distance smooths the steep hyperbolic gradient (d/dr c(n/r) = -2/r) near sample boundaries, eliminating border spikes/valleys and covering peripheral non-significant regions under thresholding (e.g. -O 80%).
+
+---
+
+#### [`geif_algo_type_t`](../include/geif/types.h#L50)
 
 ```c
 typedef enum geif_algo_type { GEIF_ALGO_CEIF = 0,        /**< CEIF: Data-anchored isotropic Gaussian cuts with Zero Kelvin & outer decay */ GEIF_ALGO_BUBBLE,          /**< Hyperspherical Bubble Cavity Carving */ GEIF_ALGO_EXEMPLAR,        /**< Non-tree direct SIMD Cauchy density kernel */ GEIF_ALGO_VORONOI          /**< Pure Voronoi perpendicular bisector splits */ } geif_algo_type_t;
@@ -857,7 +893,7 @@ p = (A + B) / 2), and partitions points based on the dot product sign.
 
 ---
 
-#### [`geif_voronoi_train`](../src/lib/algo_voronoi.c#L181)
+#### [`geif_voronoi_train`](../src/lib/algo_voronoi.c#L189)
 
 ```c
 static geif_status_t geif_voronoi_train(geif_forest_t *f);
@@ -878,7 +914,7 @@ midpoint perpendicular bisector cuts.
 
 ---
 
-#### [`geif_voronoi_score`](../src/lib/algo_voronoi.c#L240)
+#### [`geif_voronoi_score`](../src/lib/algo_voronoi.c#L248)
 
 ```c
 static geif_status_t geif_voronoi_score(const geif_forest_t *f, const double *point, double *score_out, double *metric_depth_out, double *d_out_out);
@@ -904,7 +940,7 @@ static geif_status_t geif_voronoi_score(const geif_forest_t *f, const double *po
 
 **Module Purpose:** Exemplar Algorithm: Non-tree direct SIMD Cauchy density kernel on reservoir samples.
 
-#### [`geif_exemplar_destroy`](../src/lib/algo_exemplar.c#L26)
+#### [`geif_exemplar_destroy`](../src/lib/algo_exemplar.c#L40)
 
 ```c
 static void geif_exemplar_destroy(geif_forest_t *f);
@@ -920,16 +956,57 @@ static void geif_exemplar_destroy(geif_forest_t *f);
 
 ---
 
-#### [`geif_exemplar_train`](../src/lib/algo_exemplar.c#L45)
+#### [`compare_doubles`](../src/lib/algo_exemplar.c#L55)
+
+```c
+static int compare_doubles(const void *a, const void *b);
+```
+
+**Description:** Double comparison callback for qsort.
+
+---
+
+#### [`geif_exemplar_compute_density`](../src/lib/algo_exemplar.c#L79)
+
+```c
+static inline double geif_exemplar_compute_density(const geif_exemplar_state_t *st, const double *scaled_point, const double *scaled_pool, size_t count, uint32_t d);
+```
+
+**Description:** Computes smooth all-reservoir Cauchy kernel density D(x).
+
+D(x) = sum_i(w_i / (1 + dist_i^2 / sigma_i^2)) / sum_i(w_i)
+
+Infinitely differentiable (C-infinity) everywhere. Eliminates order-K Voronoi
+boundary derivative jumps (caustic fringes) and starburst rays.
+
+**Parameters:**
+
+| Parameter | Direction | Description |
+| :--- | :--- | :--- |
+| `st` | `[in]` | Exemplar internal state. |
+| `scaled_point` | `[in]` | Scaled observation vector. |
+| `scaled_pool` | `[in]` | Array of reservoir sample coordinates. |
+| `count` | `[in]` | Number of reservoir samples. |
+| `d` | `[in]` | Dimensionality. |
+
+**Returns:** Aggregated normalized kernel density D in [0, 1].
+
+---
+
+#### [`geif_exemplar_train`](../src/lib/algo_exemplar.c#L112)
 
 ```c
 static geif_status_t geif_exemplar_train(geif_forest_t *f);
 ```
 
-**Description:** Trains the Exemplar model by computing adaptive local bandwidths.
+**Description:** Trains the Exemplar model by computing regularized bandwidths and credibility weights.
 
-Bypasses binary tree construction entirely. For each sample in the reservoir pool,
-finds its K-nearest neighbors and calculates local bandwidth sigma_i.
+Bypasses binary tree construction entirely. For each sample in the reservoir pool:
+1. Computes mean distance to K=5 nearest neighbors in scaled space.
+2. Computes global robust median spacing sigma_median.
+3. Clamps bandwidths: sigma_i in [0.5 * sigma_median, 1.5 * sigma_median].
+4. Computes pilot density credibility weights w_i = 1 / (1 + (excess / sigma_median)^2).
+5. Precomputes max core density D_max for Zero Kelvin calibration.
 
 **Parameters:**
 
@@ -941,7 +1018,7 @@ finds its K-nearest neighbors and calculates local bandwidth sigma_i.
 
 ---
 
-#### [`geif_exemplar_score`](../src/lib/algo_exemplar.c#L156)
+#### [`geif_exemplar_score`](../src/lib/algo_exemplar.c#L300)
 
 ```c
 static geif_status_t geif_exemplar_score(const geif_forest_t *f, const double *point, double *score_out, double *metric_depth_out, double *d_out_out);
@@ -949,9 +1026,10 @@ static geif_status_t geif_exemplar_score(const geif_forest_t *f, const double *p
 
 **Description:** Scores a query point via direct Cauchy kernel density estimation.
 
-Finds the K nearest exemplars in the reservoir pool and aggregates their
-kernel density: D = (1/K) * sum(1 / (1 + (dist_i / sigma_i)^2)).
-Score is evaluated as 1.0 - D with outer space stadium attenuation.
+Smoothly aggregates kernel density across all reservoir exemplars:
+D(x) = sum_i(w_i / (1 + (d_i / sigma_i)^2)) / sum_i(w_i).
+Anomaly score is evaluated via Zero Kelvin calibration:
+s_raw = (D_max - D(x)) / D_max, followed by outer space stadium attenuation.
 
 **Parameters:**
 
@@ -998,7 +1076,7 @@ Gaussian normal vector.
 
 ---
 
-#### [`geif_ceif_train`](../src/lib/algo_ceif.c#L188)
+#### [`geif_ceif_train`](../src/lib/algo_ceif.c#L196)
 
 ```c
 static geif_status_t geif_ceif_train(geif_forest_t *f);
@@ -1016,7 +1094,7 @@ static geif_status_t geif_ceif_train(geif_forest_t *f);
 
 ---
 
-#### [`geif_ceif_score`](../src/lib/algo_ceif.c#L247)
+#### [`geif_ceif_score`](../src/lib/algo_ceif.c#L255)
 
 ```c
 static geif_status_t geif_ceif_score(const geif_forest_t *f, const double *point, double *score_out, double *metric_depth_out, double *d_out_out);
@@ -1710,7 +1788,7 @@ the destination string buffer.
 
 **Module Purpose:** Unified training dispatcher for GEIF algorithms.
 
-#### [`geif_forest_train`](../src/lib/train.c#L19)
+#### [`geif_forest_train`](../src/lib/train.c#L20)
 
 ```c
 geif_status_t geif_forest_train(geif_forest_t *f);
@@ -1794,7 +1872,7 @@ computing continuous tree traversal depth and exterior bounding box Euclidean di
 
 ---
 
-#### [`geif_forest_score_detailed`](../src/lib/evaluate.c#L104)
+#### [`geif_forest_score_detailed`](../src/lib/evaluate.c#L107)
 
 ```c
 geif_status_t geif_forest_score_detailed(const geif_forest_t *f, const double *point, double *score_out, double *metric_depth_out, double *d_out_out);
@@ -1821,7 +1899,7 @@ Dispatches to the active algorithm engine to compute:
 
 ---
 
-#### [`geif_forest_score`](../src/lib/evaluate.c#L130)
+#### [`geif_forest_score`](../src/lib/evaluate.c#L139)
 
 ```c
 geif_status_t geif_forest_score(const geif_forest_t *f, const double *point, double *score_out);
@@ -1843,7 +1921,7 @@ Convenience wrapper around geif_forest_score_detailed().
 
 ---
 
-#### [`geif_forest_get_averages`](../src/lib/evaluate.c#L147)
+#### [`geif_forest_get_averages`](../src/lib/evaluate.c#L156)
 
 ```c
 geif_status_t geif_forest_get_averages(const geif_forest_t *forest, double *averages_out);
@@ -1865,7 +1943,7 @@ reservoir pool samples, or takes the midpoint of the coordinate bounding envelop
 
 ---
 
-#### [`geif_forest_dimension_attribution`](../src/lib/evaluate.c#L194)
+#### [`geif_forest_dimension_attribution`](../src/lib/evaluate.c#L203)
 
 ```c
 geif_status_t geif_forest_dimension_attribution(const geif_forest_t *forest, const double *point, double *attr_scores_out);
@@ -1889,7 +1967,7 @@ evaluating the resulting score.
 
 ---
 
-#### [`pscore_cmp`](../src/lib/evaluate.c#L234)
+#### [`pscore_cmp`](../src/lib/evaluate.c#L243)
 
 ```c
 static int pscore_cmp(const void *a, const void *b);
@@ -1899,7 +1977,7 @@ static int pscore_cmp(const void *a, const void *b);
 
 ---
 
-#### [`geif_forest_calculate_percentile_score`](../src/lib/evaluate.c#L253)
+#### [`geif_forest_calculate_percentile_score`](../src/lib/evaluate.c#L262)
 
 ```c
 double geif_forest_calculate_percentile_score(const geif_forest_t *forest, double percentile);
@@ -2043,7 +2121,32 @@ specifications to the newly instantiated sub-forest.
 
 ---
 
-#### [`geif_ensemble_feed`](../src/lib/ensemble.c#L254)
+#### [`geif_ensemble_add_forest`](../src/lib/ensemble.c#L255)
+
+```c
+geif_status_t geif_ensemble_add_forest(geif_ensemble_t *ens, const char *category, geif_forest_t *forest, uint64_t total_rows, time_t last_updated);
+```
+
+**Description:** Directly registers a pre-constructed sub-forest into an ensemble.
+
+Transfers ownership of forest to the ensemble. If the category already exists,
+the previous forest is destroyed and replaced.
+
+**Parameters:**
+
+| Parameter | Direction | Description |
+| :--- | :--- | :--- |
+| `ens` | `[in,out]` | Ensemble instance. |
+| `category` | `[in]` | Category name string. |
+| `forest` | `[in]` | Forest instance to add (ownership transferred). |
+| `total_rows` | `[in]` | Total rows observed for this category. |
+| `last_updated` | `[in]` | Last modification timestamp. |
+
+**Returns:** GEIF_OK on success, or an error status code.
+
+---
+
+#### [`geif_ensemble_feed`](../src/lib/ensemble.c#L349)
 
 ```c
 geif_status_t geif_ensemble_feed(geif_ensemble_t *ens, const char *category, const double *point);
@@ -2067,7 +2170,7 @@ streaming reservoir sampling.
 
 ---
 
-#### [`geif_ensemble_prune_categories`](../src/lib/ensemble.c#L290)
+#### [`geif_ensemble_prune_categories`](../src/lib/ensemble.c#L385)
 
 ```c
 geif_status_t geif_ensemble_prune_categories(geif_ensemble_t *ens, uint64_t min_rows);
@@ -2089,7 +2192,7 @@ and rebuilds the category hash table.
 
 ---
 
-#### [`geif_ensemble_prune_age`](../src/lib/ensemble.c#L344)
+#### [`geif_ensemble_prune_age`](../src/lib/ensemble.c#L439)
 
 ```c
 geif_status_t geif_ensemble_prune_age(geif_ensemble_t *ens, time_t max_age_seconds, time_t now);
@@ -2109,7 +2212,7 @@ geif_status_t geif_ensemble_prune_age(geif_ensemble_t *ens, time_t max_age_secon
 
 ---
 
-#### [`geif_ensemble_train`](../src/lib/ensemble.c#L402)
+#### [`geif_ensemble_train`](../src/lib/ensemble.c#L497)
 
 ```c
 geif_status_t geif_ensemble_train(geif_ensemble_t *ens);
@@ -2130,7 +2233,7 @@ sub-forest with pool_count > 0.
 
 ---
 
-#### [`geif_ensemble_score_detailed`](../src/lib/ensemble.c#L434)
+#### [`geif_ensemble_score_detailed`](../src/lib/ensemble.c#L529)
 
 ```c
 geif_status_t geif_ensemble_score_detailed(const geif_ensemble_t *ens, const char *category, const double *point, double *score_out, double *metric_depth_out, double *d_out_out);
@@ -2157,7 +2260,7 @@ training, returns maximum outlier score (1.0 - 1e-6) and GEIF_ERR_INVALID_ARG.
 
 ---
 
-#### [`geif_ensemble_summary`](../src/lib/ensemble.c#L480)
+#### [`geif_ensemble_summary`](../src/lib/ensemble.c#L582)
 
 ```c
 void geif_ensemble_summary(const geif_ensemble_t *ens, char *buffer, size_t buffer_size);
@@ -2178,7 +2281,7 @@ for each sub-forest (rows seen, pool size, tree count, calibrated H_max, timesta
 
 ---
 
-#### [`geif_forest_remove_outliers`](../src/lib/ensemble.c#L536)
+#### [`geif_forest_remove_outliers`](../src/lib/ensemble.c#L638)
 
 ```c
 geif_status_t geif_forest_remove_outliers(geif_forest_t *f, uint32_t k);
@@ -2201,7 +2304,7 @@ memmove, and retrains the trees to recalibrate spatial boundaries without outlie
 
 ---
 
-#### [`geif_ensemble_remove_outliers`](../src/lib/ensemble.c#L583)
+#### [`geif_ensemble_remove_outliers`](../src/lib/ensemble.c#L689)
 
 ```c
 geif_status_t geif_ensemble_remove_outliers(geif_ensemble_t *ens, uint32_t k);
@@ -2298,7 +2401,7 @@ calibration parameters, and the raw reservoir sample pool.
 
 ---
 
-#### [`geif_forest_from_json_object`](../src/lib/json_io.c#L122)
+#### [`geif_forest_from_json_object`](../src/lib/json_io.c#L115)
 
 ```c
 geif_status_t geif_forest_from_json_object(geif_forest_t **forest_out, struct json_object *root);
@@ -2320,7 +2423,7 @@ builds and calibrates the tree structures in RAM.
 
 ---
 
-#### [`geif_forest_save_json`](../src/lib/json_io.c#L340)
+#### [`geif_forest_save_json`](../src/lib/json_io.c#L238)
 
 ```c
 geif_status_t geif_forest_save_json(const geif_forest_t *f, const char *path);
@@ -2339,7 +2442,7 @@ geif_status_t geif_forest_save_json(const geif_forest_t *f, const char *path);
 
 ---
 
-#### [`geif_ensemble_save_json`](../src/lib/json_io.c#L369)
+#### [`geif_ensemble_save_json`](../src/lib/json_io.c#L267)
 
 ```c
 geif_status_t geif_ensemble_save_json(const geif_ensemble_t *ens, const char *path);
@@ -2361,7 +2464,7 @@ of sub-forest objects with their respective sample pools and metadata.
 
 ---
 
-#### [`geif_ensemble_load_json`](../src/lib/json_io.c#L437)
+#### [`geif_ensemble_load_json`](../src/lib/json_io.c#L335)
 
 ```c
 geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char *path);
@@ -2383,7 +2486,7 @@ model schemas, dynamically reconstructing memory structures and building trees.
 
 ---
 
-#### [`geif_forest_load_json`](../src/lib/json_io.c#L667)
+#### [`geif_forest_load_json`](../src/lib/json_io.c#L541)
 
 ```c
 geif_status_t geif_forest_load_json(geif_forest_t **forest_out, const char *path);
@@ -2451,7 +2554,7 @@ static void print_usage(const char *prog);
 
 ---
 
-#### [`tokenize_line`](../src/cli/main.c#L87)
+#### [`tokenize_line`](../src/cli/main.c#L88)
 
 ```c
 static uint32_t tokenize_line(char *line, char delim, char **tokens, uint32_t max_tokens);
@@ -2475,7 +2578,7 @@ delimiters, and trims surrounding whitespace. Modifies the input line buffer in-
 
 ---
 
-#### [`parse_delete_interval`](../src/cli/main.c#L141)
+#### [`parse_delete_interval`](../src/cli/main.c#L142)
 
 ```c
 static time_t parse_delete_interval(const char *s);
@@ -2496,7 +2599,7 @@ Supports units: 'y' (years), 'm'/'M' (months or minutes depending on context),
 
 ---
 
-#### [`process_scoring_row`](../src/cli/main.c#L221)
+#### [`process_scoring_row`](../src/cli/main.c#L222)
 
 ```c
 static void process_scoring_row(geif_ensemble_t *ensemble, const geif_column_config_t *col_cfg, const cat_filter_t *cat_filter, char **tokens, uint32_t n_tok, const char *orig_line, uint64_t line_num, char list_sep, char cat_sep, double threshold, bool threshold_is_average, bool threshold_is_percentage, bool silent_outliers, const char *point_tmpl, const char *average_tmpl, const char *new_cat_tmpl, int decimals, const char *printf_format, const char *print_dimension, uint32_t low_rgb, uint32_t high_rgb, double *vec, uint32_t dims, FILE *out_fp, uint64_t *analyzed, uint64_t *total_outliers);
@@ -2541,7 +2644,7 @@ determines outlier status against threshold, and formats output via templates.
 
 ---
 
-#### [`process_categorize_row`](../src/cli/main.c#L414)
+#### [`process_categorize_row`](../src/cli/main.c#L415)
 
 ```c
 static void process_categorize_row(geif_ensemble_t *ensemble, const geif_column_config_t *col_cfg, bool direct_feature_mapping, const cat_filter_t *cat_filter, char **tokens, uint32_t n_tok, const char *orig_line, uint64_t line_num, char list_sep, char cat_sep, double threshold, bool threshold_is_average, bool threshold_is_percentage, bool score_limit_given, const char *point_tmpl, int decimals, const char *printf_format, const char *print_dimension, uint32_t low_rgb, uint32_t high_rgb, double *vec, uint32_t dims, FILE *out_fp, uint64_t *analyzed);
@@ -2584,10 +2687,10 @@ checks outlier threshold limits, and outputs the assigned classification.
 
 ---
 
-#### [`update_ensemble_percentage_scores`](../src/cli/main.c#L562)
+#### [`update_ensemble_percentage_scores`](../src/cli/main.c#L563)
 
 ```c
-static void update_ensemble_percentage_scores(geif_ensemble_t *ens, double pct, bool verbose);
+static void update_ensemble_percentage_scores(geif_ensemble_t *ens, double pct, const cat_filter_t *filter, bool verbose);
 ```
 
 **Description:** Recalculates empirical percentile threshold scores for all sub-forests in an ensemble.
@@ -2605,7 +2708,7 @@ to the given cumulative percentile (e.g. 80% or 95%).
 
 ---
 
-#### [`main`](../src/cli/main.c#L589)
+#### [`main`](../src/cli/main.c#L594)
 
 ```c
 int main(int argc, char *argv[]);

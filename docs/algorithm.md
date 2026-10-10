@@ -106,17 +106,27 @@ $$
 
 ### 2.3 Dynamic Dimensional Leaf Sizing & Nearest Neighbor Bounding
 
-In earlier Isolation Forest variants, node partitioning stopped at a hardcoded sample threshold (e.g. $N_{\text{leaf}} < 3$). GEIF introduces a dimension-dependent minimum leaf sample count:
+In earlier Isolation Forest variants, node partitioning stopped at an arbitrary hardcoded sample threshold (e.g. $N_{\text{leaf}} < 3$). GEIF introduces a dimension-dependent minimum leaf sample count with a **1D stabilization floor** of 4 samples (`GEIF_MIN_LEAF_SAMPLE_FLOOR = 4U`):
 
 $$
-N_{\text{min-leaf}}(D) = \begin{cases} 2^D & \text{if } D < 4 \\ 8 & \text{if } D \ge 4 \end{cases}
+N_{\text{min-leaf}}(D) = \max\left(4, \; \min\left(2^D, \; 8\right)\right) = \begin{cases} 4 & \text{if } D \le 2 \\ 8 & \text{if } D \ge 3 \end{cases}
 $$
 
 **Geometric & Algorithmic Rationale:**
-- **$D = 1$ ($2^1 = 2$):** A 1D point is framed by exactly 2 bounding samples (left and right), forming the minimal bilateral boundary.
-- **$D = 2$ ($2^2 = 4$):** An interior 2D query point is framed in all four quadrants ($++$, $+-$, $-+$, $--$). Leaves with 4 samples ensure query points can be completely surrounded on all sides.
-- **$D = 3$ ($2^3 = 8$):** Provides samples across all 8 spatial octants.
-- **Dimension Cap at $D = 4$ ($8$ samples):** Capping at 8 samples prevents exponential tree starvation for higher dimensions (where $2^{10} = 1024$ would exceed the sub-sample size $\psi = 256$).
+- **$D = 1$ ($4$ samples, 1D stabilization floor):** While a 1D point is theoretically bounded by 2 bilateral samples (left and right), isolating down to 2 samples in 1D creates excessive variance, boundary spikes/valleys, and brittle relative distance estimation near distribution edges. Enforcing a floor of 4 samples (`GEIF_MIN_LEAF_SAMPLE_FLOOR = 4U`) provides robust bilateral framing (both immediate and secondary neighbors), stabilizes the relative leaf distance calculation $d_{\text{rel}}(x)$, and prevents anomalous distortion under quantile thresholding (e.g. `-O 80%`).
+- **$D = 2$ ($2^2 = 4$ samples):** An interior 2D query point is framed across all four quadrants ($++$, $+-$, $-+$, $--$). Leaves with 4 samples ensure query points can be completely surrounded on all sides.
+- **$D = 3$ ($2^3 = 8$ samples):** Provides samples across all 8 spatial octants.
+- **Dimension Cap at $D \ge 3$ / High-D Ceiling ($8$ samples):** Capping at 8 samples (`GEIF_MIN_LEAF_SAMPLE_HIGH_DIM = 8U`) prevents exponential leaf starvation for higher dimensions (where $2^{10} = 1024$ would exceed the sub-sample size $\psi = 256$), ensuring isolation trees maintain healthy split depth and balanced partitioning across high-dimensional feature spaces.
+
+In C17 (`include/geif/types.h`), this dynamic leaf termination is implemented as:
+```c
+#define GEIF_MIN_LEAF_SAMPLE_FLOOR     4U       /**< Floor on minimum leaf samples / nearest neighbors (1D stabilization) */
+#define MIN_LEAF_FLOOR_SAMPLES         GEIF_MIN_LEAF_SAMPLE_FLOOR
+#define GEIF_MIN_LEAF_SAMPLE_DIM_CAP   4U       /**< Dimensionality threshold (D < 4) for 2^D minimum leaf samples */
+#define GEIF_MIN_LEAF_SAMPLE_HIGH_DIM  8U       /**< Fixed minimum leaf sample count for D >= 4 */
+#define GEIF_NODE_MIN_SAMPLE(d)        (((1U << (d)) < GEIF_MIN_LEAF_SAMPLE_FLOOR) ? GEIF_MIN_LEAF_SAMPLE_FLOOR : (((d) < GEIF_MIN_LEAF_SAMPLE_DIM_CAP) ? (1U << (d)) : GEIF_MIN_LEAF_SAMPLE_HIGH_DIM))
+#define NODE_MIN_SAMPLE(d)             GEIF_NODE_MIN_SAMPLE(d)
+```
 
 **Computational Advantage:**  
 By avoiding excessive fine splits down to 1–3 sample leaves, trees remain shallower by 1–2 levels, cutting node allocations and tree construction time. Fine-grained local density resolution is naturally shifted to the continuous Euclidean relative distance evaluation ($d_{\text{rel}}(x)$), eliminating artificial hyperplane slicing artifacts and sharply carving out interior topological cavities (such as donut holes).
@@ -125,7 +135,11 @@ To evaluate local cluster density and detect interior voids without constructing
 
 For a test point $x$ falling into a leaf node:
 1. The leaf identifies the bounding hyper-rectangle formed by its bounding data points.
-2. In $D$-dimensional space, the distance to the nearest bounding samples is evaluated:
+2. In $D$-dimensional space, the distance to the nearest bounding samples is evaluated. The maximum nearest neighbors $K$ evaluated in a leaf also enforces the same 1D stabilization floor:
+
+$$
+K_{\text{nearest}}(D) = \max\left(4, \; \min\left(2^D, \; 32\right)\right) = \begin{cases} 4 & \text{if } D \le 2 \\ 2^D & \text{if } 3 \le D \le 4 \\ 32 & \text{if } D \ge 5 \end{cases}
+$$
 
 $$
 d_{\text{rel}}(x) = \frac{1}{K} \sum_{k=1}^K \frac{\Vert x - p_k \Vert_{\text{scaled}}}{\delta_{\text{nominal}}}
