@@ -316,7 +316,7 @@ $$
 ### 5.3 Exemplar Kernel Density (`algo_exemplar.c`)
 
 Non-parametric spatial density kernel evaluating regularized Cauchy kernel distances across the reservoir pool:
-1. **Training Phase (`geif_exemplar_train`)**: For each sample $i$ in the reservoir pool, finds its $K$-nearest neighbors ($K = 5$), calculates local adaptive bandwidth $\sigma_i$ clamped to $[0.5 \tilde{\sigma}, 1.5 \tilde{\sigma}]$, and assigns credibility pilot weights $w_i$.
+1. **Training Phase (`geif_exemplar_train`)**: For each sample $i$ in the reservoir pool, finds its $K$-nearest neighbors ($K = 5$), calculates local adaptive bandwidth $\sigma_i$ clamped to $[0.5, 1.5] \times \sigma_{\text{med}}$, and assigns credibility pilot weights $w_i$.
 2. **Inference Phase (`geif_exemplar_score`)**: Unrolled AVX2/FMA vector loop aggregates weighted Cauchy kernel density across the entire sample pool:
 
 $$D(x) = \frac{1}{\sum_i w_i} \sum_{i=1}^N \frac{w_i}{1 + (\Vert x - s_i \Vert / \sigma_i)^2}$$

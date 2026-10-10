@@ -346,10 +346,10 @@ $$
 \sigma_{\text{med}} = \text{median}(\sigma_1, \sigma_2, \ldots, \sigma_N)
 $$
 
-2. Each raw bandwidth $\sigma_i$ is clamped to the symmetrical interval $[0.5 \tilde{\sigma}, 1.5 \tilde{\sigma}]$ around the median $\sigma_{\text{med}}$:
+2. Each raw bandwidth $\sigma_i$ is clamped to the bounded interval $[0.5, 1.5] \times \sigma_{\text{med}}$ around the global median $\sigma_{\text{med}}$:
 
 $$
-\sigma_i^{\text{clamped}} = \max\left(0.5 \, \sigma_{\text{med}}, \; \min\left(\sigma_i, \; 1.5 \, \sigma_{\text{med}}\right)\right)
+\sigma_i^{\text{clamped}} = \max\left(0.5 \, \sigma_{\text{med}}, \; \min\left(\sigma_i, \; 1.5 \, \sigma_{\text{med}}\right)\right) = \begin{cases} 0.5 \, \sigma_{\text{med}} & \text{if } \sigma_i < 0.5 \, \sigma_{\text{med}} \\ \sigma_i & \text{if } 0.5 \, \sigma_{\text{med}} \le \sigma_i \le 1.5 \, \sigma_{\text{med}} \\ 1.5 \, \sigma_{\text{med}} & \text{if } \sigma_i > 1.5 \, \sigma_{\text{med}} \end{cases}
 $$
 
 This guarantees:

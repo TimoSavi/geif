@@ -149,7 +149,7 @@ $$
 * **Continuous Metric Potential**:
   Instead of discrete integer hops ($1, 2, 3 \ldots$), Exemplar evaluates an infinitely differentiable ($C^\infty$) field with:
   * Multi-scale $K$-NN bandwidths ($\sigma_i$)
-  * Robust median clamping ($0.5 \tilde{\sigma} \le \sigma_i \le 1.5 \tilde{\sigma}$ around median $\sigma_{\text{med}}$)
+  * Robust median clamping ($0.5 \sigma_m \le \sigma_i \le 1.5 \sigma_m$ around median $\sigma_{\text{med}}$)
   * Pilot credibility damping ($w_i$) to neutralize noise bubbles
   * Zero Kelvin potential calibration ($s = 1 - \sqrt{D / D_{\max}}$)
   * Asymptotic exponential outer stadium decay ($\exp(-\lambda d_{\text{out}})$)
