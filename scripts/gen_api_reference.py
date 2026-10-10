@@ -13,7 +13,8 @@ import shutil
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 DOCS_DIR = os.path.join(REPO_ROOT, "docs")
 TARGET_FILE = os.path.join(DOCS_DIR, "api_reference.md")
-USER_DOCS_TARGET = os.path.expanduser("~/docs/geif-api-reference.md")
+USER_DOCS_TARGET = os.path.expanduser("~/docs/tools/geif/geif-api-reference.md")
+USER_DOCS_ALT_TARGET = os.path.expanduser("~/docs/tools/geif/api_reference.md")
 
 def sanitize_gfm_math(text):
     """Ensures math blocks comply with GitHub Flavored Markdown rules."""
@@ -402,12 +403,14 @@ def main():
 
     print(f"Generated {TARGET_FILE} ({total_funcs} documented functions/entities).")
 
-    # Generate user copy for ~/docs/ with file:// links for IDE navigation
+    # Generate user copies for ~/docs/tools/geif/ with file:// links for IDE navigation
     user_copy_content = final_content.replace("](../", f"](file://{REPO_ROOT}/")
     os.makedirs(os.path.dirname(USER_DOCS_TARGET), exist_ok=True)
     with open(USER_DOCS_TARGET, "w", encoding="utf-8") as f:
         f.write(user_copy_content)
-    print(f"Copied user document to {USER_DOCS_TARGET} with local file:// links.")
+    with open(USER_DOCS_ALT_TARGET, "w", encoding="utf-8") as f:
+        f.write(user_copy_content)
+    print(f"Copied user documents to {USER_DOCS_TARGET} and {USER_DOCS_ALT_TARGET} with local file:// links.")
 
 if __name__ == "__main__":
     main()
