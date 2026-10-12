@@ -214,7 +214,15 @@ geif_status_t geif_forest_from_json_object(geif_forest_t **forest_out, struct js
     // Load sample pool
     struct json_object *j_arr = NULL;
     if (json_object_object_get_ex(root, "pool_count", &j_val)) {
-        f->pool_count = (size_t)json_object_get_int(j_val);
+        size_t saved_count = (size_t)json_object_get_int(j_val);
+        if (saved_count > f->pool_capacity) {
+            double *new_pool = (double *)realloc(f->sample_pool, saved_count * dimensions * sizeof(double));
+            if (new_pool) {
+                f->sample_pool = new_pool;
+                f->pool_capacity = saved_count;
+            }
+        }
+        f->pool_count = (saved_count <= f->pool_capacity) ? saved_count : f->pool_capacity;
     }
     if (json_object_object_get_ex(root, "sample_pool", &j_arr)) {
         size_t len = (size_t)json_object_array_length(j_arr);

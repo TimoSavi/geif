@@ -81,4 +81,14 @@ echo "Testing 'eif' alias for 'ceif'..."
 grep -q "\"algorithm\":\"ceif\"" "$TEST_DIR/model_eif.json"
 echo "  [PASS] 'eif' alias correctly mapped to 'ceif'."
 
+echo "Testing exemplar obedience to -s option for exemplar count..."
+"$GEIF_BIN" -l "test/2blob.csv" -B exemplar -s 50 -w "$TEST_DIR/model_exemplar_s50.json" > /dev/null
+EXEMPLAR_SUMMARY=$("$GEIF_BIN" -r "$TEST_DIR/model_exemplar_s50.json" -q)
+if ! echo "$EXEMPLAR_SUMMARY" | grep -q "samples=50"; then
+    echo "ERROR: Exemplar failed to obey -s 50 (expected samples=50):"
+    echo "$EXEMPLAR_SUMMARY"
+    exit 1
+fi
+echo "  [PASS] Exemplar successfully capped reservoir to exactly 50 exemplars with -s 50."
+
 echo "=== All GEIF Multi-Algorithm POC Suite Tests Passed! ==="

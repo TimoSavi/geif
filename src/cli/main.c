@@ -48,7 +48,7 @@ static void print_usage(const char *prog)
     printf("  -g <file>      Configuration / RC file (overrides ~/.geifrc and ~/.ceifrc)\n");
     printf("  -t <int>       Number of trees in forest (default: 100)\n");
     printf("  -i <int>       Test grid sample intervals (default: 256) or tree count alias\n");
-    printf("  -s <int>       Number of samples per tree (default: 256)\n");
+    printf("  -s <int>       Number of samples per tree / exemplar count (default: 256)\n");
     printf("  -m <fmt|int>   Dimension format string (e.g. \"%%'.0f\") or max depth cap\n");
     printf("  -f <char>      Input field delimiter (default: ',')\n");
     printf("  -e <char>      List separator for output / field delimiter fallback\n");

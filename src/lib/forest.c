@@ -72,8 +72,13 @@ geif_status_t geif_forest_create(geif_forest_t **forest_out,
     if (f->config.kappa <= 1.0) f->config.kappa = GEIF_DEFAULT_KAPPA;
     if (f->config.alpha < 0.0) f->config.alpha = GEIF_DEFAULT_ALPHA;
 
-    f->tree_count = f->config.tree_count;
-    f->pool_capacity = (size_t)f->tree_count * f->config.samples_per_tree;
+    if (f->config.algo == GEIF_ALGO_EXEMPLAR) {
+        f->tree_count = 1;
+        f->pool_capacity = f->config.samples_per_tree;
+    } else {
+        f->tree_count = f->config.tree_count;
+        f->pool_capacity = (size_t)f->tree_count * f->config.samples_per_tree;
+    }
 
     // Allocate coordinate envelope arrays
     f->envelope_min   = (double *)malloc(dimensions * sizeof(double));

@@ -146,7 +146,7 @@ int main(int argc, char *argv[])
                 f->config.samples_per_tree = new_samples;
                 f->trees = (geif_tree_t *)calloc(new_trees, sizeof(geif_tree_t));
 
-                size_t needed_cap = (size_t)new_trees * new_samples;
+                size_t needed_cap = (f->config.algo == GEIF_ALGO_EXEMPLAR) ? (size_t)new_samples : (size_t)new_trees * new_samples;
                 if (needed_cap > f->pool_capacity) {
                     double *new_pool = (double *)realloc(f->sample_pool, needed_cap * f->dimensions * sizeof(double));
                     if (new_pool) {
