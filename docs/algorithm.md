@@ -90,7 +90,7 @@ $$
 where $\lambda = 0.10$ and $d_{\text{out}}(x)$ is the normalized Euclidean distance to the ensemble training envelope bounding box:
 
 $$
-d_{\text{out}}(x) = \sqrt{\sum_{j=1}^D \left(\frac{\max(0,\; \min_j - x_j,\; x_j - \max_j)}{\text{span}_j}\right)^2}
+d_{\text{out}}(x) = \sqrt{\sum_{j=1}^D \left(\frac{\max(0, \min_j - x_j, x_j - \max_j)}{\text{span}_j}\right)^2}
 $$
 
 #### Properties:
@@ -109,7 +109,7 @@ $$
 In earlier Isolation Forest variants, node partitioning stopped at an arbitrary hardcoded sample threshold (e.g. $N_{\text{leaf}} < 3$). GEIF introduces a dimension-dependent minimum leaf sample count with a **1D stabilization floor** of 4 samples (`GEIF_MIN_LEAF_SAMPLE_FLOOR = 4U`):
 
 $$
-N_{\text{min-leaf}}(D) = \max\left(4, \; \min\left(2^D, \; 8\right)\right) = \begin{cases} 4 & \text{if } D \le 2 \\ 8 & \text{if } D \ge 3 \end{cases}
+N_{\text{min-leaf}}(D) = \max\left(4, \min\left(2^D, 8\right)\right) = \begin{cases} 4 & \text{if } D \le 2 \\ 8 & \text{if } D \ge 3 \end{cases}
 $$
 
 **Geometric & Algorithmic Rationale:**
@@ -138,7 +138,7 @@ For a test point $x$ falling into a leaf node:
 2. In $D$-dimensional space, the distance to the nearest bounding samples is evaluated. The maximum nearest neighbors $K$ evaluated in a leaf also enforces the same 1D stabilization floor:
 
 $$
-K_{\text{nearest}}(D) = \max\left(4, \; \min\left(2^D, \; 32\right)\right) = \begin{cases} 4 & \text{if } D \le 2 \\ 2^D & \text{if } 3 \le D \le 4 \\ 32 & \text{if } D \ge 5 \end{cases}
+K_{\text{nearest}}(D) = \max\left(4, \min\left(2^D, 32\right)\right) = \begin{cases} 4 & \text{if } D \le 2 \\ 2^D & \text{if } 3 \le D \le 4 \\ 32 & \text{if } D \ge 5 \end{cases}
 $$
 
 $$
@@ -175,7 +175,7 @@ $$
 
 Because all dimensions contribute isotropically to the radial partitioning, splitting spheres naturally conform to the true cluster shape regardless of numerical magnitude.
 
-| Metric | `Wtest.csv` (Span: $X \approx 110, \; Y \approx 1,900,000$) |
+| Metric | `Wtest.csv` (Span: $X \approx 110, Y \approx 1,900,000$) |
 |:---|:---:|
 | **Raw Training Samples** | ![Wtest raw](pics/geif/Wtest_raw.png) |
 | **$T = 0.00$ (Continuous Landscape)** | ![Wtest T0](pics/geif/Wtest_T0.png) |
@@ -300,15 +300,17 @@ $$
 $$
 
 where pool size $N = |S_{\text{pool}}|$ is bounded by capacity $N_{\text{capacity}}$ (default $N = \psi = 256$ per sub-forest or category).
+
 3. **Bounded Adaptive Replacement**:
    - When the reservoir is not yet full (total observed rows $n \le N_{\text{capacity}}$), each incoming point is accepted directly into the pool.
    - When the reservoir capacity is reached ($n > N_{\text{capacity}}$), incoming point $x_t$ replaces a randomly selected existing exemplar in the pool with probability:
 
 $$
-P(\text{accept}) = \frac{N_{\text{capacity}}}{\min(N_{\text{seen}}, \; (C + 1) \, N_{\text{capacity}})}
+P(\text{accept}) = \frac{N_{\text{capacity}}}{\min(N_{\text{seen}}, (C + 1) \, N_{\text{capacity}})}
 $$
 
 where $C$ is the adaptive ceiling factor (default $C = 3$). This ceiling cap prevents sample freezing over long streams while guaranteeing continuous adaptivity to distribution drift.
+
 4. **Spatial Anchors**: These $N$ exemplar observations serve as non-parametric kernel centroids. Because no decision trees are grown or traversed, memory overhead is minimal ($< 5\,\text{KB}$ per category) and model cold-starts require $< 1\,\text{ms}$.
 
 ---
@@ -349,7 +351,7 @@ $$
 2. Each raw bandwidth $\sigma_i$ is clamped to the bounded interval $[0.5, 1.5] \times \sigma_{\text{med}}$ around the global median $\sigma_{\text{med}}$:
 
 $$
-\sigma_i^{\text{clamped}} = \max\left(0.5 \, \sigma_{\text{med}}, \; \min\left(\sigma_i, \; 1.5 \, \sigma_{\text{med}}\right)\right) = \begin{cases} 0.5 \, \sigma_{\text{med}} & \text{if } \sigma_i < 0.5 \, \sigma_{\text{med}} \\ \sigma_i & \text{if } 0.5 \, \sigma_{\text{med}} \le \sigma_i \le 1.5 \, \sigma_{\text{med}} \\ 1.5 \, \sigma_{\text{med}} & \text{if } \sigma_i > 1.5 \, \sigma_{\text{med}} \end{cases}
+\sigma_i^{\text{clamped}} = \max\left(0.5 \, \sigma_{\text{med}}, \min\left(\sigma_i, 1.5 \, \sigma_{\text{med}}\right)\right) = \begin{cases} 0.5 \, \sigma_{\text{med}} & \text{if } \sigma_i < 0.5 \, \sigma_{\text{med}} \\ \sigma_i & \text{if } 0.5 \, \sigma_{\text{med}} \le \sigma_i \le 1.5 \, \sigma_{\text{med}} \\ 1.5 \, \sigma_{\text{med}} & \text{if } \sigma_i > 1.5 \, \sigma_{\text{med}} \end{cases}
 $$
 
 This guarantees:
@@ -365,7 +367,7 @@ To prevent solitary noise samples or stray outliers in the training data from cr
 1. The excess dispersion $\text{excess}_i$ of exemplar $x_i$ beyond the global median spacing is computed:
 
 $$
-\text{excess}_i = \max\left(0, \; \sigma_i - \sigma_{\text{med}}\right)
+\text{excess}_i = \max\left(0, \sigma_i - \sigma_{\text{med}}\right)
 $$
 
 2. The credibility weight $w_i$ is assigned via quadratic Cauchy damping:
@@ -411,7 +413,7 @@ $$
    The raw continuous anomaly score $s_{\text{raw}}(x)$ is evaluated via square-root potential calibration:
 
 $$
-s_{\text{raw}}(x) = 1.0 - \sqrt{\min\left(1.0, \; \frac{D(x)}{D_{\max}}\right)}
+s_{\text{raw}}(x) = 1.0 - \sqrt{\min\left(1.0, \frac{D(x)}{D_{\max}}\right)}
 $$
 
    - At the densest cluster centroid, $D(x) \approx D_{\max}$, establishing an exact Zero Kelvin baseline: $s_{\text{raw}} \approx 0.000$.
@@ -421,7 +423,7 @@ $$
    For query points that lie outside the training data bounding box between $x_{\min}$ and $x_{\max}$, the outer Euclidean distance $d_{\text{out}}(x)$ is evaluated:
 
 $$
-d_{\text{out}}^2(x) = \sum_{j=1}^D \left(\frac{\max(0, \; x_{\min,j} - x_j, \; x_j - x_{\max,j})}{\text{span}_j}\right)^2
+d_{\text{out}}^2(x) = \sum_{j=1}^D \left(\frac{\max(0, x_{\min,j} - x_j, x_j - x_{\max,j})}{\text{span}_j}\right)^2
 $$
 
    If $d_{\text{out}}(x) > 0$, asymptotic exponential stadium attenuation is applied:
