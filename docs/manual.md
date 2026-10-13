@@ -76,7 +76,7 @@ Input data is expected to be character-delimited ASCII/UTF-8 records (default co
 | `-L` | `RANGE` | Column indices/ranges to treat as descriptive labels (excluded from features). |
 | `-C` | `RANGE` | Column indices/ranges to treat as category keys for multi-category routing. |
 | `-F` | `REGEXP` | Filter out categories matching regular expression (prefix with `-v ` to invert / keep only). |
-| `-R` | `INT` | Minimum row count required to train a sub-forest for a category. |
+| `-R` | `INT` | Minimum row count required to retain a category across training, analysis (`-a`), categorization (`-c`), and maintenance. |
 | `-D` | `INTERVAL`| Drop sub-forest categories older than specified age (e.g. `30d`, `7d`, `24h`, `3600s`). |
 | `-N`, `--new` | `[TMPL]` | Output format template for newly observed, unseen categories during scoring or continuous learning (default: `"%v"`). Evaluated immediately for any new category sample regardless of sample counts. |
 | `-M`, `--missing` | `[TMPL]` | Output format template for missed categories (trained but absent in test stream; default: `"%C"`). |

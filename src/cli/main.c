@@ -59,7 +59,7 @@ static void print_usage(const char *prog)
     printf("  -L <range>     Label column indices/ranges (excluded from features, kept as label)\n");
     printf("  -C <range>     Category column indices/ranges (e.g. '12' or '2-4')\n");
     printf("  -F <filter>    Filter out categories matching regex (prefix '-v ' to invert / keep only matching)\n");
-    printf("  -R <int>       Minimum row count per category required to train sub-forest\n");
+    printf("  -R <int>       Minimum row count required to retain a category\n");
     printf("  -D <interval>  Drop / prune categories older than interval (e.g. '30d', '7d', '24h', '3600s')\n");
     printf("  -N [tmpl]      Output template for NEW / unseen categories during learning/analysis (default: '%%v')\n");
     printf("  -M [tmpl]      Output template for MISSED categories (default: '%%C')\n");
@@ -945,6 +945,25 @@ int main(int argc, char *argv[])
             }
         }
 
+        if (!learn_file) {
+            if (delete_interval > 0) {
+                size_t before = ensemble->count;
+                geif_ensemble_prune_age(ensemble, delete_interval, time(NULL));
+                if (verbose && before != ensemble->count) {
+                    printf("Age pruning (-D): dropped %zu stale sub-forests (%zu remaining).\n",
+                           before - ensemble->count, ensemble->count);
+                }
+            }
+            if (min_cat_rows > 0) {
+                size_t before = ensemble->count;
+                geif_ensemble_prune_categories(ensemble, min_cat_rows);
+                if (verbose && before != ensemble->count) {
+                    printf("Pruned categories with fewer than %llu rows (%zu -> %zu categories retained).\n",
+                           (unsigned long long)min_cat_rows, before, ensemble->count);
+                }
+            }
+        }
+
         if (!learn_file && !query_mode) {
             for (size_t i = 0; i < ensemble->count; i++) {
                 const char *cat_name = ensemble->entries[i].category;
@@ -1008,18 +1027,26 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    // Standalone model maintenance (-D pruning and/or -k outlier recalibration): -r <model> [-D <interval>] [-k] -w <model>
-    if (!learn_file && !analyze_file && !categorize_file && (delete_interval > 0 || kill_outliers_count > 0)) {
+    // Standalone model maintenance (-D pruning, -R row threshold pruning, and/or -k outlier recalibration): -r <model> [-D <interval>] [-R <min_rows>] [-k] -w <model>
+    if (!learn_file && !analyze_file && !categorize_file && (delete_interval > 0 || kill_outliers_count > 0 || min_cat_rows > 0)) {
         if (!ensemble) {
-            fprintf(stderr, "Error: maintenance operations (-D, -k) require a loaded model via -r <model.json>\n");
+            fprintf(stderr, "Error: maintenance operations (-D, -R, -k) require a loaded model via -r <model.json>\n");
             return 1;
         }
         if (delete_interval > 0) {
             size_t before = ensemble->count;
             geif_ensemble_prune_age(ensemble, delete_interval, time(NULL));
-            if (verbose) {
+            if (verbose && before != ensemble->count) {
                 printf("Age pruning (-D): dropped %zu stale sub-forests (%zu remaining).\n",
                        before - ensemble->count, ensemble->count);
+            }
+        }
+        if (min_cat_rows > 0) {
+            size_t before = ensemble->count;
+            geif_ensemble_prune_categories(ensemble, min_cat_rows);
+            if (verbose && before != ensemble->count) {
+                printf("Pruned categories with fewer than %llu rows (%zu -> %zu categories retained).\n",
+                       (unsigned long long)min_cat_rows, before, ensemble->count);
             }
         }
         if (kill_outliers_count > 0) {
@@ -1441,6 +1468,15 @@ int main(int argc, char *argv[])
             }
         }
 
+        if (min_cat_rows > 0) {
+            size_t before = ensemble->count;
+            geif_ensemble_prune_categories(ensemble, min_cat_rows);
+            if (verbose && before != ensemble->count) {
+                printf("Pruned categories with fewer than %llu rows (%zu -> %zu categories retained).\n",
+                       (unsigned long long)min_cat_rows, before, ensemble->count);
+            }
+        }
+
         if (kill_outliers_count > 0) {
             if (verbose) {
                 printf("Pruning %d outlier(s) per category and recalibrating ensemble...\n", kill_outliers_count);
@@ -1722,13 +1758,6 @@ int main(int argc, char *argv[])
             return 1;
         }
 
-        if (ensemble->count == 0) {
-            fprintf(stderr, "Error: Categorization requires at least one category in the model.\n");
-            geif_ensemble_destroy(ensemble);
-            geif_cat_filter_free(&cat_filter);
-            return 1;
-        }
-
         if (delete_interval > 0) {
             size_t before = ensemble->count;
             geif_ensemble_prune_age(ensemble, delete_interval, time(NULL));
@@ -1736,6 +1765,22 @@ int main(int argc, char *argv[])
                 printf("Age pruning (-D): dropped %zu stale sub-forests (%zu remaining).\n",
                        before - ensemble->count, ensemble->count);
             }
+        }
+
+        if (min_cat_rows > 0) {
+            size_t before = ensemble->count;
+            geif_ensemble_prune_categories(ensemble, min_cat_rows);
+            if (verbose && before != ensemble->count) {
+                printf("Pruned categories with fewer than %llu rows (%zu -> %zu categories retained).\n",
+                       (unsigned long long)min_cat_rows, before, ensemble->count);
+            }
+        }
+
+        if (ensemble->count == 0) {
+            fprintf(stderr, "Error: Categorization requires at least one category in the model.\n");
+            geif_ensemble_destroy(ensemble);
+            geif_cat_filter_free(&cat_filter);
+            return 1;
         }
 
         if (kill_outliers_count > 0) {
