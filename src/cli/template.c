@@ -137,14 +137,27 @@ size_t geif_format_template(char *out,
             out[w++] = '%';
             break;
 
-        case 's': // Score
+        case ':': // Category value separator
+            out[w++] = (ctx && ctx->category_sep) ? ctx->category_sep : ';';
+            break;
+
+        case '.': // Label value separator
+            out[w++] = (ctx && ctx->label_sep) ? ctx->label_sep : '-';
+            break;
+
+        case 's': // Score (or outlier score threshold in -v summary)
             n = format_double(out + w, out_size - w, ctx ? ctx->score : 0.0, dec, NULL);
             if (n > 0) w += (size_t)n;
             break;
 
-        case 'S': // Score percentage
-            n = snprintf(out + w, out_size - w, "%.*f%%", dec > 0 ? (dec <= 2 ? dec : 2) : 2, ctx ? (ctx->score * 100.0) : 0.0);
-            if (n > 0) w += (size_t)n;
+        case 'S': // Average anomaly score for analyzed data
+            {
+                double avg_s = (ctx && (ctx->is_summary || ctx->test_average_score > 0.0))
+                               ? ctx->test_average_score
+                               : (ctx ? ctx->score : 0.0);
+                n = format_double(out + w, out_size - w, avg_s, dec, NULL);
+                if (n > 0) w += (size_t)n;
+            }
             break;
 
         case 'r': // Row / line index
@@ -179,7 +192,7 @@ size_t geif_format_template(char *out,
             }
             break;
 
-        case 'm': // Metric depth or dimension expansion (-j)
+        case 'm': // Dimension expansion (-j template). Empty if -j is not provided (matching CEIF)
             if (ctx && ctx->print_dimension && ctx->print_dimension[0] != '\0' &&
                 (ctx->vector || ctx->averages) && ctx->vector_dim > 0) {
                 for (uint32_t i = 0; i < ctx->vector_dim && w + 1 < out_size; i++) {
@@ -230,9 +243,6 @@ size_t geif_format_template(char *out,
                         }
                     }
                 }
-            } else {
-                n = format_double(out + w, out_size - w, ctx ? ctx->metric_depth : 0.0, dec, NULL);
-                if (n > 0) w += (size_t)n;
             }
             break;
 
@@ -265,7 +275,7 @@ size_t geif_format_template(char *out,
             }
             break;
 
-        case 'a': // Category dimension averages list (joined by sep) or orig_line
+        case 'a': // Category dimension averages list (joined by sep)
             if (ctx && ctx->averages && ctx->vector_dim > 0) {
                 for (uint32_t i = 0; i < ctx->vector_dim && w + 1 < out_size; i++) {
                     if (i > 0 && sep != '\0') {
@@ -275,9 +285,6 @@ size_t geif_format_template(char *out,
                     int dn = format_double(out + w, out_size - w, ctx->averages[i], dec, ctx->printf_format);
                     if (dn > 0) w += (size_t)dn;
                 }
-            } else if (ctx && ctx->orig_line && ctx->orig_line[0] != '\0') {
-                n = snprintf(out + w, out_size - w, "%s", ctx->orig_line);
-                if (n > 0) w += (size_t)n;
             }
             break;
 
@@ -302,13 +309,21 @@ size_t geif_format_template(char *out,
             if (n > 0) w += (size_t)n;
             break;
 
-        case 'h': // H_max universal scale
-            n = format_double(out + w, out_size - w, ctx ? ctx->H_max : 0.0, dec, NULL);
+        case 'h': // H_max universal scale, or high_analyzed_rows in summary (-v)
+            if (ctx && ctx->is_summary) {
+                n = snprintf(out + w, out_size - w, "%llu", (unsigned long long)ctx->high_analyzed_rows);
+            } else {
+                n = format_double(out + w, out_size - w, ctx ? ctx->H_max : 0.0, dec, NULL);
+            }
             if (n > 0) w += (size_t)n;
             break;
 
-        case 'o': // Outlier flag
-            n = snprintf(out + w, out_size - w, "%d", ctx ? ctx->is_outlier : 0);
+        case 'o': // Outlier flag in row mode, or analyzed_rows in summary mode (-v)
+            if (ctx && ctx->is_summary) {
+                n = snprintf(out + w, out_size - w, "%llu", (unsigned long long)ctx->analyzed_rows);
+            } else {
+                n = snprintf(out + w, out_size - w, "%d", ctx ? ctx->is_outlier : 0);
+            }
             if (n > 0) w += (size_t)n;
             break;
 

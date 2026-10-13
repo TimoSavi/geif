@@ -111,21 +111,25 @@ if ! echo "$EXPAND_F2" | grep -q "2:val=99.0,imp="; then
 fi
 echo "  [PASS] -j dimension template expansion (%m) verified."
 
-# Test 5: Inlier output template (-v) vs Outlier output template (-p)
-echo "Test 5: Dual output templates: -v for inliers and -p for outliers..."
+# Test 5: Summary output template (-v) and Outlier output template (-p)
+echo "Test 5: Summary template (-v) and outlier template (-p)..."
 DUAL_OUT="$TEST_DIR/scores_dual.txt"
-run_geif_score -r "$MODEL_JSON" -a "$TEST_CSV" -L 1 -C 5 -T 0.6 -v "INLIER: %l (%c) score=%s" -p "OUTLIER: %l (%c) score=%s" -o "$DUAL_OUT"
+run_geif_score -r "$MODEL_JSON" -a "$TEST_CSV" -L 1 -C 5 -T 0.6 -v "SUMMARY: %C rows=%o outliers=%h avg_score=%S" -p "OUTLIER: %l (%c) score=%s" -o "$DUAL_OUT"
 
 cat "$DUAL_OUT"
-if ! grep -q "^INLIER: inlier1" "$DUAL_OUT"; then
-    echo "ERROR: inlier1 was not formatted with -v template"
-    exit 1
-fi
 if ! grep -q "^OUTLIER: anomaly_f1" "$DUAL_OUT"; then
     echo "ERROR: anomaly_f1 was not formatted with -p template"
     exit 1
 fi
-echo "  [PASS] Inlier template (-v) and outlier template (-p) routed correctly."
+if ! grep -q "^SUMMARY: catA rows=4 outliers=3" "$DUAL_OUT"; then
+    echo "ERROR: catA summary was not formatted correctly with -v template"
+    exit 1
+fi
+if ! grep -q "^SUMMARY: catB rows=1 outliers=1" "$DUAL_OUT"; then
+    echo "ERROR: catB summary was not formatted correctly with -v template"
+    exit 1
+fi
+echo "  [PASS] Summary template (-v) and outlier template (-p) evaluated correctly."
 
 # Test 6: Outlier threshold aliases (-O average and -O 80%)
 echo "Test 6: Outlier threshold with -O average and -O 80%..."

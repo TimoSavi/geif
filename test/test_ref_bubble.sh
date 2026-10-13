@@ -34,7 +34,7 @@ with open('$SLICE_CSV', 'w') as f:
 "
 
 SCORES_OUT="$TEST_DIR/slice_scores.csv"
-"$GEIF_BIN" -r "$MODEL_2BLOB" -a "$SLICE_CSV" -p '%d,%s' > "$SCORES_OUT" || true
+"$GEIF_BIN" -r "$MODEL_2BLOB" -a "$SLICE_CSV" -O -1 -p '%d,%s' > "$SCORES_OUT" || true
 
 python3 -c "
 with open('$SCORES_OUT') as f:
@@ -118,8 +118,8 @@ echo "Part 3: Testing interior cavity (donut hole) anomaly detection..."
 CAVITY_PT="5107.55,0.9887"
 
 set +e
-B_CAVITY_SCORE=$("$GEIF_BIN" -r "$MODEL_BUBBLE_CMPLX" -a - -p '%s' <<< "$CAVITY_PT" 2>/dev/null | tr -d '[:space:]')
-C_CAVITY_SCORE=$("$GEIF_BIN" -r "$MODEL_CEIF_CMPLX" -a - -p '%s' <<< "$CAVITY_PT" 2>/dev/null | tr -d '[:space:]')
+B_CAVITY_SCORE=$("$GEIF_BIN" -r "$MODEL_BUBBLE_CMPLX" -a - -O -1 -p '%s' <<< "$CAVITY_PT" 2>/dev/null | tr -d '[:space:]')
+C_CAVITY_SCORE=$("$GEIF_BIN" -r "$MODEL_CEIF_CMPLX" -a - -O -1 -p '%s' <<< "$CAVITY_PT" 2>/dev/null | tr -d '[:space:]')
 set -e
 
 # Extract 94% threshold for bubble

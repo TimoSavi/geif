@@ -95,13 +95,13 @@ SCORES_IMPLICIT="$TEST_DIR/scores_implicit.txt"
 run_geif_score -r "$MODEL_CLEAN1" -a "$TEST_CSV" -L 1 -C 5 -p "%l;%s;%o" -o "$SCORES_IMPLICIT"
 
 cat "$SCORES_IMPLICIT"
-# In test.csv: test_norm should be inlier (o=0), test_wild should be outlier (o=1)
-if ! grep -q "^test_norm;.*;0$" "$SCORES_IMPLICIT"; then
+# In test.csv: test_norm is an inlier and suppressed under -p, test_wild is an outlier (o=1)
+if grep -q "^test_norm;" "$SCORES_IMPLICIT"; then
     echo "ERROR: test_norm was flagged as outlier"
     exit 1
 fi
 if ! grep -q "^test_wild;.*;1$" "$SCORES_IMPLICIT"; then
-    echo "ERROR: test_wild was flagged as inlier"
+    echo "ERROR: test_wild was not flagged as outlier"
     exit 1
 fi
 echo "  [PASS] Implicit threshold from model JSON correctly evaluated."

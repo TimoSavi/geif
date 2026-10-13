@@ -121,11 +121,11 @@ SCORE_OUT="$TEST_DIR/score_out.txt"
 "$GEIF_BIN" -r "$GEIF_MIGRATED" -a "$DATA_CSV" -L 1 -C 5 -p "%l;%c;%s;%o" -o "$SCORE_OUT" || true
 cat "$SCORE_OUT"
 
-if ! grep -q "p_norm;alpha;.*0$" "$SCORE_OUT"; then
-    echo "ERROR: Normal point misclassified or not scored"
+if grep -q "^p_norm;" "$SCORE_OUT"; then
+    echo "ERROR: Normal point misclassified as outlier"
     exit 1
 fi
-if ! grep -q "p_outlier;alpha;.*1$" "$SCORE_OUT"; then
+if ! grep -q "^p_outlier;alpha;.*1$" "$SCORE_OUT"; then
     echo "ERROR: Outlier point not detected"
     exit 1
 fi
@@ -136,11 +136,11 @@ echo "Test 4: Transparently loading CEIF model directly into geif -r..."
 SCORE_DIRECT="$TEST_DIR/score_direct.txt"
 "$GEIF_BIN" -r "$CEIF_JSON" -a "$DATA_CSV" -L 1 -C 5 -p "%l;%c;%s;%o" -o "$SCORE_DIRECT" || true
 
-if ! grep -q "p_norm;alpha;.*0$" "$SCORE_DIRECT"; then
-    echo "ERROR: Direct CEIF loading failed to score normal point"
+if grep -q "^p_norm;" "$SCORE_DIRECT"; then
+    echo "ERROR: Direct CEIF loading misclassified normal point as outlier"
     exit 1
 fi
-if ! grep -q "p_outlier;alpha;.*1$" "$SCORE_DIRECT"; then
+if ! grep -q "^p_outlier;alpha;.*1$" "$SCORE_DIRECT"; then
     echo "ERROR: Direct CEIF loading failed to detect outlier"
     exit 1
 fi

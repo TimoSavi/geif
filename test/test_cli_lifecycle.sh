@@ -58,7 +58,7 @@ echo "  [PASS] -R 100 correctly pruned categories below 100 rows, retaining exac
 echo "Test 4: Format NEW / Unseen category with custom and default template (-N, --new)..."
 UNSEEN_INPUT="7.4;0.7;0;1.9;0.076;11;34;0.9978;3.51;0.56;9.4;99"
 NEW_OUT=$(echo "$UNSEEN_INPUT" | $BIN -r "$TMP_DIR/model_full.json" -a - --no-header -f ';' -N "NEW;cat=%c;metric=%m;outlier=%o;epoch=%u" || true)
-if ! echo "$NEW_OUT" | grep -q "^NEW;cat=99;metric=0.000000;outlier=1;epoch=[0-9][0-9]*"; then
+if ! echo "$NEW_OUT" | grep -q "^NEW;cat=99;metric=;outlier=1;epoch=[0-9][0-9]*"; then
     echo "  [FAIL] Unexpected NEW category formatted output: '$NEW_OUT'"
     exit 1
 fi
@@ -126,7 +126,7 @@ echo "  [PASS] All 5 absent categories detected and emitted as MISSED notificati
 
 # Test 6: Custom Point Output Templating (-p <tmpl>)
 echo "Test 6: Format scored observations with custom template (-p 'A;%s;%c;%m')..."
-PT_OUT=$(head -n 2 "$TMP_DIR/test_cat5_only.csv" | $BIN -r "$TMP_DIR/model_full.json" -a - --no-header -f ';' -p "A;%s;%c;%m" || true)
+PT_OUT=$(head -n 2 "$TMP_DIR/test_cat5_only.csv" | $BIN -r "$TMP_DIR/model_full.json" -a - --no-header -f ';' -O -1 -j "%d" -p "A;%s;%c;%m" || true)
 echo "$PT_OUT" | grep "^A;[0-9.]*;5;[0-9.]*" > /dev/null
 echo "  [PASS] Custom point output formatted accurately using -p."
 
