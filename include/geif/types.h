@@ -159,6 +159,7 @@ typedef struct {
     time_t         last_updated;
     uint64_t       total_rows;
     bool           seen_in_analysis;  /**< Ephemeral tracking flag for missed category detection (-M) */
+    bool           is_new_category;   /**< Ephemeral tracking flag indicating category was newly created during training */
 } geif_category_entry_t;
 
 typedef struct geif_cat_hash_node {

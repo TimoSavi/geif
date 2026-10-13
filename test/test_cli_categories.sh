@@ -130,4 +130,32 @@ if [ -f "$CIRCLES_TXT" ]; then
     echo "  [PASS] Inverted filter -F '-v ^(6|11)$' retained exclusively categories 6 and 11."
 fi
 
+# Test 10: Continuous learning with -N for new / unseen category discovery
+echo "Test 10: Continuous learning (-z / -l) with -N for new category discovery..."
+cat << 'EOF' > "$TMP_DIR/wine_incremental.csv"
+"fixed acidity";"volatile acidity";"citric acid";"residual sugar";"chlorides";"free sulfur dioxide";"total sulfur dioxide";"density";"pH";"sulphates";"alcohol";"quality"
+20.4;0.7;0;1.9;0.076;11;34;0.9978;3.51;0.56;9.4;5
+20;0.88;0;2.6;0.098;25;67;0.9968;3.2;0.68;9.8;16
+20;0.88;0;2.6;0.098;25;67;0.9968;3.2;0.68;9.8;17
+EOF
+
+cp "$TMP_DIR/model_wine_cat.json" "$TMP_DIR/model_wine_inc.json"
+NEW_OUT=$($BIN -z "$TMP_DIR/model_wine_inc.json" -l "$TMP_DIR/wine_incremental.csv" -N "new: %c %v")
+echo "$NEW_OUT" | grep "^new: 16"
+echo "$NEW_OUT" | grep "^new: 17"
+if echo "$NEW_OUT" | grep -q "^new: 5"; then
+    echo "  [FAIL] Existing category 5 was incorrectly flagged as new!"
+    exit 1
+fi
+echo "  [PASS] -N correctly emitted only newly discovered categories 16 and 17 during continuous learning."
+
+# Verify consecutive run does not re-emit categories 16 and 17
+NEW_OUT2=$($BIN -z "$TMP_DIR/model_wine_inc.json" -l "$TMP_DIR/wine_incremental.csv" -N "new: %c %v")
+if [ -n "$NEW_OUT2" ]; then
+    echo "  [FAIL] Expected no output on consecutive run, got: $NEW_OUT2"
+    exit 1
+fi
+echo "  [PASS] Consecutive run correctly identified categories 16 and 17 as already known in the model."
+
 echo ">>> ALL FEATURE 3 TESTS PASSED SUCCESSFULLY! <<<"
+

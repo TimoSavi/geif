@@ -61,7 +61,7 @@ static void print_usage(const char *prog)
     printf("  -F <filter>    Filter out categories matching regex (prefix '-v ' to invert / keep only matching)\n");
     printf("  -R <int>       Minimum row count per category required to train sub-forest\n");
     printf("  -D <interval>  Drop / prune categories older than interval (e.g. '30d', '7d', '24h', '3600s')\n");
-    printf("  -N [tmpl]      Output template for NEW / unseen categories during analysis (default: '%%v')\n");
+    printf("  -N [tmpl]      Output template for NEW / unseen categories during learning/analysis (default: '%%v')\n");
     printf("  -M [tmpl]      Output template for MISSED categories (default: '%%C')\n");
     printf("  -p <tmpl>      Output template for scored rows (%%s=score, %%l=label, %%c=cat, %%m=metric/dims, %%d=vector, %%e=attrib, %%a=avg, %%t=time, %%u=epoch)\n");
     printf("  -v [tmpl]      Output template for inlier/average rows, or verbose flag\n");
@@ -1090,14 +1090,17 @@ int main(int argc, char *argv[])
             return 1;
         }
 
+        bool is_existing_model = (ensemble != NULL);
         char line[8192];
         char line_copy[8192];
         char *tokens[1024];
         uint32_t total_cols = 0;
         bool first_line_is_data = false;
+        uint64_t line_num = 0;
 
         // Read first non-empty line to detect columns and handle header
         while (fgets(line, sizeof(line), fp)) {
+            line_num++;
             if (line[0] == '#' || line[0] == '\r' || line[0] == '\n') continue;
             strncpy(line_copy, line, sizeof(line_copy) - 1);
             line_copy[sizeof(line_copy) - 1] = '\0';
@@ -1160,38 +1163,162 @@ int main(int argc, char *argv[])
         if (active_label) strncpy(ensemble->label_dims_spec, active_label, sizeof(ensemble->label_dims_spec) - 1);
         if (active_category) strncpy(ensemble->category_dims_spec, active_category, sizeof(ensemble->category_dims_spec) - 1);
 
+        FILE *learn_out_fp = stdout;
+        bool close_learn_out_fp = false;
+        if (new_cat_tmpl && output_file && !analyze_file && strcmp(output_file, "-") != 0) {
+            learn_out_fp = xfopen(output_file, "w");
+            if (!learn_out_fp) {
+                xfclose(fp);
+                geif_column_config_free(&col_cfg);
+                if (ensemble) geif_ensemble_destroy(ensemble);
+                return 1;
+            }
+            close_learn_out_fp = true;
+        }
+
         if (!skip_header) {
             first_line_is_data = true;
         }
 
         double *vec = (double *)xmalloc(dims * sizeof(double));
         char cat_buf[256];
+        char label_buf[256];
         uint64_t rows = 0;
 
         if (first_line_is_data) {
+            char orig_line[8192];
+            strncpy(orig_line, line, sizeof(orig_line) - 1);
+            orig_line[sizeof(orig_line) - 1] = '\0';
+            orig_line[strcspn(orig_line, "\r\n")] = 0;
+
             geif_extract_category(&col_cfg, tokens, total_cols, category_sep, cat_buf, sizeof(cat_buf));
+            geif_extract_label(&col_cfg, tokens, total_cols, category_sep, label_buf, sizeof(label_buf));
+
+            geif_category_entry_t *entry = geif_ensemble_get_entry(ensemble, cat_buf);
+            bool is_new_cat_sample = false;
+            if (is_existing_model) {
+                if (!entry || entry->is_new_category) {
+                    is_new_cat_sample = true;
+                }
+            } else {
+                if (!entry) {
+                    is_new_cat_sample = true;
+                }
+            }
+
             if (geif_extract_features(&col_cfg, tokens, total_cols, vec)) {
                 geif_ensemble_feed(ensemble, cat_buf, vec);
                 rows++;
             }
+
+            if (is_new_cat_sample && new_cat_tmpl && geif_cat_filter_allows(&cat_filter, cat_buf)) {
+                geif_template_context_t ctx = {
+                    .orig_line        = orig_line,
+                    .label            = label_buf,
+                    .category         = cat_buf,
+                    .input_category   = cat_buf,
+                    .score            = 1.0,
+                    .metric_depth     = 0.0,
+                    .d_out            = 999.0,
+                    .H_max            = 0.0,
+                    .is_outlier       = 1,
+                    .timestamp        = time(NULL),
+                    .total_rows       = 0,
+                    .analyzed_rows    = rows,
+                    .row_idx          = line_num,
+                    .vector           = vec,
+                    .averages         = NULL,
+                    .attr_scores      = NULL,
+                    .vector_dim       = dims,
+                    .raw_values       = tokens,
+                    .raw_value_count  = total_cols,
+                    .list_separator   = list_separator,
+                    .decimals         = decimals,
+                    .printf_format    = printf_format,
+                    .print_dimension  = print_dimension,
+                    .low_rgb          = low_rgb,
+                    .high_rgb         = high_rgb
+                };
+                char out_buf[8192];
+                geif_format_template(out_buf, sizeof(out_buf), new_cat_tmpl, &ctx);
+                fprintf(learn_out_fp, "%s\n", out_buf);
+            }
         }
 
         while (fgets(line, sizeof(line), fp)) {
+            line_num++;
             if (line[0] == '#' || line[0] == '\r' || line[0] == '\n') continue;
+
+            char orig_line[8192];
+            strncpy(orig_line, line, sizeof(orig_line) - 1);
+            orig_line[sizeof(orig_line) - 1] = '\0';
+            orig_line[strcspn(orig_line, "\r\n")] = 0;
+
             strncpy(line_copy, line, sizeof(line_copy) - 1);
             line_copy[sizeof(line_copy) - 1] = '\0';
             uint32_t n_tok = tokenize_line(line_copy, delimiter, tokens, 1024);
             if (n_tok >= total_cols) {
                 geif_extract_category(&col_cfg, tokens, n_tok, category_sep, cat_buf, sizeof(cat_buf));
+                geif_extract_label(&col_cfg, tokens, n_tok, category_sep, label_buf, sizeof(label_buf));
+
+                geif_category_entry_t *entry = geif_ensemble_get_entry(ensemble, cat_buf);
+                bool is_new_cat_sample = false;
+                if (is_existing_model) {
+                    if (!entry || entry->is_new_category) {
+                        is_new_cat_sample = true;
+                    }
+                } else {
+                    if (!entry) {
+                        is_new_cat_sample = true;
+                    }
+                }
+
                 if (geif_extract_features(&col_cfg, tokens, n_tok, vec)) {
                     geif_ensemble_feed(ensemble, cat_buf, vec);
                     rows++;
+                }
+
+                if (is_new_cat_sample && new_cat_tmpl && geif_cat_filter_allows(&cat_filter, cat_buf)) {
+                    geif_template_context_t ctx = {
+                        .orig_line        = orig_line,
+                        .label            = label_buf,
+                        .category         = cat_buf,
+                        .input_category   = cat_buf,
+                        .score            = 1.0,
+                        .metric_depth     = 0.0,
+                        .d_out            = 999.0,
+                        .H_max            = 0.0,
+                        .is_outlier       = 1,
+                        .timestamp        = time(NULL),
+                        .total_rows       = 0,
+                        .analyzed_rows    = rows,
+                        .row_idx          = line_num,
+                        .vector           = vec,
+                        .averages         = NULL,
+                        .attr_scores      = NULL,
+                        .vector_dim       = dims,
+                        .raw_values       = tokens,
+                        .raw_value_count  = n_tok,
+                        .list_separator   = list_separator,
+                        .decimals         = decimals,
+                        .printf_format    = printf_format,
+                        .print_dimension  = print_dimension,
+                        .low_rgb          = low_rgb,
+                        .high_rgb         = high_rgb
+                    };
+                    char out_buf[8192];
+                    geif_format_template(out_buf, sizeof(out_buf), new_cat_tmpl, &ctx);
+                    fprintf(learn_out_fp, "%s\n", out_buf);
                 }
             }
         }
         xfree(vec);
         xfclose(fp);
         geif_column_config_free(&col_cfg);
+        if (close_learn_out_fp && learn_out_fp) {
+            xfclose(learn_out_fp);
+            learn_out_fp = NULL;
+        }
 
         if (delete_interval > 0) {
             size_t before = ensemble->count;

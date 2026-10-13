@@ -21,6 +21,7 @@
 test/plot_*.csv
 test/*.json
 test/dist_bubble.csv
+test/wine_*.csv
 
 # Editor & OS files
 .DS_Store

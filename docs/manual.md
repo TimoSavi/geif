@@ -78,7 +78,7 @@ Input data is expected to be character-delimited ASCII/UTF-8 records (default co
 | `-F` | `REGEXP` | Filter out categories matching regular expression (prefix with `-v ` to invert / keep only). |
 | `-R` | `INT` | Minimum row count required to train a sub-forest for a category. |
 | `-D` | `INTERVAL`| Drop sub-forest categories older than specified age (e.g. `30d`, `7d`, `24h`, `3600s`). |
-| `-N`, `--new` | `[TMPL]` | Output format template for newly observed, unseen categories during scoring (default: `"%v"`). |
+| `-N`, `--new` | `[TMPL]` | Output format template for newly observed, unseen categories during scoring or continuous learning (default: `"%v"`). |
 | `-M`, `--missing` | `[TMPL]` | Output format template for missed categories (trained but absent in test stream; default: `"%C"`). |
 | `-p` | `TMPL` | Printf-style format template for scored anomaly rows. |
 | `-v` | `[TMPL]` | Format template for nominal inlier rows, or verbose flag. |

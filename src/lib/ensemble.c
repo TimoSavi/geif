@@ -146,13 +146,13 @@ void geif_ensemble_destroy(geif_ensemble_t *ens)
 }
 
 /**
- * @brief Searches for an existing category's sub-forest in the ensemble hash table.
+ * @brief Finds a category entry in the ensemble. Returns NULL if not found.
  *
  * @param[in] ens      Ensemble instance.
  * @param[in] category Category string name (empty string or NULL refers to default forest).
- * @return Pointer to matching geif_forest_t, or NULL if category has not been created.
+ * @return Pointer to matching geif_category_entry_t, or NULL if not found.
  */
-geif_forest_t *geif_ensemble_find(const geif_ensemble_t *ens, const char *category)
+geif_category_entry_t *geif_ensemble_get_entry(const geif_ensemble_t *ens, const char *category)
 {
     if (!ens || !ens->hash_buckets || ens->count == 0) return NULL;
 
@@ -164,12 +164,25 @@ geif_forest_t *geif_ensemble_find(const geif_ensemble_t *ens, const char *catego
     while (node) {
         uint32_t idx = node->entry_idx;
         if (strcmp(ens->entries[idx].category, cat_key) == 0) {
-            return ens->entries[idx].forest;
+            return &ens->entries[idx];
         }
         node = node->next;
     }
 
     return NULL;
+}
+
+/**
+ * @brief Searches for an existing category's sub-forest in the ensemble hash table.
+ *
+ * @param[in] ens      Ensemble instance.
+ * @param[in] category Category string name (empty string or NULL refers to default forest).
+ * @return Pointer to matching geif_forest_t, or NULL if category has not been created.
+ */
+geif_forest_t *geif_ensemble_find(const geif_ensemble_t *ens, const char *category)
+{
+    geif_category_entry_t *entry = geif_ensemble_get_entry(ens, category);
+    return entry ? entry->forest : NULL;
 }
 
 /**
@@ -232,6 +245,8 @@ geif_forest_t *geif_ensemble_get_or_create(geif_ensemble_t *ens, const char *cat
     entry->forest = forest;
     entry->last_updated = time(NULL);
     entry->total_rows = 0;
+    entry->seen_in_analysis = false;
+    entry->is_new_category = true;
 
     // Insert into hash bucket
     uint32_t h = ensemble_hash(cat_key);
@@ -311,6 +326,8 @@ geif_status_t geif_ensemble_add_forest(geif_ensemble_t *ens,
             ens->entries[idx].forest = forest;
             ens->entries[idx].total_rows = total_rows;
             ens->entries[idx].last_updated = last_updated;
+            ens->entries[idx].seen_in_analysis = false;
+            ens->entries[idx].is_new_category = false;
             return GEIF_OK;
         }
         node = node->next;
@@ -339,6 +356,8 @@ geif_status_t geif_ensemble_add_forest(geif_ensemble_t *ens,
     entry->forest = forest;
     entry->last_updated = last_updated;
     entry->total_rows = total_rows;
+    entry->seen_in_analysis = false;
+    entry->is_new_category = false;
 
     geif_cat_hash_node_t *new_node = (geif_cat_hash_node_t *)malloc(sizeof(geif_cat_hash_node_t));
     if (!new_node) return GEIF_ERR_OUT_OF_MEMORY;

@@ -284,7 +284,7 @@ The build compiles with `-std=c17 -O3 -march=native -Wall -Wextra -Wpedantic` an
 | `-m` | `<fmt>` | Printf numeric format string for dimension output (e.g., `"%'.0f"`). |
 | `-p` | `<tmpl>` | Output template for outlier rows (or all rows if `-S` is omitted). |
 | `-v` | `<tmpl>` | Output template for inlier rows (dual templating). |
-| `-N`, `--new` | `[tmpl]` | Output template for newly observed, untrained categories (default: `"%v"`). |
+| `-N`, `--new` | `[tmpl]` | Output template for newly observed, untrained categories during scoring or continuous learning (default: `"%v"`). |
 | `-M`, `--missing` | `[tmpl]` | Output template for missed categories (trained but absent in stream; default: `"%C"`). |
 | `-j` | `<tmpl>` | Sub-template for `%m` per-dimension expansion. |
 | `-F` | `<spec>` | Category filter: regex (matching categories are filtered out; prefix `-v ` to invert). |

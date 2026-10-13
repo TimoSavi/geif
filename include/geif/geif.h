@@ -194,6 +194,11 @@ geif_status_t geif_ensemble_create(geif_ensemble_t **ensemble_out,
 void geif_ensemble_destroy(geif_ensemble_t *ensemble);
 
 /**
+ * @brief Finds a category entry in the ensemble. Returns NULL if not found.
+ */
+geif_category_entry_t *geif_ensemble_get_entry(const geif_ensemble_t *ensemble, const char *category);
+
+/**
  * @brief Finds a sub-forest by category string. Returns NULL if not found.
  */
 geif_forest_t *geif_ensemble_find(const geif_ensemble_t *ensemble, const char *category);
