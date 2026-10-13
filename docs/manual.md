@@ -69,7 +69,8 @@ Input data is expected to be character-delimited ASCII/UTF-8 records (default co
 | `-g` | `FILE` | Load configuration / RC file (overrides `~/.geifrc` and `~/.ceifrc`). Repeatable. |
 | `-f` | `CHAR` | Input field delimiter character (default: `,`). Persisted in model JSON and restored automatically. |
 | `-e` | `CHAR` | Output field separator character (default: `,`). Persisted in model JSON and restored automatically. |
-| `-H` | (none) | Ignore header line in input CSV files. |
+| `-H`, `--header` | (none) | Ignore header line in input CSV files. Persisted in model JSON and restored automatically. |
+| `--no-header` | (none) | Explicitly disable header skipping, overriding saved model header state. |
 | `-I` | `RANGE` | Comma-separated list of 1-based column indices/ranges to ignore (e.g. `1,3,5-7`). |
 | `-U` | `RANGE` | Comma-separated list of 1-based column indices/ranges to include exclusively. |
 | `-L` | `RANGE` | Column indices/ranges to treat as descriptive labels (excluded from features). |
@@ -149,6 +150,7 @@ ALGO bubble
 TREES 100
 MAX_SAMPLES 256
 OUTLIER_SCORE 0.50
+HEADER true
 
 # Output preferences
 DECIMALS 4

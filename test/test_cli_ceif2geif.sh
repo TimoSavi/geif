@@ -111,6 +111,7 @@ echo "  [PASS] Migrated model verified with geif -q: both sub-forests intact."
 echo "Test 3: Scoring data against migrated model..."
 DATA_CSV="$TEST_DIR/query.csv"
 cat << 'EOF' > "$DATA_CSV"
+label,dim1,dim2,dim3,cat
 p_norm,10.05,20.05,30.05,alpha
 p_outlier,99.0,99.0,99.0,alpha
 p_beta_norm,50.1,60.1,70.1,beta

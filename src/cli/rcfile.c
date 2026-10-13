@@ -135,6 +135,13 @@ bool geif_rc_parse_file(geif_rc_config_t *rc, const char *filepath)
         } else if ((val = extract_value(line, "LABEL_SEPARATOR")) != NULL) {
             rc->label_sep = (val[0] == '"' && val[1]) ? val[1] : val[0];
             rc->label_sep_set = true;
+        } else if ((val = extract_value(line, "HEADER")) != NULL) {
+            if (strcasecmp(val, "true") == 0 || strcmp(val, "1") == 0 || strcasecmp(val, "yes") == 0) {
+                rc->header = true;
+            } else {
+                rc->header = false;
+            }
+            rc->header_set = true;
         } else if (extract_value(line, "AUTO_SCALE") != NULL ||
                    extract_value(line, "AUTO_WEIGTH") != NULL ||
                    extract_value(line, "NEAREST") != NULL ||

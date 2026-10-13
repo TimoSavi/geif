@@ -57,19 +57,19 @@ echo "  [PASS] -R 100 correctly pruned categories below 100 rows, retaining exac
 # Test 4: NEW / Unseen Category Template Formatting (-N [tmpl] / --new [tmpl])
 echo "Test 4: Format NEW / Unseen category with custom and default template (-N, --new)..."
 UNSEEN_INPUT="7.4;0.7;0;1.9;0.076;11;34;0.9978;3.51;0.56;9.4;99"
-NEW_OUT=$(echo "$UNSEEN_INPUT" | $BIN -r "$TMP_DIR/model_full.json" -a - -f ';' -N "NEW;cat=%c;metric=%m;outlier=%o;epoch=%u" || true)
+NEW_OUT=$(echo "$UNSEEN_INPUT" | $BIN -r "$TMP_DIR/model_full.json" -a - --no-header -f ';' -N "NEW;cat=%c;metric=%m;outlier=%o;epoch=%u" || true)
 if ! echo "$NEW_OUT" | grep -q "^NEW;cat=99;metric=0.000000;outlier=1;epoch=[0-9][0-9]*"; then
     echo "  [FAIL] Unexpected NEW category formatted output: '$NEW_OUT'"
     exit 1
 fi
 # Test default -N (defaults to %v)
-DEF_NEW_OUT=$(echo "$UNSEEN_INPUT" | $BIN -r "$TMP_DIR/model_full.json" -a - -f ';' -e ';' -N || true)
+DEF_NEW_OUT=$(echo "$UNSEEN_INPUT" | $BIN -r "$TMP_DIR/model_full.json" -a - --no-header -f ';' -e ';' -N || true)
 if [ "$DEF_NEW_OUT" != "$UNSEEN_INPUT" ]; then
     echo "  [FAIL] Expected default -N to output raw line '%v', got '$DEF_NEW_OUT'"
     exit 1
 fi
 # Test --new long option without argument
-LONG_NEW_OUT=$(echo "$UNSEEN_INPUT" | $BIN -r "$TMP_DIR/model_full.json" -a - -f ';' -e ';' --new || true)
+LONG_NEW_OUT=$(echo "$UNSEEN_INPUT" | $BIN -r "$TMP_DIR/model_full.json" -a - --no-header -f ';' -e ';' --new || true)
 if [ "$LONG_NEW_OUT" != "$UNSEEN_INPUT" ]; then
     echo "  [FAIL] Expected default --new to output raw line '%v', got '$LONG_NEW_OUT'"
     exit 1
@@ -81,7 +81,7 @@ echo "Test 5: Report MISSED categories at end of analysis batch (-M, --missing).
 # Create a test input containing only category 5 rows
 awk -F';' '$12 == "5" { print; if (++n == 10) exit }' "$WINE_CSV" > "$TMP_DIR/test_cat5_only.csv"
 set +e
-$BIN -r "$TMP_DIR/model_full.json" -a "$TMP_DIR/test_cat5_only.csv" -f ';' -M "MISSED;%c;%s;%t;%u;%a" -o "$TMP_DIR/missed_output.csv"
+$BIN -r "$TMP_DIR/model_full.json" -a "$TMP_DIR/test_cat5_only.csv" --no-header -f ';' -M "MISSED;%c;%s;%t;%u;%a" -o "$TMP_DIR/missed_output.csv"
 EXIT_CODE=$?
 set -e
 if [ "$EXIT_CODE" -ne 2 ]; then
@@ -103,7 +103,7 @@ fi
 
 # Test default -M (defaults to %C)
 set +e
-$BIN -r "$TMP_DIR/model_full.json" -a "$TMP_DIR/test_cat5_only.csv" -f ';' -M -o "$TMP_DIR/def_missed.csv"
+$BIN -r "$TMP_DIR/model_full.json" -a "$TMP_DIR/test_cat5_only.csv" --no-header -f ';' -M -o "$TMP_DIR/def_missed.csv"
 set -e
 for c in 3 4 6 7 8; do
     if ! grep -q "^$c$" "$TMP_DIR/def_missed.csv"; then
@@ -114,7 +114,7 @@ done
 
 # Test --missing long option without argument
 set +e
-$BIN -r "$TMP_DIR/model_full.json" -a "$TMP_DIR/test_cat5_only.csv" -f ';' --missing -o "$TMP_DIR/long_missed.csv"
+$BIN -r "$TMP_DIR/model_full.json" -a "$TMP_DIR/test_cat5_only.csv" --no-header -f ';' --missing -o "$TMP_DIR/long_missed.csv"
 set -e
 for c in 3 4 6 7 8; do
     if ! grep -q "^$c$" "$TMP_DIR/long_missed.csv"; then
@@ -126,7 +126,7 @@ echo "  [PASS] All 5 absent categories detected and emitted as MISSED notificati
 
 # Test 6: Custom Point Output Templating (-p <tmpl>)
 echo "Test 6: Format scored observations with custom template (-p 'A;%s;%c;%m')..."
-PT_OUT=$(head -n 2 "$TMP_DIR/test_cat5_only.csv" | $BIN -r "$TMP_DIR/model_full.json" -a - -f ';' -p "A;%s;%c;%m" || true)
+PT_OUT=$(head -n 2 "$TMP_DIR/test_cat5_only.csv" | $BIN -r "$TMP_DIR/model_full.json" -a - --no-header -f ';' -p "A;%s;%c;%m" || true)
 echo "$PT_OUT" | grep "^A;[0-9.]*;5;[0-9.]*" > /dev/null
 echo "  [PASS] Custom point output formatted accurately using -p."
 

@@ -109,6 +109,7 @@ echo "  [PASS] Exact production pipeline generated $LINE_COUNT points successful
 echo "Test 6: Backward compatibility of -a with -T <thresh>..."
 ANALYZE_CSV="$TEST_DIR/analyze.csv"
 cat << 'EOF' > "$ANALYZE_CSV"
+ID,X,Y,CAT
 p_norm,10.2,20.2,catA
 p_out,99.0,99.0,catA
 EOF

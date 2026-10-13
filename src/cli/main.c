@@ -52,7 +52,8 @@ static void print_usage(const char *prog)
     printf("  -m <fmt|int>   Dimension format string (e.g. \"%%'.0f\") or max depth cap\n");
     printf("  -f <char>      Input field delimiter (default: ',')\n");
     printf("  -e <char>      List separator for output / field delimiter fallback\n");
-    printf("  -H             Skip header line in input CSV\n");
+    printf("  -H, --header   Skip header line in input CSV\n");
+    printf("      --no-header Do not skip header line (override model/rc setting)\n");
     printf("  -I <range>     Ignore column indices/ranges from features (e.g. '12' or '1,3,5')\n");
     printf("  -U <range>     Use/include only specified column indices/ranges (e.g. '2-10')\n");
     printf("  -L <range>     Label column indices/ranges (excluded from features, kept as label)\n");
@@ -626,6 +627,7 @@ int main(int argc, char *argv[])
     bool field_sep_explicit  = false;
     bool list_sep_explicit   = false;
     bool skip_header         = false;
+    bool header_explicit     = false;
     double threshold         = 0.5;
     bool threshold_is_average = false;
     bool threshold_is_percentage = false;
@@ -672,6 +674,8 @@ int main(int argc, char *argv[])
         {"inplace-forest", required_argument, 0, 'z'},
         {"missing",      optional_argument, 0, 'M'},
         {"new",          optional_argument, 0, 'N'},
+        {"header",       no_argument,       0, 'H'},
+        {"no-header",    no_argument,       0, 1001},
         {"help",         no_argument,       0, 'h'},
         {"version",      no_argument,       0, 'v'},
         {0, 0, 0, 0}
@@ -763,7 +767,14 @@ int main(int argc, char *argv[])
                 delimiter = optarg[0];
             }
             break;
-        case 'H': skip_header = true; break;
+        case 'H':
+            skip_header = true;
+            header_explicit = true;
+            break;
+        case 1001:
+            skip_header = false;
+            header_explicit = true;
+            break;
         case 'I': ignore_spec = optarg; break;
         case 'U': include_spec = optarg; break;
         case 'L': label_spec = optarg; break;
@@ -849,6 +860,9 @@ int main(int argc, char *argv[])
     }
     if (rc_cfg.category_sep_set) {
         category_sep = rc_cfg.category_sep;
+    }
+    if (!header_explicit && rc_cfg.header_set) {
+        skip_header = rc_cfg.header;
     }
     if (!cli_outlier_score_given && rc_cfg.outlier_score_set) {
         cli_outlier_score_given = true;
@@ -955,6 +969,14 @@ int main(int argc, char *argv[])
                 if (ensemble->entries[i].forest) ensemble->entries[i].forest->list_separator = list_separator;
             }
         }
+        if (!header_explicit) {
+            skip_header = ensemble->has_header;
+        } else {
+            ensemble->has_header = skip_header;
+            for (size_t i = 0; i < ensemble->count; i++) {
+                if (ensemble->entries[i].forest) ensemble->entries[i].forest->has_header = skip_header;
+            }
+        }
     }
 
     // Mode: Model info query (-q)
@@ -1002,11 +1024,13 @@ int main(int argc, char *argv[])
             ensemble->decimals = decimals;
             ensemble->input_delimiter = delimiter;
             ensemble->list_separator = list_separator;
+            ensemble->has_header = skip_header;
             for (size_t i = 0; i < ensemble->count; i++) {
                 if (ensemble->entries[i].forest) {
                     ensemble->entries[i].forest->decimals = decimals;
                     ensemble->entries[i].forest->input_delimiter = delimiter;
                     ensemble->entries[i].forest->list_separator = list_separator;
+                    ensemble->entries[i].forest->has_header = skip_header;
                 }
             }
             geif_status_t status = geif_ensemble_save_json(ensemble, save_file);
@@ -1113,6 +1137,12 @@ int main(int argc, char *argv[])
                 geif_column_config_free(&col_cfg);
                 return 1;
             }
+        } else if (dims != ensemble->dimensions) {
+            fprintf(stderr, "geif: error: training file '%s' has %u feature dimensions, but model expects %u\n",
+                    learn_file, dims, ensemble->dimensions);
+            xfclose(fp);
+            geif_column_config_free(&col_cfg);
+            return 1;
         }
 
         // Save column metadata into ensemble
@@ -1121,6 +1151,7 @@ int main(int argc, char *argv[])
         ensemble->scale_score = true;
         ensemble->input_delimiter = delimiter;
         ensemble->list_separator = list_separator;
+        ensemble->has_header = skip_header;
         if (cli_outlier_score_given) {
             strncpy(ensemble->outlier_score_spec, cli_outlier_score_spec, sizeof(ensemble->outlier_score_spec) - 1);
         }
@@ -1221,11 +1252,13 @@ int main(int argc, char *argv[])
             ensemble->decimals = decimals;
             ensemble->input_delimiter = delimiter;
             ensemble->list_separator = list_separator;
+            ensemble->has_header = skip_header;
             for (size_t i = 0; i < ensemble->count; i++) {
                 if (ensemble->entries[i].forest) {
                     ensemble->entries[i].forest->decimals = decimals;
                     ensemble->entries[i].forest->input_delimiter = delimiter;
                     ensemble->entries[i].forest->list_separator = list_separator;
+                    ensemble->entries[i].forest->has_header = skip_header;
                 }
             }
             status = geif_ensemble_save_json(ensemble, save_file);
@@ -1443,11 +1476,13 @@ int main(int argc, char *argv[])
             ensemble->decimals = decimals;
             ensemble->input_delimiter = delimiter;
             ensemble->list_separator = list_separator;
+            ensemble->has_header = skip_header;
             for (size_t i = 0; i < ensemble->count; i++) {
                 if (ensemble->entries[i].forest) {
                     ensemble->entries[i].forest->decimals = decimals;
                     ensemble->entries[i].forest->input_delimiter = delimiter;
                     ensemble->entries[i].forest->list_separator = list_separator;
+                    ensemble->entries[i].forest->has_header = skip_header;
                 }
             }
             geif_status_t status = geif_ensemble_save_json(ensemble, save_file);
@@ -1620,11 +1655,13 @@ int main(int argc, char *argv[])
             ensemble->decimals = decimals;
             ensemble->input_delimiter = delimiter;
             ensemble->list_separator = list_separator;
+            ensemble->has_header = skip_header;
             for (size_t i = 0; i < ensemble->count; i++) {
                 if (ensemble->entries[i].forest) {
                     ensemble->entries[i].forest->decimals = decimals;
                     ensemble->entries[i].forest->input_delimiter = delimiter;
                     ensemble->entries[i].forest->list_separator = list_separator;
+                    ensemble->entries[i].forest->has_header = skip_header;
                 }
             }
             geif_status_t status = geif_ensemble_save_json(ensemble, save_file);

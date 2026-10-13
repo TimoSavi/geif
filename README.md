@@ -276,7 +276,8 @@ The build compiles with `-std=c17 -O3 -march=native -Wall -Wextra -Wpedantic` an
 | `-L` | `<spec>` | Label column range/list (e.g., `1`, `"1-2"`). |
 | `-U` | `<spec>` | Include column range/list for feature vectors. |
 | `-I` | `<spec>` | Ignore column range/list. |
-| `-H` | *(flag)* | Skip header row in input CSV. |
+| `-H`, `--header` | *(flag)* | Skip header row in input CSV (persisted in model JSON and restored automatically). |
+| `--no-header` | *(flag)* | Explicitly disable header skipping, overriding saved model header state. |
 | `-f` | `<char>` | Input field delimiter (default: `,`; saved in model and restored automatically). |
 | `-e` | `<char>` | List separator for output / field delimiter fallback (saved in model and restored). |
 | `-d` | `<num>` | Output floating-point decimal precision (default: 6). |

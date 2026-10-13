@@ -148,6 +148,7 @@ typedef struct geif_forest {
     bool          scale_score;            /**< Flag indicating if anomaly scores are scaled [0..1] via min/max */
     char          input_delimiter;        /**< Field delimiter from -f (default: ',') */
     char          list_separator;         /**< Output list separator from -e (default: ',') */
+    bool          has_header;             /**< Flag indicating input CSV has a header line to skip (-H) */
     bool          is_trained;             /**< Flag indicating whether trees have been built */
     void         *algo_data;              /**< Optional algorithm-specific auxiliary state */
 } geif_forest_t;
@@ -178,6 +179,7 @@ typedef struct {
     bool           scale_score;            /**< Flag indicating if anomaly scores are scaled [0..1] via min/max */
     char           input_delimiter;        /**< Field delimiter from -f (default: ',') */
     char           list_separator;         /**< Output list separator from -e (default: ',') */
+    bool           has_header;             /**< Flag indicating input CSV has a header line to skip (-H) */
 
     geif_category_entry_t *entries;        /**< Dynamic array of category sub-forests */
     size_t         count;                  /**< Number of active sub-forests */

@@ -40,6 +40,9 @@ typedef struct {
 
     char     label_sep;
     bool     label_sep_set;
+
+    bool     header;
+    bool     header_set;
 } geif_rc_config_t;
 
 /**

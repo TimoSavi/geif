@@ -78,7 +78,7 @@ echo "Test 4: Incremental Learning with Age Refresh and Pruning (-r -l -D 7d -w)
 awk -F';' '$12 == "3" { print; if (++n == 5) exit }' "$WINE_CSV" > "$TMP_DIR/cat3_fresh.csv"
 
 # Run incremental training with -r, -l, -D 7d, -w
-$BIN -r "$TMP_DIR/model_aged.json" -l "$TMP_DIR/cat3_fresh.csv" -f ';' -D 7d -w "$TMP_DIR/model_cat3_refreshed.json" -v
+$BIN -r "$TMP_DIR/model_aged.json" -l "$TMP_DIR/cat3_fresh.csv" --no-header -f ';' -D 7d -w "$TMP_DIR/model_cat3_refreshed.json" -v
 
 REFRESHED_SUMMARY=$($BIN -r "$TMP_DIR/model_cat3_refreshed.json" -q)
 echo "$REFRESHED_SUMMARY"
@@ -113,7 +113,7 @@ echo "Test 6: Score against aged-out category (triggers -N outlier)..."
 awk -F';' '$12 == "4" { print; if (++n == 1) exit }' "$WINE_CSV" > "$TMP_DIR/query_cat4.csv"
 
 set +e
-$BIN -r "$TMP_DIR/model_pruned_7d.json" -a "$TMP_DIR/query_cat4.csv" -f ';' -N "NEW;cat=%c;outlier=%o" -o "$TMP_DIR/cat4_out.csv"
+$BIN -r "$TMP_DIR/model_pruned_7d.json" -a "$TMP_DIR/query_cat4.csv" --no-header -f ';' -N "NEW;cat=%c;outlier=%o" -o "$TMP_DIR/cat4_out.csv"
 EXIT_CODE=$?
 set -e
 

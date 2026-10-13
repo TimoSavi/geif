@@ -85,6 +85,7 @@ geif_status_t geif_ensemble_create(geif_ensemble_t **ensemble_out,
     ens->scale_score = true;
     ens->input_delimiter = ',';
     ens->list_separator = ',';
+    ens->has_header = false;
 
     ens->capacity = GEIF_ENS_INIT_CAPACITY;
     ens->entries = (geif_category_entry_t *)calloc(ens->capacity, sizeof(geif_category_entry_t));
@@ -222,6 +223,7 @@ geif_forest_t *geif_ensemble_get_or_create(geif_ensemble_t *ens, const char *cat
     forest->scale_score = ens->scale_score;
     forest->input_delimiter = ens->input_delimiter;
     forest->list_separator = ens->list_separator;
+    forest->has_header = ens->has_header;
 
     uint32_t entry_idx = (uint32_t)ens->count++;
     geif_category_entry_t *entry = &ens->entries[entry_idx];
@@ -291,6 +293,9 @@ geif_status_t geif_ensemble_add_forest(geif_ensemble_t *ens,
     }
     if (forest->list_separator == '\0' || forest->list_separator == ',') {
         forest->list_separator = ens->list_separator ? ens->list_separator : ',';
+    }
+    if (!forest->has_header && ens->has_header) {
+        forest->has_header = ens->has_header;
     }
 
     // Check if category already exists in hash table
@@ -604,7 +609,8 @@ void geif_ensemble_summary(const geif_ensemble_t *ens, char *buffer, size_t buff
                      "  Include Columns (-U): %s\n"
                      "  Ignore Columns (-I):  %s\n"
                      "  Input Delimiter (-f): '%c'\n"
-                     "  List Separator (-e):  '%c'\n",
+                     "  List Separator (-e):  '%c'\n"
+                     "  Skip Header (-H):     %s\n",
                      ens->dimensions,
                      ens->count,
                      ens->total_input_cols,
@@ -613,7 +619,8 @@ void geif_ensemble_summary(const geif_ensemble_t *ens, char *buffer, size_t buff
                      ens->include_dims_spec[0] ? ens->include_dims_spec : "(all)",
                      ens->ignore_dims_spec[0] ? ens->ignore_dims_spec : "(none)",
                      ens->input_delimiter ? ens->input_delimiter : ',',
-                     ens->list_separator ? ens->list_separator : ',');
+                     ens->list_separator ? ens->list_separator : ',',
+                     ens->has_header ? "Yes" : "No");
     if (n > 0) written += (size_t)n;
 
     for (size_t i = 0; i < ens->count && written + 80 < buffer_size; i++) {
