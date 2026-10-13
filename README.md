@@ -266,7 +266,8 @@ The build compiles with `-std=c17 -O3 -march=native -Wall -Wextra -Wpedantic` an
 | `-a` | `<file>` | Analysis / score mode: score data from CSV file or `-` (stdin). |
 | `-c` | `<file>` | Categorize mode: classify samples against all categories and assign best match. |
 | `-w` | `<file>` | Write / save model to JSON file or `-` (stdout). |
-| `-r` | `<file>` | Read / load model from JSON file or `-` (stdin). |
+| `-r` | `<file>` | Read / load model from JSON file or `-` (stdin); auto-restores saved `-f` and `-e` delimiters. |
+| `-z` | `<file>` | Update model in-place (loads model, updates with `-l`, rewrites file; auto-restores `-f`). |
 | `-o` | `<file>` | Output file for scoring results (default: `-` for stdout). |
 | `-O` | `<spec>` | Outlier threshold: decimal (`0.65`), percentage (`80%`), or `average`. |
 | `-k` | *(flag)* | Recalibrate model / prune reservoir outliers (repeatable: `-k -k`). |
@@ -276,8 +277,8 @@ The build compiles with `-std=c17 -O3 -march=native -Wall -Wextra -Wpedantic` an
 | `-U` | `<spec>` | Include column range/list for feature vectors. |
 | `-I` | `<spec>` | Ignore column range/list. |
 | `-H` | *(flag)* | Skip header row in input CSV. |
-| `-f` | `<char>` | Input field delimiter (default: `,`). |
-| `-e` | `<char>` | List separator for output / field delimiter fallback (e.g., `-e ';'`). |
+| `-f` | `<char>` | Input field delimiter (default: `,`; saved in model and restored automatically). |
+| `-e` | `<char>` | List separator for output / field delimiter fallback (saved in model and restored). |
 | `-d` | `<num>` | Output floating-point decimal precision (default: 6). |
 | `-m` | `<fmt>` | Printf numeric format string for dimension output (e.g., `"%'.0f"`). |
 | `-p` | `<tmpl>` | Output template for outlier rows (or all rows if `-S` is omitted). |

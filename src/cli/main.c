@@ -624,6 +624,7 @@ int main(int argc, char *argv[])
     char delimiter           = ',';
     char list_separator      = ',';
     bool field_sep_explicit  = false;
+    bool list_sep_explicit   = false;
     bool skip_header         = false;
     double threshold         = 0.5;
     bool threshold_is_average = false;
@@ -757,6 +758,7 @@ int main(int argc, char *argv[])
             break;
         case 'e':
             list_separator = optarg[0];
+            list_sep_explicit = true;
             if (!field_sep_explicit) {
                 delimiter = optarg[0];
             }
@@ -936,6 +938,23 @@ int main(int argc, char *argv[])
         } else if (ensemble->decimals > 0) {
             decimals = ensemble->decimals;
         }
+
+        if (!field_sep_explicit && ensemble->input_delimiter != '\0') {
+            delimiter = ensemble->input_delimiter;
+        } else if (field_sep_explicit) {
+            ensemble->input_delimiter = delimiter;
+            for (size_t i = 0; i < ensemble->count; i++) {
+                if (ensemble->entries[i].forest) ensemble->entries[i].forest->input_delimiter = delimiter;
+            }
+        }
+        if (!list_sep_explicit && ensemble->list_separator != '\0') {
+            list_separator = ensemble->list_separator;
+        } else if (list_sep_explicit) {
+            ensemble->list_separator = list_separator;
+            for (size_t i = 0; i < ensemble->count; i++) {
+                if (ensemble->entries[i].forest) ensemble->entries[i].forest->list_separator = list_separator;
+            }
+        }
     }
 
     // Mode: Model info query (-q)
@@ -981,8 +1000,14 @@ int main(int argc, char *argv[])
         }
         if (save_file) {
             ensemble->decimals = decimals;
+            ensemble->input_delimiter = delimiter;
+            ensemble->list_separator = list_separator;
             for (size_t i = 0; i < ensemble->count; i++) {
-                if (ensemble->entries[i].forest) ensemble->entries[i].forest->decimals = decimals;
+                if (ensemble->entries[i].forest) {
+                    ensemble->entries[i].forest->decimals = decimals;
+                    ensemble->entries[i].forest->input_delimiter = delimiter;
+                    ensemble->entries[i].forest->list_separator = list_separator;
+                }
             }
             geif_status_t status = geif_ensemble_save_json(ensemble, save_file);
             if (status != GEIF_OK) {
@@ -1094,6 +1119,8 @@ int main(int argc, char *argv[])
         ensemble->total_input_cols = total_cols;
         ensemble->decimals = decimals;
         ensemble->scale_score = true;
+        ensemble->input_delimiter = delimiter;
+        ensemble->list_separator = list_separator;
         if (cli_outlier_score_given) {
             strncpy(ensemble->outlier_score_spec, cli_outlier_score_spec, sizeof(ensemble->outlier_score_spec) - 1);
         }
@@ -1192,8 +1219,14 @@ int main(int argc, char *argv[])
         // Save trained model if requested
         if (save_file) {
             ensemble->decimals = decimals;
+            ensemble->input_delimiter = delimiter;
+            ensemble->list_separator = list_separator;
             for (size_t i = 0; i < ensemble->count; i++) {
-                if (ensemble->entries[i].forest) ensemble->entries[i].forest->decimals = decimals;
+                if (ensemble->entries[i].forest) {
+                    ensemble->entries[i].forest->decimals = decimals;
+                    ensemble->entries[i].forest->input_delimiter = delimiter;
+                    ensemble->entries[i].forest->list_separator = list_separator;
+                }
             }
             status = geif_ensemble_save_json(ensemble, save_file);
             if (status != GEIF_OK) {
@@ -1408,8 +1441,14 @@ int main(int argc, char *argv[])
 
         if (!learn_file && save_file) {
             ensemble->decimals = decimals;
+            ensemble->input_delimiter = delimiter;
+            ensemble->list_separator = list_separator;
             for (size_t i = 0; i < ensemble->count; i++) {
-                if (ensemble->entries[i].forest) ensemble->entries[i].forest->decimals = decimals;
+                if (ensemble->entries[i].forest) {
+                    ensemble->entries[i].forest->decimals = decimals;
+                    ensemble->entries[i].forest->input_delimiter = delimiter;
+                    ensemble->entries[i].forest->list_separator = list_separator;
+                }
             }
             geif_status_t status = geif_ensemble_save_json(ensemble, save_file);
             if (status != GEIF_OK) {
@@ -1579,8 +1618,14 @@ int main(int argc, char *argv[])
 
         if (!learn_file && save_file) {
             ensemble->decimals = decimals;
+            ensemble->input_delimiter = delimiter;
+            ensemble->list_separator = list_separator;
             for (size_t i = 0; i < ensemble->count; i++) {
-                if (ensemble->entries[i].forest) ensemble->entries[i].forest->decimals = decimals;
+                if (ensemble->entries[i].forest) {
+                    ensemble->entries[i].forest->decimals = decimals;
+                    ensemble->entries[i].forest->input_delimiter = delimiter;
+                    ensemble->entries[i].forest->list_separator = list_separator;
+                }
             }
             geif_status_t status = geif_ensemble_save_json(ensemble, save_file);
             if (status != GEIF_OK) {

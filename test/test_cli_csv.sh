@@ -65,4 +65,48 @@ NAN_SCORED=$(wc -l < "$TMP_DIR/nan_out.csv")
 test "$NAN_SCORED" -eq 2
 echo "  [PASS] NaN, Inf, and empty fields gracefully parsed as 0.0 without errors."
 
+# Test 7: Verify field delimiter (-f) and list separator (-e) persistence in JSON model
+echo "Test 7: Verify delimiter persistence in saved JSON model..."
+$BIN -r "$TMP_DIR/model.json" -q | grep -F "Input Delimiter (-f): ';'"
+$BIN -r "$TMP_DIR/model.json" -q | grep -F "List Separator (-e):  ','"
+grep -E -q '"input_separator":[[:space:]]*";"' "$TMP_DIR/model.json"
+grep -E -q '"inputSeparator":[[:space:]]*";"' "$TMP_DIR/model.json"
+
+# Also verify explicit -e '|' persistence
+$BIN -l "$WINE_CSV" -H -f ';' -e '|' -w "$TMP_DIR/custom_sep.json" -i 10 -s 32
+$BIN -r "$TMP_DIR/custom_sep.json" -q | grep -F "Input Delimiter (-f): ';'"
+$BIN -r "$TMP_DIR/custom_sep.json" -q | grep -F "List Separator (-e):  '|'"
+grep -E -q '"list_separator":[[:space:]]*"\|"' "$TMP_DIR/custom_sep.json"
+grep -E -q '"listSeparator":[[:space:]]*"\|"' "$TMP_DIR/custom_sep.json"
+echo "  [PASS] Delimiters properly serialized in root and CEIF-compatible globals."
+
+# Test 8: Auto-restoration of delimiter during scoring without -f flag
+echo "Test 8: Scoring without -f flag (auto-restoring saved ';' delimiter)..."
+head -n 25 "$WINE_CSV" | tail -n 20 > "$TMP_DIR/wine_subset.csv"
+# Notice: no -f ';' supplied on CLI!
+$BIN -r "$TMP_DIR/model.json" -a "$TMP_DIR/wine_subset.csv" -o "$TMP_DIR/restored_scores.csv" -T 0.99
+RESTORED_COUNT=$(wc -l < "$TMP_DIR/restored_scores.csv")
+test "$RESTORED_COUNT" -eq 20
+# Output delimiter should also default to the model's saved separator
+grep -q ";" "$TMP_DIR/restored_scores.csv"
+echo "  [PASS] Model automatically used saved delimiter ';' without -f on CLI ($RESTORED_COUNT rows)."
+
+# Test 9: In-place continuous training (-z) without -f flag
+echo "Test 9: In-place continuous training (-z) without -f flag..."
+cp "$TMP_DIR/model.json" "$TMP_DIR/model_inplace.json"
+BEFORE_ROWS=$($BIN -r "$TMP_DIR/model_inplace.json" -q | grep -o 'rows=[0-9]*' | head -n 1 | cut -d= -f2)
+head -n 50 "$WINE_CSV" | tail -n 30 > "$TMP_DIR/wine_batch2.csv"
+# Ingest new batch without -f flag
+$BIN -z "$TMP_DIR/model_inplace.json" -l "$TMP_DIR/wine_batch2.csv" -v 2>&1 | grep "Ingested 30 rows"
+AFTER_ROWS=$($BIN -r "$TMP_DIR/model_inplace.json" -q | grep -o 'rows=[0-9]*' | head -n 1 | cut -d= -f2)
+test "$AFTER_ROWS" -eq $((BEFORE_ROWS + 30))
+echo "  [PASS] Continuous learning (-z) automatically used saved delimiter (rows: $BEFORE_ROWS -> $AFTER_ROWS)."
+
+# Test 10: Explicit CLI override (-f) takes precedence over saved model delimiter
+echo "Test 10: Explicit CLI flag overrides saved delimiter..."
+# Convert wine batch to comma-separated
+tr ';' ',' < "$TMP_DIR/wine_batch2.csv" > "$TMP_DIR/wine_comma.csv"
+$BIN -z "$TMP_DIR/model_inplace.json" -l "$TMP_DIR/wine_comma.csv" -f ',' -v 2>&1 | grep "Ingested 30 rows"
+echo "  [PASS] Explicit -f ',' successfully overrode model delimiter."
+
 echo ">>> ALL FEATURE 1 TESTS PASSED SUCCESSFULLY! <<<"

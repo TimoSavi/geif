@@ -146,6 +146,8 @@ typedef struct geif_forest {
     char          category_dims_spec[128];/**< Category columns spec (e.g. "12") */
     int           decimals;               /**< Decimal precision for serialization (-d, default: 6) */
     bool          scale_score;            /**< Flag indicating if anomaly scores are scaled [0..1] via min/max */
+    char          input_delimiter;        /**< Field delimiter from -f (default: ',') */
+    char          list_separator;         /**< Output list separator from -e (default: ',') */
     bool          is_trained;             /**< Flag indicating whether trees have been built */
     void         *algo_data;              /**< Optional algorithm-specific auxiliary state */
 } geif_forest_t;
@@ -174,6 +176,8 @@ typedef struct {
     char           outlier_score_spec[64]; /**< Outlier score threshold spec (e.g. "0.5", "average", "80%", "0.65s") */
     int            decimals;               /**< Decimal precision for serialization (-d, default: 6) */
     bool           scale_score;            /**< Flag indicating if anomaly scores are scaled [0..1] via min/max */
+    char           input_delimiter;        /**< Field delimiter from -f (default: ',') */
+    char           list_separator;         /**< Output list separator from -e (default: ',') */
 
     geif_category_entry_t *entries;        /**< Dynamic array of category sub-forests */
     size_t         count;                  /**< Number of active sub-forests */

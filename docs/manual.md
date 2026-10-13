@@ -12,7 +12,7 @@
 geif [OPTIONS]...
 ```
 
-Input data is expected to be character-delimited ASCII/UTF-8 records (default comma `,`). A different separator can be specified with `-f`.
+Input data is expected to be character-delimited ASCII/UTF-8 records (default comma `,`). A different separator can be specified with `-f`. Delimiters (`-f` and `-e`) are automatically serialized into the model JSON (`input_separator` and `list_separator`) and restored when evaluating (`-r`) or continuously updating (`-z`) models without requiring `-f` or `-e` on subsequent CLI invocations.
 
 ### Core Operational Modes
 
@@ -57,8 +57,8 @@ Input data is expected to be character-delimited ASCII/UTF-8 records (default co
 | `-a` | `FILE` | Score and analyze samples from input CSV (use `-` for stdin). |
 | `-c` | `FILE` | Categorize observations against all sub-forest categories and assign best fit. |
 | `-w` | `FILE` | Write trained model ensemble to a JSON file (use `-` for stdout). |
-| `-r` | `FILE` | Read model ensemble from a JSON file (supports GEIF-1.0 and legacy formats). |
-| `-z` | `FILE` | Update model in-place: read model from `FILE`, update with streaming data, and rewrite to `FILE`. |
+| `-r` | `FILE` | Read model ensemble from a JSON file (supports GEIF-1.0 and legacy formats; auto-restores `-f` and `-e`). |
+| `-z` | `FILE` | Update model in-place: read model from `FILE`, update with streaming data, and rewrite to `FILE` (auto-restores `-f`). |
 | `-o` | `FILE` | Output file path for scoring results (default: stdout, `-` for stdout). |
 | `-O` | `THRESH` | Anomaly threshold: float in $[0.0, 1.0]$ (default 0.50), percentage (e.g. `90%`), or `average`. |
 | `-t` | `INT` | Number of isolation trees per sub-forest (default: 100). |
@@ -67,8 +67,8 @@ Input data is expected to be character-delimited ASCII/UTF-8 records (default co
 | `-T` | `[FLOAT]` | Generate synthetic test grid with optional domain extension margin (e.g. `0.1`). |
 | `-k` | (none) | Prune the most extreme outlier sample from the reservoir pool and recalibrate (repeatable). |
 | `-g` | `FILE` | Load configuration / RC file (overrides `~/.geifrc` and `~/.ceifrc`). Repeatable. |
-| `-f` | `CHAR` | Input field delimiter character (default: `,`). |
-| `-e` | `CHAR` | Output field separator character (default: `,`). |
+| `-f` | `CHAR` | Input field delimiter character (default: `,`). Persisted in model JSON and restored automatically. |
+| `-e` | `CHAR` | Output field separator character (default: `,`). Persisted in model JSON and restored automatically. |
 | `-H` | (none) | Ignore header line in input CSV files. |
 | `-I` | `RANGE` | Comma-separated list of 1-based column indices/ranges to ignore (e.g. `1,3,5-7`). |
 | `-U` | `RANGE` | Comma-separated list of 1-based column indices/ranges to include exclusively. |

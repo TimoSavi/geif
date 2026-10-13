@@ -83,6 +83,8 @@ geif_status_t geif_ensemble_create(geif_ensemble_t **ensemble_out,
     ens->config = config ? *config : geif_config_default();
     ens->decimals = 6;
     ens->scale_score = true;
+    ens->input_delimiter = ',';
+    ens->list_separator = ',';
 
     ens->capacity = GEIF_ENS_INIT_CAPACITY;
     ens->entries = (geif_category_entry_t *)calloc(ens->capacity, sizeof(geif_category_entry_t));
@@ -218,6 +220,8 @@ geif_forest_t *geif_ensemble_get_or_create(geif_ensemble_t *ens, const char *cat
     strncpy(forest->category_dims_spec, ens->category_dims_spec, sizeof(forest->category_dims_spec) - 1);
     forest->decimals = ens->decimals;
     forest->scale_score = ens->scale_score;
+    forest->input_delimiter = ens->input_delimiter;
+    forest->list_separator = ens->list_separator;
 
     uint32_t entry_idx = (uint32_t)ens->count++;
     geif_category_entry_t *entry = &ens->entries[entry_idx];
@@ -282,6 +286,12 @@ geif_status_t geif_ensemble_add_forest(geif_ensemble_t *ens,
     }
     if (ens->decimals > 0 && forest->decimals <= 0) forest->decimals = ens->decimals;
     forest->scale_score = ens->scale_score;
+    if (forest->input_delimiter == '\0' || forest->input_delimiter == ',') {
+        forest->input_delimiter = ens->input_delimiter ? ens->input_delimiter : ',';
+    }
+    if (forest->list_separator == '\0' || forest->list_separator == ',') {
+        forest->list_separator = ens->list_separator ? ens->list_separator : ',';
+    }
 
     // Check if category already exists in hash table
     uint32_t h = ensemble_hash(cat_key);
@@ -592,14 +602,18 @@ void geif_ensemble_summary(const geif_ensemble_t *ens, char *buffer, size_t buff
                      "  Category Columns (-C): %s\n"
                      "  Label Columns (-L):  %s\n"
                      "  Include Columns (-U): %s\n"
-                     "  Ignore Columns (-I):  %s\n",
+                     "  Ignore Columns (-I):  %s\n"
+                     "  Input Delimiter (-f): '%c'\n"
+                     "  List Separator (-e):  '%c'\n",
                      ens->dimensions,
                      ens->count,
                      ens->total_input_cols,
                      ens->category_dims_spec[0] ? ens->category_dims_spec : "(none - global forest)",
                      ens->label_dims_spec[0] ? ens->label_dims_spec : "(none)",
                      ens->include_dims_spec[0] ? ens->include_dims_spec : "(all)",
-                     ens->ignore_dims_spec[0] ? ens->ignore_dims_spec : "(none)");
+                     ens->ignore_dims_spec[0] ? ens->ignore_dims_spec : "(none)",
+                     ens->input_delimiter ? ens->input_delimiter : ',',
+                     ens->list_separator ? ens->list_separator : ',');
     if (n > 0) written += (size_t)n;
 
     for (size_t i = 0; i < ens->count && written + 80 < buffer_size; i++) {
