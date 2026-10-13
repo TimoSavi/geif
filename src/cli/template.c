@@ -181,7 +181,7 @@ size_t geif_format_template(char *out,
 
         case 'm': // Metric depth or dimension expansion (-j)
             if (ctx && ctx->print_dimension && ctx->print_dimension[0] != '\0' &&
-                ctx->vector && ctx->vector_dim > 0) {
+                (ctx->vector || ctx->averages) && ctx->vector_dim > 0) {
                 for (uint32_t i = 0; i < ctx->vector_dim && w + 1 < out_size; i++) {
                     if (i > 0 && sep != '\0') {
                         out[w++] = sep;
@@ -203,7 +203,7 @@ size_t geif_format_template(char *out,
                         int dn = 0;
                         switch (dspec) {
                         case 'd':
-                            dn = format_double(out + w, out_size - w, ctx->vector[i], dec, ctx->printf_format);
+                            dn = format_double(out + w, out_size - w, ctx->vector ? ctx->vector[i] : 0.0, dec, ctx->printf_format);
                             if (dn > 0) w += (size_t)dn;
                             break;
                         case 'a':
@@ -317,9 +317,28 @@ size_t geif_format_template(char *out,
             if (n > 0) w += (size_t)n;
             break;
 
-        case 't': // Timestamp
-            n = snprintf(out + w, out_size - w, "%ld", (long)(ctx ? ctx->timestamp : time(NULL)));
-            if (n > 0) w += (size_t)n;
+        case 't': // Human-readable timestamp (localtime strftime "%c", matching CEIF)
+            {
+                time_t ts = (ctx && ctx->timestamp > 0) ? ctx->timestamp : time(NULL);
+                struct tm tm_buf;
+                struct tm *tmp = localtime_r(&ts, &tm_buf);
+                if (tmp) {
+                    char time_str[128];
+                    if (strftime(time_str, sizeof(time_str), "%c", tmp) > 0) {
+                        n = snprintf(out + w, out_size - w, "%s", time_str);
+                        if (n > 0) w += (size_t)n;
+                    }
+                }
+            }
+            break;
+
+        case 'u': // Unix epoch timestamp (%ld)
+        case 'T':
+            {
+                time_t ts = (ctx && ctx->timestamp > 0) ? ctx->timestamp : time(NULL);
+                n = snprintf(out + w, out_size - w, "%ld", (long)ts);
+                if (n > 0) w += (size_t)n;
+            }
             break;
 
         default:

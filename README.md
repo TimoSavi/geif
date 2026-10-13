@@ -282,8 +282,8 @@ The build compiles with `-std=c17 -O3 -march=native -Wall -Wextra -Wpedantic` an
 | `-m` | `<fmt>` | Printf numeric format string for dimension output (e.g., `"%'.0f"`). |
 | `-p` | `<tmpl>` | Output template for outlier rows (or all rows if `-S` is omitted). |
 | `-v` | `<tmpl>` | Output template for inlier rows (dual templating). |
-| `-N` | `<tmpl>` | Output template for newly observed, untrained categories. |
-| `-M` | `<tmpl>` | Output template for missed categories (trained but absent in stream). |
+| `-N`, `--new` | `[tmpl]` | Output template for newly observed, untrained categories (default: `"%v"`). |
+| `-M`, `--missing` | `[tmpl]` | Output template for missed categories (trained but absent in stream; default: `"%C"`). |
 | `-j` | `<tmpl>` | Sub-template for `%m` per-dimension expansion. |
 | `-F` | `<spec>` | Category filter: regex (matching categories are filtered out; prefix `-v ` to invert). |
 | `-R` | `<num>` | Minimum training row count required to retain a category sub-forest. |
@@ -311,7 +311,8 @@ The following template tokens can be used in `-p`, `-v`, `-N`, `-M`, and `-j`:
 | `%h` | Calibration scale factor $H_{\text{max}}$ | `27.7608` |
 | `%o` | Outlier indicator flag (`1` if outlier, `0` if inlier) | `1` |
 | `%n` | Total training rows seen by sub-forest | `1599` |
-| `%t` | Unix timestamp of evaluation | `1774866874` |
+| `%t` | Human-readable timestamp (local time via `strftime("%c")`, matching CEIF) | `Tue Oct 13 10:06:19 2026` |
+| `%u`, `%T` | Raw Unix epoch timestamp in seconds | `1791875179` |
 | `%v` | Raw input line tokens joined by delimiter | `token1;token2` |
 
 ### RC Configuration File (`~/.geifrc` / `~/.ceifrc`)

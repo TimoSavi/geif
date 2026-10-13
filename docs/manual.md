@@ -77,8 +77,8 @@ Input data is expected to be character-delimited ASCII/UTF-8 records (default co
 | `-F` | `REGEXP` | Filter out categories matching regular expression (prefix with `-v ` to invert / keep only). |
 | `-R` | `INT` | Minimum row count required to train a sub-forest for a category. |
 | `-D` | `INTERVAL`| Drop sub-forest categories older than specified age (e.g. `30d`, `7d`, `24h`, `3600s`). |
-| `-N` | `TMPL` | Output format template for newly observed, unseen categories during scoring. |
-| `-M` | `TMPL` | Output format template for missed categories (trained but absent in test stream). |
+| `-N`, `--new` | `[TMPL]` | Output format template for newly observed, unseen categories during scoring (default: `"%v"`). |
+| `-M`, `--missing` | `[TMPL]` | Output format template for missed categories (trained but absent in test stream; default: `"%C"`). |
 | `-p` | `TMPL` | Printf-style format template for scored anomaly rows. |
 | `-v` | `[TMPL]` | Format template for nominal inlier rows, or verbose flag. |
 | `-d` | `INT` | Decimal precision for floating-point values (default: 6). |
@@ -105,23 +105,28 @@ GEIF scales all anomaly scores to the calibrated range $[0.0, 1.0]$ by default:
 
 ---
 
-## 4. Output Formatting & Template Directives (`-p`, `-v`, `-j`)
+## 4. Output Formatting & Template Directives (`-p`, `-v`, `-N`, `-M`, `-j`)
 
-The `-p` (outlier) and `-v` (inlier) options accept formatting directives:
+The `-p` (outlier), `-v` (inlier), `-N` (unseen), and `-M` (missed) options accept formatting directives:
 
 | Directive | Description |
 | :--- | :--- |
 | `%s` | Calibrated anomaly score (e.g. `0.8421`). |
+| `%S` | Anomaly score percentage (e.g. `84.21%`). |
 | `%l` | Concatenated label string extracted from `-L` columns. |
-| `%c` | Assigned / predicted category string (when classifying with `-c`). |
-| `%C` | True category string from input observation (from `-C` columns). |
-| `%d` | Vector of raw numerical feature values (comma-separated). |
-| `%m` | Dimension attribution metrics expanded via `-j` template. |
-| `%e` | Single-dimension attribute indices contributing to anomaly. |
-| `%a` | Ensemble average score. |
-| `%n` | Total number of anomalies detected. |
-| `%N` | Total number of rows evaluated. |
-| `%rgb` | Hex RGB color code corresponding to anomaly score (smooth green to purple gradient). |
+| `%c` | Category string from input observation (from `-C` columns). |
+| `%C` | Model / assigned category string. |
+| `%d` | Vector of raw numerical feature values (comma-separated), or outer stadium distance. |
+| `%m` | Dimension attribution metrics expanded via `-j` template, or continuous metric depth $H(x)$. |
+| `%e` | Single-dimension impact / attribution scores contributing to anomaly. |
+| `%a` | Category dimension averages. |
+| `%v` | Raw input line tokens joined by delimiter. |
+| `%x` | Hex RGB color code corresponding to anomaly score (interpolated between low and high colors). |
+| `%h` | Forest $H_{\text{max}}$ universal scale. |
+| `%o` | Outlier flag (`1` for outlier, `0` for inlier). |
+| `%n` | Total training rows seen by sub-forest. |
+| `%t` | Human-readable timestamp (local time via `strftime("%c")`, matching CEIF). |
+| `%u`, `%T` | Raw Unix epoch timestamp in seconds. |
 
 ### Example Template Usage:
 ```bash

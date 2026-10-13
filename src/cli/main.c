@@ -60,9 +60,9 @@ static void print_usage(const char *prog)
     printf("  -F <filter>    Filter out categories matching regex (prefix '-v ' to invert / keep only matching)\n");
     printf("  -R <int>       Minimum row count per category required to train sub-forest\n");
     printf("  -D <interval>  Drop / prune categories older than interval (e.g. '30d', '7d', '24h', '3600s')\n");
-    printf("  -N <tmpl>      Output template for NEW / unseen categories during analysis\n");
-    printf("  -M <tmpl>      Output template for MISSED categories (trained but absent in test data)\n");
-    printf("  -p <tmpl>      Output template for scored rows (%%s=score, %%l=label, %%c=cat, %%m=metric/dims, %%d=vector, %%e=attrib, %%a=avg)\n");
+    printf("  -N [tmpl]      Output template for NEW / unseen categories during analysis (default: '%%v')\n");
+    printf("  -M [tmpl]      Output template for MISSED categories (default: '%%C')\n");
+    printf("  -p <tmpl>      Output template for scored rows (%%s=score, %%l=label, %%c=cat, %%m=metric/dims, %%d=vector, %%e=attrib, %%a=avg, %%t=time, %%u=epoch)\n");
     printf("  -v [tmpl]      Output template for inlier/average rows, or verbose flag\n");
     printf("  -d <int>       Floating point decimal precision (default: 6)\n");
     printf("  -j <tmpl>      Per-dimension expansion template for %%m (%%d=val, %%a=avg, %%e=attrib, %%i=index)\n");
@@ -326,6 +326,17 @@ static void process_scoring_row(geif_ensemble_t *ensemble,
             if (attr_scores) geif_forest_dimension_attribution(sub_forest, vec, attr_scores);
         }
 
+        time_t cat_ts = 0;
+        if (ensemble && ensemble->entries) {
+            for (size_t ei = 0; ei < ensemble->count; ei++) {
+                if (strcmp(ensemble->entries[ei].category, cat_buf) == 0) {
+                    cat_ts = ensemble->entries[ei].last_updated;
+                    break;
+                }
+            }
+        }
+        if (cat_ts == 0) cat_ts = time(NULL);
+
         geif_template_context_t ctx = {
             .orig_line        = orig_line,
             .label            = label_buf,
@@ -336,7 +347,7 @@ static void process_scoring_row(geif_ensemble_t *ensemble,
             .d_out            = d_out,
             .H_max            = sub_forest ? sub_forest->H_max : 0.0,
             .is_outlier       = is_outlier ? 1 : 0,
-            .timestamp        = time(NULL),
+            .timestamp        = cat_ts,
             .total_rows       = sub_forest ? sub_forest->total_rows_seen : 0,
             .analyzed_rows    = *analyzed,
             .row_idx          = line_num,
@@ -658,13 +669,15 @@ int main(int argc, char *argv[])
         {"output",       required_argument, 0, 'o'},
         {"inplace",      required_argument, 0, 'z'},
         {"inplace-forest", required_argument, 0, 'z'},
+        {"missing",      optional_argument, 0, 'M'},
+        {"new",          optional_argument, 0, 'N'},
         {"help",         no_argument,       0, 'h'},
         {"version",      no_argument,       0, 'v'},
         {0, 0, 0, 0}
     };
 
     int opt;
-    while ((opt = getopt_long(argc, argv, "l:a:c:w:r:z:o:T::O:t:i:s:m:f:e:HqvhI:U:L:C:F:R:N:M:p:SD:d:j:v::WAkg:B:", long_options, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "l:a:c:w:r:z:o:T::O:t:i:s:m:f:e:HqvhI:U:L:C:F:R:N::M::p:SD:d:j:v::WAkg:B:", long_options, NULL)) != -1) {
         switch (opt) {
         case 'B': config.algo = geif_algo_from_name(optarg); break;
         case 'l': learn_file = optarg; break;
@@ -769,10 +782,22 @@ int main(int argc, char *argv[])
             }
             break;
         case 'N':
-            new_cat_tmpl = optarg;
+            if (optarg != NULL) {
+                new_cat_tmpl = optarg;
+            } else if (optind < argc && argv[optind][0] != '-') {
+                new_cat_tmpl = argv[optind++];
+            } else {
+                new_cat_tmpl = "%v";
+            }
             break;
         case 'M':
-            missed_cat_tmpl = optarg;
+            if (optarg != NULL) {
+                missed_cat_tmpl = optarg;
+            } else if (optind < argc && argv[optind][0] != '-') {
+                missed_cat_tmpl = argv[optind++];
+            } else {
+                missed_cat_tmpl = "%C";
+            }
             break;
         case 'p':
             point_tmpl = optarg;
@@ -1331,6 +1356,10 @@ int main(int argc, char *argv[])
                 }
                 if (!ensemble->entries[i].seen_in_analysis) {
                     total_outliers++;
+                    geif_forest_t *sub_f = ensemble->entries[i].forest;
+                    time_t cat_ts = ensemble->entries[i].last_updated;
+                    if (cat_ts == 0) cat_ts = time(NULL);
+
                     geif_template_context_t ctx = {
                         .orig_line        = cat_name,
                         .label            = "",
@@ -1339,16 +1368,16 @@ int main(int argc, char *argv[])
                         .score            = 1.0,
                         .metric_depth     = 0.0,
                         .d_out            = 0.0,
-                        .H_max            = ensemble->entries[i].forest ? ensemble->entries[i].forest->H_max : 0.0,
+                        .H_max            = sub_f ? sub_f->H_max : 0.0,
                         .is_outlier       = 1,
-                        .timestamp        = time(NULL),
+                        .timestamp        = cat_ts,
                         .total_rows       = ensemble->entries[i].total_rows,
                         .analyzed_rows    = analyzed,
                         .row_idx          = 0,
                         .vector           = NULL,
-                        .averages         = NULL,
+                        .averages         = sub_f ? sub_f->averages : NULL,
                         .attr_scores      = NULL,
-                        .vector_dim       = 0,
+                        .vector_dim       = sub_f ? sub_f->dimensions : 0,
                         .raw_values       = NULL,
                         .raw_value_count  = 0,
                         .list_separator   = list_separator,

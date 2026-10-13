@@ -25,7 +25,7 @@ typedef struct {
     double        d_out;             /**< %d (when vector is NULL): Outer stadium distance */
     double        H_max;             /**< %h: Calibrated scale H_max */
     int           is_outlier;        /**< %o: Outlier indicator (0 or 1) */
-    time_t        timestamp;         /**< %t: Epoch timestamp */
+    time_t        timestamp;         /**< %t: Human-readable timestamp, %u / %T: Epoch timestamp */
     uint64_t      total_rows;        /**< %n: Category total rows */
     uint64_t      analyzed_rows;     /**< %o: Analyzed rows count */
     uint64_t      row_idx;           /**< %r: 1-based row number */
@@ -61,7 +61,9 @@ typedef struct {
  *   %h - Forest H_max universal scale
  *   %o - Outlier flag (0 or 1)
  *   %n - Category total training rows
- *   %t - Epoch timestamp (%ld)
+ *   %t - Human-readable timestamp (localtime strftime "%c", matching CEIF)
+ *   %u - Unix epoch timestamp in seconds (%ld)
+ *   %T - Unix epoch timestamp in seconds (%ld, alias of %u)
  *   %% - Literal percent sign
  *
  * Inside dimension template (-j, expanded by %m):

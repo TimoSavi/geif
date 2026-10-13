@@ -3136,7 +3136,9 @@ Supported specifiers:
 %h - Forest H_max universal scale
 %o - Outlier flag (0 or 1)
 %n - Category total training rows
-%t - Epoch timestamp (%ld)
+%t - Human-readable timestamp (local time via strftime("%c"), matching CEIF)
+%u - Raw Unix epoch timestamp in seconds (%ld)
+%T - Raw Unix epoch timestamp in seconds (%ld, alias of %u)
 %% - Literal percent sign
 
 Inside dimension template (-j, expanded by %m):

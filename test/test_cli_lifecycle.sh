@@ -54,22 +54,34 @@ if echo "$R100_SUMMARY" | grep -E "Sub-forest '(3|4|8)'"; then
 fi
 echo "  [PASS] -R 100 correctly pruned categories below 100 rows, retaining exactly 3 sub-forests."
 
-# Test 4: NEW / Unseen Category Template Formatting (-N <tmpl>)
-echo "Test 4: Format NEW / Unseen category with custom template (-N 'NEW;%l;%c;%m')..."
+# Test 4: NEW / Unseen Category Template Formatting (-N [tmpl] / --new [tmpl])
+echo "Test 4: Format NEW / Unseen category with custom and default template (-N, --new)..."
 UNSEEN_INPUT="7.4;0.7;0;1.9;0.076;11;34;0.9978;3.51;0.56;9.4;99"
-NEW_OUT=$(echo "$UNSEEN_INPUT" | $BIN -r "$TMP_DIR/model_full.json" -a - -f ';' -N "NEW;cat=%c;metric=%m;outlier=%o" || true)
-if [ "$NEW_OUT" != "NEW;cat=99;metric=0.000000;outlier=1" ]; then
+NEW_OUT=$(echo "$UNSEEN_INPUT" | $BIN -r "$TMP_DIR/model_full.json" -a - -f ';' -N "NEW;cat=%c;metric=%m;outlier=%o;epoch=%u" || true)
+if ! echo "$NEW_OUT" | grep -q "^NEW;cat=99;metric=0.000000;outlier=1;epoch=[0-9][0-9]*"; then
     echo "  [FAIL] Unexpected NEW category formatted output: '$NEW_OUT'"
     exit 1
 fi
-echo "  [PASS] Unseen category formatted with -N template: '$NEW_OUT'."
+# Test default -N (defaults to %v)
+DEF_NEW_OUT=$(echo "$UNSEEN_INPUT" | $BIN -r "$TMP_DIR/model_full.json" -a - -f ';' -e ';' -N || true)
+if [ "$DEF_NEW_OUT" != "$UNSEEN_INPUT" ]; then
+    echo "  [FAIL] Expected default -N to output raw line '%v', got '$DEF_NEW_OUT'"
+    exit 1
+fi
+# Test --new long option without argument
+LONG_NEW_OUT=$(echo "$UNSEEN_INPUT" | $BIN -r "$TMP_DIR/model_full.json" -a - -f ';' -e ';' --new || true)
+if [ "$LONG_NEW_OUT" != "$UNSEEN_INPUT" ]; then
+    echo "  [FAIL] Expected default --new to output raw line '%v', got '$LONG_NEW_OUT'"
+    exit 1
+fi
+echo "  [PASS] Unseen category formatted with custom and default -N / --new templates."
 
-# Test 5: MISSED Category Reporting (-M <tmpl>)
-echo "Test 5: Report MISSED categories at end of analysis batch (-M 'MISSED;%c;%s')..."
+# Test 5: MISSED Category Reporting (-M [tmpl] / --missing [tmpl])
+echo "Test 5: Report MISSED categories at end of analysis batch (-M, --missing)..."
 # Create a test input containing only category 5 rows
 awk -F';' '$12 == "5" { print; if (++n == 10) exit }' "$WINE_CSV" > "$TMP_DIR/test_cat5_only.csv"
 set +e
-$BIN -r "$TMP_DIR/model_full.json" -a "$TMP_DIR/test_cat5_only.csv" -f ';' -M "MISSED;%c;%s" -o "$TMP_DIR/missed_output.csv"
+$BIN -r "$TMP_DIR/model_full.json" -a "$TMP_DIR/test_cat5_only.csv" -f ';' -M "MISSED;%c;%s;%t;%u;%a" -o "$TMP_DIR/missed_output.csv"
 EXIT_CODE=$?
 set -e
 if [ "$EXIT_CODE" -ne 2 ]; then
@@ -78,17 +90,39 @@ if [ "$EXIT_CODE" -ne 2 ]; then
 fi
 # Model has categories 3, 4, 5, 6, 7, 8. Test file has only 5.
 # Missed categories should be: 3, 4, 6, 7, 8.
-grep "MISSED;3;1.000000" "$TMP_DIR/missed_output.csv" > /dev/null
-grep "MISSED;4;1.000000" "$TMP_DIR/missed_output.csv" > /dev/null
-grep "MISSED;6;1.000000" "$TMP_DIR/missed_output.csv" > /dev/null
-grep "MISSED;7;1.000000" "$TMP_DIR/missed_output.csv" > /dev/null
-grep "MISSED;8;1.000000" "$TMP_DIR/missed_output.csv" > /dev/null
+grep -q "^MISSED;3;1.000000;.*;[0-9][0-9]*;[0-9]" "$TMP_DIR/missed_output.csv"
+grep -q "^MISSED;4;1.000000;.*;[0-9][0-9]*;[0-9]" "$TMP_DIR/missed_output.csv"
+grep -q "^MISSED;6;1.000000;.*;[0-9][0-9]*;[0-9]" "$TMP_DIR/missed_output.csv"
+grep -q "^MISSED;7;1.000000;.*;[0-9][0-9]*;[0-9]" "$TMP_DIR/missed_output.csv"
+grep -q "^MISSED;8;1.000000;.*;[0-9][0-9]*;[0-9]" "$TMP_DIR/missed_output.csv"
 MISSED_COUNT=$(grep -c "^MISSED;" "$TMP_DIR/missed_output.csv")
 if [ "$MISSED_COUNT" -ne 5 ]; then
     echo "  [FAIL] Expected 5 missed categories, got $MISSED_COUNT"
     exit 1
 fi
-echo "  [PASS] All 5 absent categories detected and emitted as MISSED notifications with exit code 2."
+
+# Test default -M (defaults to %C)
+set +e
+$BIN -r "$TMP_DIR/model_full.json" -a "$TMP_DIR/test_cat5_only.csv" -f ';' -M -o "$TMP_DIR/def_missed.csv"
+set -e
+for c in 3 4 6 7 8; do
+    if ! grep -q "^$c$" "$TMP_DIR/def_missed.csv"; then
+        echo "  [FAIL] Expected default -M to output category '$c'"
+        exit 1
+    fi
+done
+
+# Test --missing long option without argument
+set +e
+$BIN -r "$TMP_DIR/model_full.json" -a "$TMP_DIR/test_cat5_only.csv" -f ';' --missing -o "$TMP_DIR/long_missed.csv"
+set -e
+for c in 3 4 6 7 8; do
+    if ! grep -q "^$c$" "$TMP_DIR/long_missed.csv"; then
+        echo "  [FAIL] Expected default --missing to output category '$c'"
+        exit 1
+    fi
+done
+echo "  [PASS] All 5 absent categories detected and emitted as MISSED notifications with custom, default -M, and --missing."
 
 # Test 6: Custom Point Output Templating (-p <tmpl>)
 echo "Test 6: Format scored observations with custom template (-p 'A;%s;%c;%m')..."
