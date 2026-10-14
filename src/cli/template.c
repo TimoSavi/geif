@@ -146,7 +146,7 @@ size_t geif_format_template(char *out,
             break;
 
         case 's': // Score (or outlier score threshold in -v summary)
-            n = format_double(out + w, out_size - w, ctx ? ctx->score : 0.0, dec, NULL);
+            n = format_double(out + w, out_size - w, ctx ? ctx->score : 0.0, 6, NULL);
             if (n > 0) w += (size_t)n;
             break;
 
@@ -155,7 +155,7 @@ size_t geif_format_template(char *out,
                 double avg_s = (ctx && (ctx->is_summary || ctx->test_average_score > 0.0))
                                ? ctx->test_average_score
                                : (ctx ? ctx->score : 0.0);
-                n = format_double(out + w, out_size - w, avg_s, dec, NULL);
+                n = format_double(out + w, out_size - w, avg_s, 6, NULL);
                 if (n > 0) w += (size_t)n;
             }
             break;
@@ -224,7 +224,7 @@ size_t geif_format_template(char *out,
                             if (dn > 0) w += (size_t)dn;
                             break;
                         case 'e':
-                            dn = format_double(out + w, out_size - w, ctx->attr_scores ? ctx->attr_scores[i] : 0.0, dec, NULL);
+                            dn = format_double(out + w, out_size - w, ctx->attr_scores ? ctx->attr_scores[i] : 0.0, 6, NULL);
                             if (dn > 0) w += (size_t)dn;
                             break;
                         case 'i':
@@ -257,7 +257,7 @@ size_t geif_format_template(char *out,
                     if (dn > 0) w += (size_t)dn;
                 }
             } else {
-                n = format_double(out + w, out_size - w, ctx ? ctx->d_out : 0.0, dec, NULL);
+                n = format_double(out + w, out_size - w, ctx ? ctx->d_out : 0.0, 6, NULL);
                 if (n > 0) w += (size_t)n;
             }
             break;
@@ -269,7 +269,7 @@ size_t geif_format_template(char *out,
                         out[w++] = sep;
                         if (w + 1 >= out_size) break;
                     }
-                    int dn = format_double(out + w, out_size - w, ctx->attr_scores[i], dec, NULL);
+                    int dn = format_double(out + w, out_size - w, ctx->attr_scores[i], 6, NULL);
                     if (dn > 0) w += (size_t)dn;
                 }
             }
@@ -328,7 +328,7 @@ size_t geif_format_template(char *out,
             if (ctx && ctx->is_summary) {
                 n = snprintf(out + w, out_size - w, "%llu", (unsigned long long)ctx->high_analyzed_rows);
             } else {
-                n = format_double(out + w, out_size - w, ctx ? ctx->H_max : 0.0, dec, NULL);
+                n = format_double(out + w, out_size - w, ctx ? ctx->H_max : 0.0, 6, NULL);
             }
             if (n > 0) w += (size_t)n;
             break;

@@ -83,9 +83,13 @@ OUT_SCORES="$TEST_DIR/scores.txt"
 run_geif_score -r "$MODEL1" -g "$RC1" -a "$DATA_CSV" -L 1 -C 5 -p "%l;score=%s;rgb=%x;dim=%m" -o "$OUT_SCORES"
 
 cat "$OUT_SCORES"
-# Check that precision formatting in %s matches DECIMALS 4 (4 decimal places)
-if ! grep -E 'score=[0-9]+\.[0-9]{4};' "$OUT_SCORES" > /dev/null; then
-    echo "ERROR: Score was not formatted with DECIMALS 4"
+# Check that %s uses standard 6 decimal places while sample values in %m match DECIMALS 4
+if ! grep -E 'score=[0-9]+\.[0-9]{6};' "$OUT_SCORES" > /dev/null; then
+    echo "ERROR: Score was not formatted with 6 decimals"
+    exit 1
+fi
+if ! grep -E 'dim=[0-9]+\.[0-9]{4}<dim>[0-9]+\.[0-9]{6}' "$OUT_SCORES" > /dev/null; then
+    echo "ERROR: Sample dimension was not formatted with DECIMALS 4"
     exit 1
 fi
 
@@ -111,12 +115,12 @@ LOW_RGB_COLOR 0x123456
 EOF
 
 OUT_OVERRIDE="$TEST_DIR/scores_override.txt"
-run_geif_score -r "$MODEL1" -g "$RC1" -g "$RC2" -a "$DATA_CSV" -L 1 -C 5 -p "%l;score=%s;rgb=%x" -o "$OUT_OVERRIDE"
+run_geif_score -r "$MODEL1" -g "$RC1" -g "$RC2" -a "$DATA_CSV" -L 1 -C 5 -p "%l;score=%s;rgb=%x;dim=%d" -o "$OUT_OVERRIDE"
 
 cat "$OUT_OVERRIDE"
-# Check that precision is 2 decimals
-if ! grep -E 'score=[0-9]+\.[0-9]{2};' "$OUT_OVERRIDE" > /dev/null; then
-    echo "ERROR: Cascaded DECIMALS 2 not applied"
+# Check that sample dimension precision is 2 decimals while score remains 6 decimals
+if ! grep -E 'score=[0-9]+\.[0-9]{6};.*dim=[0-9]+\.[0-9]{2},' "$OUT_OVERRIDE" > /dev/null; then
+    echo "ERROR: Cascaded DECIMALS 2 not applied to sample values"
     exit 1
 fi
 if ! grep -qE 'rgb=([0-9A-Fa-f]{6})' "$OUT_OVERRIDE"; then
@@ -134,11 +138,11 @@ DECIMALS 3
 EOF
 
 OUT_HOME="$TEST_DIR/scores_home.txt"
-HOME="$FAKE_HOME" run_geif_score -r "$MODEL1" -a "$DATA_CSV" -L 1 -C 5 -p "%l;score=%s;rgb=%x" -o "$OUT_HOME"
+HOME="$FAKE_HOME" run_geif_score -r "$MODEL1" -a "$DATA_CSV" -L 1 -C 5 -p "%l;score=%s;rgb=%x;dim=%d" -o "$OUT_HOME"
 
 cat "$OUT_HOME"
-if ! grep -E 'score=[0-9]+\.[0-9]{3};' "$OUT_HOME" > /dev/null; then
-    echo "ERROR: ~/.geifrc DECIMALS 3 was not automatically discovered and applied"
+if ! grep -E 'score=[0-9]+\.[0-9]{6};.*dim=[0-9]+\.[0-9]{3},' "$OUT_HOME" > /dev/null; then
+    echo "ERROR: ~/.geifrc DECIMALS 3 was not automatically discovered and applied to sample values"
     exit 1
 fi
 echo "  [PASS] ~/.geifrc successfully loaded automatically."

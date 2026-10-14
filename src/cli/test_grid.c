@@ -230,11 +230,11 @@ void geif_generate_test_grid(const geif_ensemble_t *ens,
                     for (uint32_t i = 0; i < dims; i++) {
                         fprintf(out_fp, "%.*f%c", decimals, test_dimension[i], list_sep);
                     }
-                    fprintf(out_fp, "%.*f%c%d%c%.*f%c%.*f\n",
-                            decimals, score, list_sep,
+                    fprintf(out_fp, "%.6f%c%d%c%.6f%c%.6f\n",
+                            score, list_sep,
                             is_outlier ? 1 : 0, list_sep,
-                            decimals, H_metric, list_sep,
-                            decimals, d_out);
+                            H_metric, list_sep,
+                            d_out);
                 }
             }
 
@@ -291,9 +291,9 @@ void geif_generate_test_grid(const geif_ensemble_t *ens,
                 for (uint32_t i = 0; i < dims; i++) {
                     fprintf(out_fp, "%.*f%c", decimals, sample[i], list_sep);
                 }
-                fprintf(out_fp, "%.*f%c0%c%.*f%c0.0\n",
-                        decimals, 0.0, list_sep, list_sep,
-                        decimals, f->H_max, list_sep);
+                fprintf(out_fp, "%.6f%c0%c%.6f%c0.0\n",
+                        0.0, list_sep, list_sep,
+                        f->H_max, list_sep);
             }
         }
 

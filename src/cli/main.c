@@ -402,9 +402,9 @@ static void process_scoring_row(geif_ensemble_t *ensemble,
                 fprintf(out_fp, "%s\n", out_buf);
             }
         } else if (!silent_outliers || is_outlier) {
-            fprintf(out_fp, "%s%c%.*f%c%d%c%.*f%c%.*f\n",
-                    orig_line, list_sep, decimals, score, list_sep,
-                    is_outlier ? 1 : 0, list_sep, decimals, H_metric, list_sep, decimals, d_out);
+            fprintf(out_fp, "%s%c%.6f%c%d%c%.6f%c%.6f\n",
+                    orig_line, list_sep, score, list_sep,
+                    is_outlier ? 1 : 0, list_sep, H_metric, list_sep, d_out);
         }
 
         if (averages) free(averages);

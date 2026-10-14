@@ -84,7 +84,7 @@ Input data is expected to be character-delimited ASCII/UTF-8 records (default co
 | `-p` | `TMPL` | Printf-style format template for scored anomaly rows or categorized data. In analysis mode (`-a`), only outlier rows (`score > threshold`) are printed; nominal inlier rows are suppressed. Default is `"%s %v"`. |
 | `-v` | `[TMPL]` | Print average score and other summary statistics calculated from analyzed data using format `TMPL` (default: `"%C %r %h"`). When specified without an argument, enables verbose mode. |
 | `-m` | `STRING` | Printf format for printing floating-point values for samples and sample averages (default: `"%.*f"`). |
-| `-d` | `INT` | Decimal precision for floating-point values (default: 6). Persisted in model JSON and restored automatically. |
+| `-d` | `INT` | Decimal precision for floating-point sample and average data values (default: 6; anomaly scores always use 6 decimals). Persisted in model JSON and restored automatically. |
 | `-j` | `TMPL` | Printf format for printing all single dimension attribute metrics together via directive `%m`. May contain directives `%d`, `%a`, `%e`, and `%i`. |
 | `-S` | (none) | Silent mode: suppress nominal inlier rows and emit only detected anomalies in default output mode. |
 | `-q` | (none) | Print model summary diagnostics and exit immediately. |

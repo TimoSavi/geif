@@ -49,9 +49,9 @@ echo "Test 1: Train multi-category model with -L 1 -C 5..."
 $GEIF_BIN -l "$TRAIN_CSV" -w "$MODEL_JSON" -L 1 -C 5 -t 20 -s 64 -W
 
 # Test 2: Custom templating with precision -d, RGB %x, score %s, label %l, category %c
-echo "Test 2: Test -p templating with %x (RGB), -d precision, and %s/%l/%c..."
+echo "Test 2: Test -p templating with %x (RGB), -d precision on %d, and 6-decimal %s/%l/%c..."
 SCORES_OUT="$TEST_DIR/scores_basic.txt"
-run_geif_score -r "$MODEL_JSON" -a "$TEST_CSV" -L 1 -C 5 -d 3 -p "%l;%c;%s;%x;%o" -o "$SCORES_OUT"
+run_geif_score -r "$MODEL_JSON" -a "$TEST_CSV" -L 1 -C 5 -d 3 -p "%l;%c;%s;%x;%o;%d" -o "$SCORES_OUT"
 
 cat "$SCORES_OUT"
 # Check row count
@@ -61,14 +61,23 @@ if [ "$LINE_COUNT" -ne 5 ]; then
     exit 1
 fi
 
-# Verify format of first line: inlier1;catA;<score_with_3_decimals>;<6_hex_digits>;<outlier_flag>
+# Verify format of first line: inlier1;catA;<score_with_6_decimals>;<6_hex_digits>;<outlier_flag>;<dims_with_3_decimals>
 FIRST_LINE=$(head -n 1 "$SCORES_OUT")
 echo "Checking first line: $FIRST_LINE"
-if ! echo "$FIRST_LINE" | grep -qE '^inlier1;catA;[0-9]+\.[0-9]{3};[0-9A-Fa-f]{6};[01]$'; then
+if ! echo "$FIRST_LINE" | grep -qE '^inlier1;catA;[0-9]+\.[0-9]{6};[0-9A-Fa-f]{6};[01];10\.000,20\.000,30\.000$'; then
     echo "ERROR: First line does not match expected format"
     exit 1
 fi
-echo "  [PASS] -p template with %s, %l, %c, %x, %o and -d 3 precision verified."
+
+# Verify -d 0 formats sample values as integers while keeping %s at 6 decimals
+SCORES_D0="$TEST_DIR/scores_d0.txt"
+run_geif_score -r "$MODEL_JSON" -a "$TEST_CSV" -L 1 -C 5 -d 0 -p "%l;%s;%d" -o "$SCORES_D0"
+FIRST_D0=$(head -n 1 "$SCORES_D0")
+if ! echo "$FIRST_D0" | grep -qE '^inlier1;[0-9]+\.[0-9]{6};10,20,30$'; then
+    echo "ERROR: -d 0 line does not match expected format: $FIRST_D0"
+    exit 1
+fi
+echo "  [PASS] -p template with %s (6 decimals), %l, %c, %x, %o and -d precision on %d verified."
 
 # Test 3: Dimension attribution (%e) and feature averages (%a)
 echo "Test 3: Single-dimension attribution impact (%e) and averages (%a)..."
