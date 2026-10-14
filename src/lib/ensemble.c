@@ -232,10 +232,10 @@ geif_forest_t *geif_ensemble_get_or_create(geif_ensemble_t *ens, const char *cat
     strncpy(forest->category, cat_key, sizeof(forest->category) - 1);
     forest->category[sizeof(forest->category) - 1] = '\0';
     forest->total_input_cols = ens->total_input_cols;
-    strncpy(forest->label_dims_spec, ens->label_dims_spec, sizeof(forest->label_dims_spec) - 1);
-    strncpy(forest->include_dims_spec, ens->include_dims_spec, sizeof(forest->include_dims_spec) - 1);
-    strncpy(forest->ignore_dims_spec, ens->ignore_dims_spec, sizeof(forest->ignore_dims_spec) - 1);
-    strncpy(forest->category_dims_spec, ens->category_dims_spec, sizeof(forest->category_dims_spec) - 1);
+    memcpy(forest->label_dims_spec, ens->label_dims_spec, sizeof(forest->label_dims_spec));
+    memcpy(forest->include_dims_spec, ens->include_dims_spec, sizeof(forest->include_dims_spec));
+    memcpy(forest->ignore_dims_spec, ens->ignore_dims_spec, sizeof(forest->ignore_dims_spec));
+    memcpy(forest->category_dims_spec, ens->category_dims_spec, sizeof(forest->category_dims_spec));
     forest->decimals = ens->decimals;
     forest->scale_score = ens->scale_score;
     forest->input_delimiter = ens->input_delimiter;
@@ -295,16 +295,16 @@ geif_status_t geif_ensemble_add_forest(geif_ensemble_t *ens,
     }
     if (forest->total_input_cols == 0) forest->total_input_cols = ens->total_input_cols;
     if (forest->label_dims_spec[0] == '\0') {
-        strncpy(forest->label_dims_spec, ens->label_dims_spec, sizeof(forest->label_dims_spec) - 1);
+        memcpy(forest->label_dims_spec, ens->label_dims_spec, sizeof(forest->label_dims_spec));
     }
     if (forest->include_dims_spec[0] == '\0') {
-        strncpy(forest->include_dims_spec, ens->include_dims_spec, sizeof(forest->include_dims_spec) - 1);
+        memcpy(forest->include_dims_spec, ens->include_dims_spec, sizeof(forest->include_dims_spec));
     }
     if (forest->ignore_dims_spec[0] == '\0') {
-        strncpy(forest->ignore_dims_spec, ens->ignore_dims_spec, sizeof(forest->ignore_dims_spec) - 1);
+        memcpy(forest->ignore_dims_spec, ens->ignore_dims_spec, sizeof(forest->ignore_dims_spec));
     }
     if (forest->category_dims_spec[0] == '\0') {
-        strncpy(forest->category_dims_spec, ens->category_dims_spec, sizeof(forest->category_dims_spec) - 1);
+        memcpy(forest->category_dims_spec, ens->category_dims_spec, sizeof(forest->category_dims_spec));
     }
     if (ens->decimals >= 0) forest->decimals = ens->decimals;
     forest->scale_score = ens->scale_score;

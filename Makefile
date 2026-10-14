@@ -1,12 +1,16 @@
 # GEIF - Geometric Extended Isolation Forest
 # High-performance C17 Makefile
 
-CC ?= gcc
-AR ?= ar
+ifeq ($(origin CC), default)
+CC = gcc
+endif
+ifeq ($(origin AR), default)
+AR := $(shell command -v gcc-ar >/dev/null 2>&1 && echo gcc-ar || echo ar)
+endif
 PREFIX ?= /usr/local
 
 CFLAGS ?= -std=c17 -O3 -Wall -Wextra -Wpedantic -Wstrict-prototypes -Wmissing-prototypes -D_GNU_SOURCE -MMD -MP
-OPTFLAGS = -march=native -mavx2 -flto
+OPTFLAGS = -march=native -mavx2 -flto -ffat-lto-objects
 
 INCLUDES = -Iinclude -Isrc/lib
 JSON_CFLAGS = $(shell pkg-config --cflags json-c 2>/dev/null)

@@ -610,8 +610,8 @@ static void process_categorize_row(geif_ensemble_t *ensemble,
             }
             found = &(*agg_buckets)[(*agg_count)++];
             memset(found, 0, sizeof(*found));
-            strncpy(found->category, in_cat_buf, sizeof(found->category) - 1);
-            strncpy(found->label, in_label_buf, sizeof(found->label) - 1);
+            memcpy(found->category, in_cat_buf, sizeof(found->category));
+            memcpy(found->label, in_label_buf, sizeof(found->label));
             found->summary = (double *)xcalloc(dims, sizeof(double));
         }
         for (uint32_t j = 0; j < dims; j++) {
@@ -941,7 +941,7 @@ int main(int argc, char *argv[])
     }
     if (!cli_outlier_score_given && rc_cfg.outlier_score_set) {
         cli_outlier_score_given = true;
-        strncpy(cli_outlier_score_spec, rc_cfg.outlier_score_spec, sizeof(cli_outlier_score_spec) - 1);
+        memcpy(cli_outlier_score_spec, rc_cfg.outlier_score_spec, sizeof(cli_outlier_score_spec));
         if (strcmp(rc_cfg.outlier_score_spec, "average") == 0) {
             threshold_is_average = true;
             threshold_is_percentage = false;
@@ -986,7 +986,7 @@ int main(int argc, char *argv[])
             if (ensemble->entries[i].forest) ensemble->entries[i].forest->scale_score = true;
         }
         if (cli_outlier_score_given) {
-            strncpy(ensemble->outlier_score_spec, cli_outlier_score_spec, sizeof(ensemble->outlier_score_spec) - 1);
+            memcpy(ensemble->outlier_score_spec, cli_outlier_score_spec, sizeof(ensemble->outlier_score_spec));
         } else if (ensemble->outlier_score_spec[0] != '\0') {
             if (strcmp(ensemble->outlier_score_spec, "average") == 0) {
                 threshold_is_average = true;
@@ -1275,12 +1275,20 @@ int main(int argc, char *argv[])
             }
         }
         if (cli_outlier_score_given) {
-            strncpy(ensemble->outlier_score_spec, cli_outlier_score_spec, sizeof(ensemble->outlier_score_spec) - 1);
+            memcpy(ensemble->outlier_score_spec, cli_outlier_score_spec, sizeof(ensemble->outlier_score_spec));
         }
-        if (active_ignore) strncpy(ensemble->ignore_dims_spec, active_ignore, sizeof(ensemble->ignore_dims_spec) - 1);
-        if (active_include) strncpy(ensemble->include_dims_spec, active_include, sizeof(ensemble->include_dims_spec) - 1);
-        if (active_label) strncpy(ensemble->label_dims_spec, active_label, sizeof(ensemble->label_dims_spec) - 1);
-        if (active_category) strncpy(ensemble->category_dims_spec, active_category, sizeof(ensemble->category_dims_spec) - 1);
+        if (active_ignore && active_ignore != ensemble->ignore_dims_spec) {
+            snprintf(ensemble->ignore_dims_spec, sizeof(ensemble->ignore_dims_spec), "%s", active_ignore);
+        }
+        if (active_include && active_include != ensemble->include_dims_spec) {
+            snprintf(ensemble->include_dims_spec, sizeof(ensemble->include_dims_spec), "%s", active_include);
+        }
+        if (active_label && active_label != ensemble->label_dims_spec) {
+            snprintf(ensemble->label_dims_spec, sizeof(ensemble->label_dims_spec), "%s", active_label);
+        }
+        if (active_category && active_category != ensemble->category_dims_spec) {
+            snprintf(ensemble->category_dims_spec, sizeof(ensemble->category_dims_spec), "%s", active_category);
+        }
 
         FILE *learn_out_fp = stdout;
         bool close_learn_out_fp = false;
@@ -1480,7 +1488,8 @@ int main(int argc, char *argv[])
         }
 
         if (cli_outlier_score_given) {
-            strncpy(ensemble->outlier_score_spec, cli_outlier_score_spec, sizeof(ensemble->outlier_score_spec) - 1);
+            memcpy(ensemble->outlier_score_spec, cli_outlier_score_spec, sizeof(ensemble->outlier_score_spec));
+            ensemble->outlier_score_spec[sizeof(ensemble->outlier_score_spec) - 1] = '\0';
         }
 
         if (verbose) {
