@@ -326,10 +326,10 @@ $$
 \text{dist}_{\text{scaled}}(x_i, x_j) = \sqrt{\sum_{d=1}^D \left(\frac{x_{i,d} - x_{j,d}}{\text{span}_d}\right)^2}
 $$
 
-2. The $K = 5$ nearest neighbors to $x_i$ are identified:
+2. The $K = 5$ nearest *distinct non-zero* neighbor distance shells to $x_i$ are identified (skipping coincident duplicates where $\text{dist}_{\text{scaled}}(x_i, x_j) = 0$ and deduplicating identical distance shells so discrete/integer datasets do not collapse $\sigma_i$ to zero):
 
 $$
-d_{(1)}(x_i) \le d_{(2)}(x_i) \le \ldots \le d_{(K)}(x_i)
+0 < d_{(1)}(x_i) < d_{(2)}(x_i) < \ldots < d_{(K)}(x_i)
 $$
 
 3. The raw adaptive bandwidth $\sigma_i$ is the arithmetic mean of these $K$-NN distances:
@@ -362,21 +362,22 @@ $$
 
 preserving local multi-scale resolution while bounding maximum dispersion.
 
-#### Pillar 3: Pilot Density Credibility Weighting ($w_i$)
-To prevent solitary noise samples or stray outliers in the training data from creating false inlier islands ("noise bubbles"), each exemplar is assigned an objective credibility weight $w_i \in (0, 1]$:
+#### Pillar 3: Pilot Density Credibility & Multiplicity Weighting ($w_i$)
+To prevent solitary noise samples or stray outliers in the training data from creating false inlier islands ("noise bubbles")—and to prevent exact duplicate pileups in discrete or integer datasets from dominating $D_{\max}$—each exemplar is assigned an objective credibility weight $w_i \in (0, 1]$:
 1. The excess dispersion $\text{excess}_i$ of exemplar $x_i$ beyond the global median spacing is computed:
 
 $$
 \text{excess}_i = \max\left(0, \sigma_i - \sigma_{\text{med}}\right)
 $$
 
-2. The credibility weight $w_i$ is assigned via quadratic Cauchy damping:
+2. Let $m_i \ge 1$ denote the coincidence multiplicity of $x_i$ (the number of reservoir samples at the identical coordinate $\text{dist}_{\text{scaled}}(x_i, x_j) \le 10^{-9}$). The credibility weight $w_i$ combines sublinear multiplicity attenuation ($1/\sqrt{m_i}$) with quadratic Cauchy damping:
 
 $$
-w_i = \frac{1}{1 + \left(\frac{\text{excess}_i}{\sigma_{\text{med}}}\right)^2}
+w_i = \frac{1}{\sqrt{m_i} \left(1 + \left(\frac{\text{excess}_i}{\sigma_{\text{med}}}\right)^2\right)}
 $$
 
-- If exemplar $x_i$ resides in a dense or nominal region ($\sigma_i \le \sigma_{\text{med}}$), then $\text{excess}_i = 0$ and $w_i = 1.0$ (full credibility).
+- For continuous data without exact duplicates ($m_i = 1$) in a nominal region ($\sigma_i \le \sigma_{\text{med}}$), $\text{excess}_i = 0$ and $w_i = 1.0$.
+- For discrete or quantized data where $m_i$ identical samples coincide at the same value, their combined kernel contribution scales sublinearly as $m_i \cdot (1/\sqrt{m_i}) = \sqrt{m_i}$, preventing mode pileups from dwarfing secondary clusters.
 - If exemplar $x_i$ is an isolated peripheral sample ($\sigma_i > \sigma_{\text{med}}$), its credibility weight $w_i$ decays rapidly toward zero, preventing solitary anomalies from distorting the density landscape.
 
 #### Pillar 4: Smooth Continuous Cauchy Kernel Pooling ($D(x)$)
@@ -431,13 +432,21 @@ $$
 This drops the post-boundary elbow from $0.80$ down to $\approx 0.60$, matching CEIF's gradual outer transition profile.
 
 2. **Asymptotic Outer Stadium Decay**:
-For query points that lie outside the training data bounding box between $x_{\min}$ and $x_{\max}$, the normalized outer Euclidean distance $d_{\text{norm}}(x)$ is evaluated:
+For query points outside the core cluster envelope, Exemplar combines the bounding-box Euclidean distance $d_{\text{out}}(x)$ with the intrinsic Cauchy effective outer radius $d_{\text{cauchy}}(x)$ beyond the boundary knee density $D_{\text{knee}}$:
 
 $$
-d_{\text{norm}}(x) = \frac{d_{\text{out}}(x)}{\text{span}_{\text{target}}} = \sqrt{\sum_{j=1}^D \left(\frac{\max(0, x_{\min,j} - x_j, x_j - x_{\max,j})}{\text{span}_j}\right)^2}
+D_{\text{knee}} = D_{\max} \left(1 - s_{\text{knee}}\right)^2
 $$
 
-If $d_{\text{out}}(x) > 0$, $C^1$-continuous asymptotic exponential stadium attenuation is applied:
+$$
+d_{\text{cauchy}}(x) = \max\left(0, \, \sigma_{\text{med}} \left(\sqrt{\frac{1}{D(x)} - 1} - \sqrt{\frac{1}{D_{\text{knee}}} - 1}\right)\right)
+$$
+
+$$
+d_{\text{norm}}(x) = \frac{\max\left(d_{\text{out}}(x), \, d_{\text{cauchy}}(x)\right)}{\text{span}_{\text{target}}}
+$$
+
+When $d_{\text{norm}}(x) > 0$, $C^1$-continuous asymptotic exponential stadium attenuation is applied:
 
 $$
 d_{\text{eff}}(x) = \frac{d_{\text{norm}}^2(x)}{d_{\text{norm}}(x) + 0.15}
@@ -447,7 +456,7 @@ $$
 s(x) = 1.0 - (1.0 - s_{\text{base}}(x)) \exp\left(-\lambda_{\text{out}} \, d_{\text{eff}}(x)\right)
 $$
 
-where $\lambda_{\text{out}} = 0.10$ (`GEIF_OUTER_DECAY_RATE`). This guarantees $C^1$ slope continuity at the bounding box edge ($d_{\text{norm}} = 0$) and smooth, strictly monotonic asymptotic convergence from $\approx 0.60$ toward $1.0$ as a query point recedes into outer space.
+where $\lambda_{\text{out}} = 0.50$ (`GEIF_OUTER_DECAY_RATE`). Combining $d_{\text{out}}(x)$ and $d_{\text{cauchy}}(x)$ guarantees that even if a solitary extreme training outlier stretches $x_{\max}$ or $x_{\min}$, the outer decay still activates smoothly past the true high-credibility cluster boundary.
 
 ---
 

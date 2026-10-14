@@ -145,9 +145,11 @@ static geif_status_t geif_exemplar_train(geif_forest_t *f)
     uint32_t d = f->dimensions;
     double *raw_d_k = (double *)malloc(n * sizeof(double));
     double *sorted_d_k = (double *)malloc(n * sizeof(double));
-    if (!raw_d_k || !sorted_d_k) {
+    size_t *mult = (size_t *)malloc(n * sizeof(size_t));
+    if (!raw_d_k || !sorted_d_k || !mult) {
         if (raw_d_k) free(raw_d_k);
         if (sorted_d_k) free(sorted_d_k);
+        if (mult) free(mult);
         if (st->bandwidths) free(st->bandwidths);
         if (st->inv_bandwidths_sq) free(st->inv_bandwidths_sq);
         if (st->weights) free(st->weights);
@@ -163,17 +165,30 @@ static geif_status_t geif_exemplar_train(geif_forest_t *f)
     if (n <= 1) {
         raw_d_k[0] = (f->avg_sample_dist > 1e-6) ? f->avg_sample_dist : 1.0;
         sorted_d_k[0] = raw_d_k[0];
+        mult[0] = 1;
     } else {
         double best_dist_sq[EXEMPLAR_K];
         for (size_t i = 0; i < n; i++) {
             const double *si = &scaled_pool[i * d];
             for (size_t k = 0; k < k_nn; k++) best_dist_sq[k] = 1e300;
+            size_t m_cnt = 0;
 
             for (size_t j = 0; j < n; j++) {
-                if (i == j) continue;
                 const double *sj = &scaled_pool[j * d];
                 double dsq = geif_dist_sq(si, sj, d);
-                if (dsq < best_dist_sq[k_nn - 1]) {
+                if (dsq <= 1e-18) {
+                    m_cnt++;
+                    continue;
+                }
+                int is_dup_dist = 0;
+                for (size_t m = 0; m < k_nn; m++) {
+                    if (best_dist_sq[m] < 1e299 &&
+                        fabs(dsq - best_dist_sq[m]) <= 1e-12 * (1.0 + dsq)) {
+                        is_dup_dist = 1;
+                        break;
+                    }
+                }
+                if (!is_dup_dist && dsq < best_dist_sq[k_nn - 1]) {
                     best_dist_sq[k_nn - 1] = dsq;
                     for (size_t m = k_nn - 1; m > 0; m--) {
                         if (best_dist_sq[m] < best_dist_sq[m - 1]) {
@@ -184,6 +199,7 @@ static geif_status_t geif_exemplar_train(geif_forest_t *f)
                     }
                 }
             }
+            mult[i] = (m_cnt > 0) ? m_cnt : 1;
 
             double sum_d = 0.0;
             size_t valid_k = 0;
@@ -213,6 +229,8 @@ static geif_status_t geif_exemplar_train(geif_forest_t *f)
     free(sorted_d_k);
 
     // Pillar 1: Clamped Bandwidth & Pillar 2: Pilot Credibility Weighting
+    // Sublinear multiplicity attenuation (1/sqrt(m_i)) prevents discrete duplicate
+    // pileups from dominating D_max while preserving continuous density gradients.
     double min_sigma = 0.5 * sigma_med;
     double max_sigma = 1.5 * sigma_med;
     double weight_sum = 0.0;
@@ -229,11 +247,12 @@ static geif_status_t geif_exemplar_train(geif_forest_t *f)
 
         double excess = (d_k_val > sigma_med) ? (d_k_val - sigma_med) : 0.0;
         double ratio = excess / sigma_med;
-        double w = 1.0 / (1.0 + ratio * ratio);
+        double w = (1.0 / sqrt((double)mult[i])) / (1.0 + ratio * ratio);
         st->weights[i] = w;
         weight_sum += w;
     }
     free(raw_d_k);
+    free(mult);
 
     if (weight_sum < 1e-12) weight_sum = 1.0;
     st->weight_sum = weight_sum;
@@ -374,9 +393,21 @@ static geif_status_t geif_exemplar_score(const geif_forest_t *f,
     double diff = raw_score - tail_score;
     double score = 0.5 * (raw_score + tail_score - sqrt(diff * diff + knee_eps * knee_eps));
 
-    // Pillar 4: Asymptotic Outer Stadium Decay (with C1-smooth onset at envelope boundary)
-    if (d_out > 0.0) {
-        double d_norm = (target_range > 1e-12) ? (d_out / target_range) : d_out;
+    // Pillar 4: Asymptotic Outer Stadium Decay (with C1-smooth onset at envelope boundary
+    // and intrinsic Cauchy effective radius fallback when isolated outliers stretch envelope_max)
+    double d_cauchy = 0.0;
+    double d_knee = max_core * (1.0 - s_knee) * (1.0 - s_knee);
+    if (D < d_knee && d_knee < 1.0 && st->sigma_median > 1e-12) {
+        double d_clamped = (D > 1e-15) ? D : 1e-15;
+        double r_eff = st->sigma_median * sqrt(1.0 / d_clamped - 1.0);
+        double r_knee = st->sigma_median * sqrt(1.0 / d_knee - 1.0);
+        if (r_eff > r_knee) {
+            d_cauchy = r_eff - r_knee;
+        }
+    }
+    double d_outer = (d_out > d_cauchy) ? d_out : d_cauchy;
+    if (d_outer > 0.0) {
+        double d_norm = (target_range > 1e-12) ? (d_outer / target_range) : d_outer;
         double d_eff = (d_norm * d_norm) / (d_norm + 0.15);
         score = 1.0 - (1.0 - score) * exp(-GEIF_OUTER_DECAY_RATE * d_eff);
     }
