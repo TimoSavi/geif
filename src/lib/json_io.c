@@ -86,6 +86,7 @@ struct json_object *geif_forest_to_json_object(const geif_forest_t *f)
     json_object_object_add(root, "input_separator", json_object_new_string(f_sep));
     json_object_object_add(root, "list_separator", json_object_new_string(l_sep));
     json_object_object_add(root, "has_header", json_object_new_boolean(f->has_header));
+    json_object_object_add(root, "aggregate", json_object_new_boolean(f->aggregate));
 
     // Globals object for CEIF format compatibility
     struct json_object *globals = json_object_new_object();
@@ -97,6 +98,7 @@ struct json_object *geif_forest_to_json_object(const geif_forest_t *f)
     json_object_object_add(globals, "inputSeparator", json_object_new_string(f_sep));
     json_object_object_add(globals, "listSeparator", json_object_new_string(l_sep));
     json_object_object_add(globals, "header", json_object_new_int(f->has_header ? 1 : 0));
+    json_object_object_add(globals, "aggregate", json_object_new_int(f->aggregate ? 1 : 0));
     json_object_object_add(root, "globals", globals);
 
     // Save sample pool with clean decimal precision
@@ -220,6 +222,9 @@ geif_status_t geif_forest_from_json_object(geif_forest_t **forest_out, struct js
         if (json_object_object_get_ex(globals, "header", &j_val)) {
             f->has_header = json_object_get_boolean(j_val);
         }
+        if (json_object_object_get_ex(globals, "aggregate", &j_val)) {
+            f->aggregate = json_object_get_boolean(j_val);
+        }
     }
 
     if (json_object_object_get_ex(root, "input_separator", &j_val) ||
@@ -235,6 +240,9 @@ geif_status_t geif_forest_from_json_object(geif_forest_t **forest_out, struct js
     if (json_object_object_get_ex(root, "has_header", &j_val) ||
         json_object_object_get_ex(root, "header", &j_val)) {
         f->has_header = json_object_get_boolean(j_val);
+    }
+    if (json_object_object_get_ex(root, "aggregate", &j_val)) {
+        f->aggregate = json_object_get_boolean(j_val);
     }
 
     if (json_object_object_get_ex(root, "decimals", &j_val)) {
@@ -337,6 +345,7 @@ geif_status_t geif_ensemble_save_json(const geif_ensemble_t *ens, const char *pa
     json_object_object_add(root, "input_separator", json_object_new_string(sep_str));
     json_object_object_add(root, "list_separator", json_object_new_string(list_sep_str));
     json_object_object_add(root, "has_header", json_object_new_boolean(ens->has_header));
+    json_object_object_add(root, "aggregate", json_object_new_boolean(ens->aggregate));
 
     // Globals object for CEIF compatibility
     struct json_object *globals = json_object_new_object();
@@ -349,6 +358,7 @@ geif_status_t geif_ensemble_save_json(const geif_ensemble_t *ens, const char *pa
     json_object_object_add(globals, "inputSeparator", json_object_new_string(sep_str));
     json_object_object_add(globals, "listSeparator", json_object_new_string(list_sep_str));
     json_object_object_add(globals, "header", json_object_new_int(ens->has_header ? 1 : 0));
+    json_object_object_add(globals, "aggregate", json_object_new_int(ens->aggregate ? 1 : 0));
     json_object_object_add(root, "globals", globals);
 
     // Save sub-forests array
@@ -522,6 +532,9 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
         if (json_object_object_get_ex(globals, "header", &j_val)) {
             ens->has_header = json_object_get_boolean(j_val);
         }
+        if (json_object_object_get_ex(globals, "aggregate", &j_val)) {
+            ens->aggregate = json_object_get_boolean(j_val);
+        }
     }
 
     if (json_object_object_get_ex(root, "input_separator", &j_val) ||
@@ -538,6 +551,9 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
         json_object_object_get_ex(root, "header", &j_val)) {
         ens->has_header = json_object_get_boolean(j_val);
     }
+    if (json_object_object_get_ex(root, "aggregate", &j_val)) {
+        ens->aggregate = json_object_get_boolean(j_val);
+    }
 
     if (json_object_object_get_ex(root, "decimals", &j_val)) {
         ens->decimals = json_object_get_int(j_val);
@@ -551,12 +567,12 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
             struct json_object *j_samples = NULL;
             if (geif_forest_from_json_object(&sub, jf) == GEIF_OK && sub) {
                 // Native GEIF format
-                if (ens->decimals > 0 && sub->decimals <= 0) sub->decimals = ens->decimals;
+                if (ens->decimals >= 0) sub->decimals = ens->decimals;
             } else if (json_object_object_get_ex(jf, "samples", &j_samples)) {
                 // CEIF format sub-forest with raw samples
                 geif_status_t fstat = geif_forest_create(&sub, dimensions, &cfg);
                 if (fstat == GEIF_OK && sub) {
-                    if (ens->decimals > 0) sub->decimals = ens->decimals;
+                    if (ens->decimals >= 0) sub->decimals = ens->decimals;
                     if (json_object_object_get_ex(jf, "category", &j_val)) {
                         strncpy(sub->category, json_object_get_string(j_val), sizeof(sub->category) - 1);
                     }
@@ -576,6 +592,8 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
                     if (json_object_object_get_ex(jf, "extraRows", &j_val)) {
                         sub->total_rows_seen += (uint64_t)json_object_get_int64(j_val);
                     }
+                    sub->aggregate = ens->aggregate;
+                    sub->summary_slot = -1;
                 }
             }
 
@@ -612,6 +630,9 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
     if (!ens->has_header && ens->count > 0 && ens->entries[0].forest && ens->entries[0].forest->has_header) {
         ens->has_header = ens->entries[0].forest->has_header;
     }
+    if (!ens->aggregate && ens->count > 0 && ens->entries[0].forest && ens->entries[0].forest->aggregate) {
+        ens->aggregate = ens->entries[0].forest->aggregate;
+    }
 
     for (size_t i = 0; i < ens->count; i++) {
         if (ens->entries[i].forest) {
@@ -619,6 +640,8 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
             ens->entries[i].forest->input_delimiter = ens->input_delimiter;
             ens->entries[i].forest->list_separator = ens->list_separator;
             ens->entries[i].forest->has_header = ens->has_header;
+            ens->entries[i].forest->aggregate = ens->aggregate;
+            ens->entries[i].forest->summary_slot = -1;
         }
     }
 

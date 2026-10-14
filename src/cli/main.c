@@ -68,7 +68,7 @@ static void print_usage(const char *prog)
     printf("  -d <int>       Floating point decimal precision (default: 6)\n");
     printf("  -j <tmpl>      Per-dimension expansion template for %%m (%%d=val, %%a=avg, %%e=attrib, %%i=index)\n");
     printf("  -W             Enable metric auto-scaling (accepted for backward compatibility)\n");
-    printf("  -A             Aggregate ensemble processing (accepted for backward compatibility)\n");
+    printf("  -A, --aggregate Aggregate sample values by category rather than storing/scoring raw rows\n");
     printf("  -S             Silent / outliers only (suppress inliers from output)\n");
     printf("  -q             Print model summary / diagnostics and exit\n");
     printf("  -h             Show this help message and exit\n");
@@ -266,6 +266,7 @@ static void process_scoring_row(geif_ensemble_t *ensemble,
         (*total_outliers)++;
 
         if (new_cat_tmpl) {
+            bool has_vec = geif_extract_features(col_cfg, tokens, n_tok, vec);
             geif_template_context_t ctx = {
                 .orig_line        = orig_line,
                 .label            = label_buf,
@@ -282,10 +283,10 @@ static void process_scoring_row(geif_ensemble_t *ensemble,
                 .analyzed_rows    = *analyzed,
                 .high_analyzed_rows = 1,
                 .row_idx          = line_num,
-                .vector           = NULL,
+                .vector           = has_vec ? vec : NULL,
                 .averages         = NULL,
                 .attr_scores      = NULL,
-                .vector_dim       = 0,
+                .vector_dim       = has_vec ? dims : 0,
                 .raw_values       = tokens,
                 .raw_value_count  = n_tok,
                 .list_separator   = list_sep,
@@ -309,8 +310,22 @@ static void process_scoring_row(geif_ensemble_t *ensemble,
         return;
     }
 
-    // Known category: extract features and score
+    // Known category: extract features and score (or accumulate if aggregate mode -A)
     if (geif_extract_features(col_cfg, tokens, n_tok, vec)) {
+        if (ensemble->aggregate) {
+            geif_category_entry_t *matched_entry = geif_ensemble_get_entry(ensemble, cat_buf);
+            if (matched_entry) {
+                matched_entry->seen_in_analysis = true;
+                if (!matched_entry->summary) {
+                    matched_entry->summary = (double *)xcalloc(dims, sizeof(double));
+                }
+                for (uint32_t j = 0; j < dims; j++) {
+                    matched_entry->summary[j] += vec[j];
+                }
+            }
+            return;
+        }
+
         double score = 0.0, H_metric = 0.0, d_out = 0.0;
         geif_ensemble_score_detailed(ensemble, cat_buf, vec, &score, &H_metric, &d_out);
 
@@ -397,84 +412,38 @@ static void process_scoring_row(geif_ensemble_t *ensemble,
     }
 }
 
-/**
- * @brief Classifies an unassigned input sample against all ensemble categories (-c).
- *
- * Scores the sample across all trained category sub-forests permitted by category filters,
- * selects the category yielding the minimum anomaly score (closest geometric fit),
- * checks outlier threshold limits, and outputs the assigned classification.
- *
- * @param[in,out] ensemble                 Category ensemble model.
- * @param[in]     col_cfg                  Column mapping configuration.
- * @param[in]     direct_feature_mapping   True if input has no label/category columns (features only).
- * @param[in]     cat_filter               Active category filter rules (-F).
- * @param[in]     tokens                   Parsed text fields of current row.
- * @param[in]     n_tok                    Token count.
- * @param[in]     orig_line                Original unparsed text line.
- * @param[in]     line_num                 1-based row counter.
- * @param[in]     list_sep                 Output list separator character (-e).
- * @param[in]     cat_sep                  Category delimiter character (-C).
- * @param[in]     label_sep                Label delimiter character.
- * @param[in]     threshold                Outlier threshold limit [0, 1].
- * @param[in]     threshold_is_average     True if threshold is calibrated to category mean score.
- * @param[in]     threshold_is_percentage  True if threshold is percentile-based.
- * @param[in]     score_limit_given        True if -O outlier threshold was specified on CLI.
- * @param[in]     point_tmpl               Output format template (-p).
- * @param[in]     decimals                 Floating point precision (-d).
- * @param[in]     printf_format            Dimension format override string (-m).
- * @param[in]     print_dimension          Per-dimension template expansion (-j).
- * @param[in]     low_rgb                  Low-score RGB color hex.
- * @param[in]     high_rgb                 High-score RGB color hex.
- * @param[in,out] vec                      Scratch buffer for feature vector.
- * @param[in]     dims                     Number of feature dimensions.
- * @param[in,out] out_fp                   Output file stream.
- * @param[in,out] analyzed                 Cumulative analyzed rows counter.
- */
-static void process_categorize_row(geif_ensemble_t *ensemble,
-                                   const geif_column_config_t *col_cfg,
-                                   bool direct_feature_mapping,
-                                   const cat_filter_t *cat_filter,
-                                   char **tokens,
-                                   uint32_t n_tok,
-                                   const char *orig_line,
-                                   uint64_t line_num,
-                                   char list_sep,
-                                   char cat_sep,
-                                   char label_sep,
-                                   double threshold,
-                                   bool threshold_is_average,
-                                   bool threshold_is_percentage,
-                                   bool score_limit_given,
-                                   const char *point_tmpl,
-                                   int decimals,
-                                   const char *printf_format,
-                                   const char *print_dimension,
-                                   uint32_t low_rgb,
-                                   uint32_t high_rgb,
-                                   double *vec,
-                                   uint32_t dims,
-                                   FILE *out_fp,
-                                   uint64_t *analyzed)
+typedef struct {
+    char category[256];
+    char label[256];
+    double *summary;
+} agg_cat_bucket_t;
+
+static void score_and_print_categorize_vec(geif_ensemble_t *ensemble,
+                                           const cat_filter_t *cat_filter,
+                                           const char *in_cat,
+                                           const char *in_label,
+                                           const char *orig_line,
+                                           char **tokens,
+                                           uint32_t n_tok,
+                                           uint64_t line_num,
+                                           char list_sep,
+                                           char cat_sep,
+                                           char label_sep,
+                                           double threshold,
+                                           bool threshold_is_average,
+                                           bool threshold_is_percentage,
+                                           bool score_limit_given,
+                                           const char *point_tmpl,
+                                           int decimals,
+                                           const char *printf_format,
+                                           const char *print_dimension,
+                                           uint32_t low_rgb,
+                                           uint32_t high_rgb,
+                                           const double *vec,
+                                           uint32_t dims,
+                                           FILE *out_fp,
+                                           uint64_t *analyzed)
 {
-    if (direct_feature_mapping) {
-        for (uint32_t i = 0; i < dims && i < n_tok; i++) {
-            char *endptr;
-            double val = strtod(tokens[i], &endptr);
-            vec[i] = (isnan(val) || isinf(val) || endptr == tokens[i]) ? 0.0 : val;
-        }
-    } else {
-        if (!geif_extract_features(col_cfg, tokens, n_tok, vec)) {
-            return;
-        }
-    }
-
-    char in_label_buf[256] = {0};
-    char in_cat_buf[256] = {0};
-    if (!direct_feature_mapping && col_cfg) {
-        geif_extract_label(col_cfg, tokens, n_tok, label_sep, in_label_buf, sizeof(in_label_buf));
-        geif_extract_category(col_cfg, tokens, n_tok, cat_sep, in_cat_buf, sizeof(in_cat_buf));
-    }
-
     double min_score = 999.0;
     int best_idx = -1;
     double best_metric_depth = 0.0;
@@ -534,9 +503,9 @@ static void process_categorize_row(geif_ensemble_t *ensemble,
 
     geif_template_context_t ctx = {
         .orig_line        = orig_line,
-        .label            = in_label_buf,
+        .label            = in_label,
         .category         = best_cat,
-        .input_category   = in_cat_buf,
+        .input_category   = in_cat,
         .score            = min_score,
         .test_average_score = min_score,
         .metric_depth     = best_metric_depth,
@@ -572,6 +541,92 @@ static void process_categorize_row(geif_ensemble_t *ensemble,
 
     if (averages) free(averages);
     if (attr_scores) free(attr_scores);
+}
+
+/**
+ * @brief Classifies an unassigned input sample against all ensemble categories (-c).
+ */
+static void process_categorize_row(geif_ensemble_t *ensemble,
+                                   const geif_column_config_t *col_cfg,
+                                   bool direct_feature_mapping,
+                                   const cat_filter_t *cat_filter,
+                                   char **tokens,
+                                   uint32_t n_tok,
+                                   const char *orig_line,
+                                   uint64_t line_num,
+                                   char list_sep,
+                                   char cat_sep,
+                                   char label_sep,
+                                   double threshold,
+                                   bool threshold_is_average,
+                                   bool threshold_is_percentage,
+                                   bool score_limit_given,
+                                   const char *point_tmpl,
+                                   int decimals,
+                                   const char *printf_format,
+                                   const char *print_dimension,
+                                   uint32_t low_rgb,
+                                   uint32_t high_rgb,
+                                   double *vec,
+                                   uint32_t dims,
+                                   FILE *out_fp,
+                                   uint64_t *analyzed,
+                                   agg_cat_bucket_t **agg_buckets,
+                                   size_t *agg_count,
+                                   size_t *agg_cap)
+{
+    if (direct_feature_mapping) {
+        for (uint32_t i = 0; i < dims && i < n_tok; i++) {
+            char *endptr;
+            double val = strtod(tokens[i], &endptr);
+            vec[i] = (isnan(val) || isinf(val) || endptr == tokens[i]) ? 0.0 : val;
+        }
+    } else {
+        if (!geif_extract_features(col_cfg, tokens, n_tok, vec)) {
+            return;
+        }
+    }
+
+    char in_label_buf[256] = {0};
+    char in_cat_buf[256] = {0};
+    if (!direct_feature_mapping && col_cfg) {
+        geif_extract_label(col_cfg, tokens, n_tok, label_sep, in_label_buf, sizeof(in_label_buf));
+        geif_extract_category(col_cfg, tokens, n_tok, cat_sep, in_cat_buf, sizeof(in_cat_buf));
+    }
+
+    if (ensemble->aggregate && agg_buckets && agg_count && agg_cap) {
+        agg_cat_bucket_t *found = NULL;
+        for (size_t i = 0; i < *agg_count; i++) {
+            if (strcmp((*agg_buckets)[i].category, in_cat_buf) == 0) {
+                found = &(*agg_buckets)[i];
+                break;
+            }
+        }
+        if (!found) {
+            if (*agg_count >= *agg_cap) {
+                size_t new_cap = (*agg_cap == 0) ? 16 : (*agg_cap * 2);
+                *agg_buckets = (agg_cat_bucket_t *)xrealloc(*agg_buckets, new_cap * sizeof(agg_cat_bucket_t));
+                *agg_cap = new_cap;
+            }
+            found = &(*agg_buckets)[(*agg_count)++];
+            memset(found, 0, sizeof(*found));
+            strncpy(found->category, in_cat_buf, sizeof(found->category) - 1);
+            strncpy(found->label, in_label_buf, sizeof(found->label) - 1);
+            found->summary = (double *)xcalloc(dims, sizeof(double));
+        }
+        for (uint32_t j = 0; j < dims; j++) {
+            found->summary[j] += vec[j];
+        }
+        return;
+    }
+
+    score_and_print_categorize_vec(ensemble, cat_filter, in_cat_buf, in_label_buf,
+                                   orig_line, tokens, n_tok, line_num,
+                                   list_sep, cat_sep, label_sep, threshold,
+                                   threshold_is_average, threshold_is_percentage,
+                                   score_limit_given, point_tmpl, decimals,
+                                   printf_format, print_dimension, low_rgb, high_rgb,
+                                   vec, dims, out_fp, analyzed);
 }
 
 /**
@@ -640,6 +695,8 @@ int main(int argc, char *argv[])
     bool list_sep_explicit   = false;
     bool skip_header         = false;
     bool header_explicit     = false;
+    bool aggregate           = false;
+    bool aggregate_explicit  = false;
     double threshold         = 0.5;
     bool threshold_is_average = false;
     bool threshold_is_percentage = false;
@@ -689,6 +746,7 @@ int main(int argc, char *argv[])
         {"new",          optional_argument, 0, 'N'},
         {"header",       no_argument,       0, 'H'},
         {"no-header",    no_argument,       0, 1001},
+        {"aggregate",    no_argument,       0, 'A'},
         {"help",         no_argument,       0, 'h'},
         {"version",      no_argument,       0, 'v'},
         {0, 0, 0, 0}
@@ -835,7 +893,8 @@ int main(int argc, char *argv[])
             // Geometric auto-scaling (enabled by default in GEIF, accepted for CEIF compatibility)
             break;
         case 'A':
-            // Ensemble aggregate processing (accepted for CEIF compatibility)
+            aggregate = true;
+            aggregate_explicit = true;
             break;
         case 'q': query_mode = true; break;
         case 'v':
@@ -984,7 +1043,7 @@ int main(int argc, char *argv[])
             for (size_t i = 0; i < ensemble->count; i++) {
                 if (ensemble->entries[i].forest) ensemble->entries[i].forest->decimals = decimals;
             }
-        } else if (ensemble->decimals > 0) {
+        } else if (ensemble->decimals >= 0) {
             decimals = ensemble->decimals;
         }
 
@@ -1010,6 +1069,14 @@ int main(int argc, char *argv[])
             ensemble->has_header = skip_header;
             for (size_t i = 0; i < ensemble->count; i++) {
                 if (ensemble->entries[i].forest) ensemble->entries[i].forest->has_header = skip_header;
+            }
+        }
+        if (!aggregate_explicit) {
+            aggregate = ensemble->aggregate;
+        } else {
+            ensemble->aggregate = aggregate;
+            for (size_t i = 0; i < ensemble->count; i++) {
+                if (ensemble->entries[i].forest) ensemble->entries[i].forest->aggregate = aggregate;
             }
         }
     }
@@ -1068,12 +1135,14 @@ int main(int argc, char *argv[])
             ensemble->input_delimiter = delimiter;
             ensemble->list_separator = list_separator;
             ensemble->has_header = skip_header;
+            ensemble->aggregate = aggregate;
             for (size_t i = 0; i < ensemble->count; i++) {
                 if (ensemble->entries[i].forest) {
                     ensemble->entries[i].forest->decimals = decimals;
                     ensemble->entries[i].forest->input_delimiter = delimiter;
                     ensemble->entries[i].forest->list_separator = list_separator;
                     ensemble->entries[i].forest->has_header = skip_header;
+                    ensemble->entries[i].forest->aggregate = aggregate;
                 }
             }
             geif_status_t status = geif_ensemble_save_json(ensemble, save_file);
@@ -1191,13 +1260,20 @@ int main(int argc, char *argv[])
             return 1;
         }
 
-        // Save column metadata into ensemble
+        // Save column metadata and aggregate flag into ensemble
         ensemble->total_input_cols = total_cols;
         ensemble->decimals = decimals;
         ensemble->scale_score = true;
         ensemble->input_delimiter = delimiter;
         ensemble->list_separator = list_separator;
         ensemble->has_header = skip_header;
+        ensemble->aggregate = aggregate;
+        for (size_t i = 0; i < ensemble->count; i++) {
+            if (ensemble->entries[i].forest) {
+                ensemble->entries[i].forest->aggregate = aggregate;
+                ensemble->entries[i].forest->summary_slot = -1;
+            }
+        }
         if (cli_outlier_score_given) {
             strncpy(ensemble->outlier_score_spec, cli_outlier_score_spec, sizeof(ensemble->outlier_score_spec) - 1);
         }
@@ -1433,12 +1509,14 @@ int main(int argc, char *argv[])
             ensemble->input_delimiter = delimiter;
             ensemble->list_separator = list_separator;
             ensemble->has_header = skip_header;
+            ensemble->aggregate = aggregate;
             for (size_t i = 0; i < ensemble->count; i++) {
                 if (ensemble->entries[i].forest) {
                     ensemble->entries[i].forest->decimals = decimals;
                     ensemble->entries[i].forest->input_delimiter = delimiter;
                     ensemble->entries[i].forest->list_separator = list_separator;
                     ensemble->entries[i].forest->has_header = skip_header;
+                    ensemble->entries[i].forest->aggregate = aggregate;
                 }
             }
             status = geif_ensemble_save_json(ensemble, save_file);
@@ -1602,6 +1680,96 @@ int main(int argc, char *argv[])
             }
         }
 
+        // In aggregate mode (-A), evaluate accumulated category summaries at EOF
+        if (ensemble->aggregate) {
+            for (size_t i = 0; i < ensemble->count; i++) {
+                geif_category_entry_t *matched_entry = &ensemble->entries[i];
+                if (!matched_entry->summary || !matched_entry->forest) continue;
+                const char *cat_name = matched_entry->category;
+                if (!geif_cat_filter_allows(&cat_filter, cat_name)) {
+                    xfree(matched_entry->summary);
+                    matched_entry->summary = NULL;
+                    continue;
+                }
+
+                geif_forest_t *sub_forest = matched_entry->forest;
+                double effective_threshold = threshold;
+                if (threshold_is_percentage) {
+                    effective_threshold = (sub_forest->percentage_score > 0.0) ? sub_forest->percentage_score : 0.5;
+                } else if (threshold_is_average) {
+                    effective_threshold = (sub_forest->average_score > 0.0) ? sub_forest->average_score : 0.5;
+                }
+
+                double score = 0.0, h_M = 0.0, d_out = 0.0;
+                geif_forest_score_detailed(sub_forest, matched_entry->summary, &score, &h_M, &d_out);
+                double *attr = (double *)xcalloc(dims, sizeof(double));
+                if (dims > 0) geif_forest_dimension_attribution(sub_forest, matched_entry->summary, attr);
+
+                analyzed++;
+                bool is_out = (score >= effective_threshold);
+                if (is_out) total_outliers++;
+
+                matched_entry->analyzed_rows++;
+                matched_entry->sum_score += score;
+                if (is_out) matched_entry->high_analyzed_rows++;
+
+                time_t cat_ts = matched_entry->last_updated;
+                if (cat_ts == 0) cat_ts = time(NULL);
+
+                double test_avg = matched_entry->sum_score / (double)matched_entry->analyzed_rows;
+
+                geif_template_context_t ctx = {
+                    .orig_line        = "",
+                    .label            = "",
+                    .category         = cat_name,
+                    .input_category   = cat_name,
+                    .score            = score,
+                    .test_average_score = test_avg,
+                    .metric_depth     = h_M,
+                    .d_out            = d_out,
+                    .H_max            = sub_forest->H_max,
+                    .is_outlier       = is_out ? 1 : 0,
+                    .timestamp        = cat_ts,
+                    .total_rows       = matched_entry->total_rows,
+                    .analyzed_rows    = matched_entry->analyzed_rows,
+                    .high_analyzed_rows = matched_entry->high_analyzed_rows,
+                    .row_idx          = analyzed,
+                    .vector           = matched_entry->summary,
+                    .averages         = sub_forest->averages,
+                    .attr_scores      = attr,
+                    .vector_dim       = dims,
+                    .raw_values       = NULL,
+                    .raw_value_count  = 0,
+                    .list_separator   = list_separator,
+                    .category_sep     = category_sep,
+                    .label_sep        = label_sep,
+                    .decimals         = decimals,
+                    .printf_format    = printf_format,
+                    .print_dimension  = print_dimension,
+                    .low_rgb          = low_rgb,
+                    .high_rgb         = high_rgb,
+                    .is_summary       = false
+                };
+
+                char out_buf[8192];
+                if (point_tmpl) {
+                    if (is_out) {
+                        geif_format_template(out_buf, sizeof(out_buf), point_tmpl, &ctx);
+                        fprintf(out_fp, "%s\n", out_buf);
+                    }
+                } else if (!average_tmpl) {
+                    if (!silent_outliers || is_out) {
+                        geif_format_template(out_buf, sizeof(out_buf), "%s %v", &ctx);
+                        fprintf(out_fp, "%s\n", out_buf);
+                    }
+                }
+
+                xfree(attr);
+                xfree(matched_entry->summary);
+                matched_entry->summary = NULL;
+            }
+        }
+
         // Emit Average summary (-v <format>) if specified
         if (average_tmpl) {
             for (size_t i = 0; i < ensemble->count; i++) {
@@ -1733,12 +1901,14 @@ int main(int argc, char *argv[])
             ensemble->input_delimiter = delimiter;
             ensemble->list_separator = list_separator;
             ensemble->has_header = skip_header;
+            ensemble->aggregate = aggregate;
             for (size_t i = 0; i < ensemble->count; i++) {
                 if (ensemble->entries[i].forest) {
                     ensemble->entries[i].forest->decimals = decimals;
                     ensemble->entries[i].forest->input_delimiter = delimiter;
                     ensemble->entries[i].forest->list_separator = list_separator;
                     ensemble->entries[i].forest->has_header = skip_header;
+                    ensemble->entries[i].forest->aggregate = aggregate;
                 }
             }
             geif_status_t status = geif_ensemble_save_json(ensemble, save_file);
@@ -1871,6 +2041,8 @@ int main(int argc, char *argv[])
         uint32_t dims = ensemble->dimensions;
         double *vec = (double *)xmalloc(dims * sizeof(double));
         uint64_t analyzed = 0;
+        agg_cat_bucket_t *agg_buckets = NULL;
+        size_t agg_count = 0, agg_cap = 0;
 
         if (first_line_is_data) {
             char orig_line[8192];
@@ -1884,7 +2056,7 @@ int main(int argc, char *argv[])
                                    threshold_is_average, threshold_is_percentage, cli_outlier_score_given,
                                    point_tmpl, decimals, printf_format, print_dimension,
                                    low_rgb, high_rgb, vec, dims,
-                                   out_fp, &analyzed);
+                                   out_fp, &analyzed, &agg_buckets, &agg_count, &agg_cap);
         }
 
         while (fgets(line, sizeof(line), in_fp)) {
@@ -1907,8 +2079,21 @@ int main(int argc, char *argv[])
                                        threshold_is_average, threshold_is_percentage, cli_outlier_score_given,
                                        point_tmpl, decimals, printf_format, print_dimension,
                                        low_rgb, high_rgb, vec, dims,
-                                       out_fp, &analyzed);
+                                       out_fp, &analyzed, &agg_buckets, &agg_count, &agg_cap);
             }
+        }
+
+        if (ensemble->aggregate) {
+            for (size_t b = 0; b < agg_count; b++) {
+                score_and_print_categorize_vec(ensemble, &cat_filter, agg_buckets[b].category, agg_buckets[b].label,
+                                               "", NULL, 0, b + 1,
+                                               list_separator, category_sep, label_sep, threshold,
+                                               threshold_is_average, threshold_is_percentage, cli_outlier_score_given,
+                                               point_tmpl, decimals, printf_format, print_dimension,
+                                               low_rgb, high_rgb, agg_buckets[b].summary, dims, out_fp, &analyzed);
+                xfree(agg_buckets[b].summary);
+            }
+            xfree(agg_buckets);
         }
 
         xfree(vec);
@@ -1921,12 +2106,14 @@ int main(int argc, char *argv[])
             ensemble->input_delimiter = delimiter;
             ensemble->list_separator = list_separator;
             ensemble->has_header = skip_header;
+            ensemble->aggregate = aggregate;
             for (size_t i = 0; i < ensemble->count; i++) {
                 if (ensemble->entries[i].forest) {
                     ensemble->entries[i].forest->decimals = decimals;
                     ensemble->entries[i].forest->input_delimiter = delimiter;
                     ensemble->entries[i].forest->list_separator = list_separator;
                     ensemble->entries[i].forest->has_header = skip_header;
+                    ensemble->entries[i].forest->aggregate = aggregate;
                 }
             }
             geif_status_t status = geif_ensemble_save_json(ensemble, save_file);

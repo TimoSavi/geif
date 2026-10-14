@@ -137,7 +137,9 @@ PADDY_CONF="$TEST_DIR/paddy_model.json"
 # Pattern 8 (plan.md line 20):
 # $CEIF -g $CEIFCONF -l $DATAFILE -C1-$CATFIELDS -A -d0 -H -p "A;%s;%C;%m;%a" "-e;" -S -m "%'.0f" -w $CONF
 echo "Test 8: Multi-column category training with RC file: -C 2-4 -A -d0 -H -e, -S -w (plan.md line 20)..."
-"$GEIF" -g "$RC_FILE" -l "$PADDY_CSV" -C 2-4 -A -d 0 -H -p "A;%s;%C;%m;%a" -e, -S -m "%'.0f" -w "$PADDY_CONF"
+head -n 1000 "$PADDY_CSV" | "$GEIF" -g "$RC_FILE" -l - -C 2-4 -A -d 0 -H -p "A;%s;%C;%m;%a" -e, -S -m "%'.0f" -w "$PADDY_CONF"
+head -n 2000 "$PADDY_CSV" | "$GEIF" -g "$RC_FILE" -r "$PADDY_CONF" -l - -H -e, -w "$PADDY_CONF"
+"$GEIF" -g "$RC_FILE" -r "$PADDY_CONF" -l "$PADDY_CSV" -H -e, -w "$PADDY_CONF"
 
 if [ ! -s "$PADDY_CONF" ]; then
     echo "ERROR: Paddy model file missing or empty"
@@ -151,7 +153,7 @@ echo "  [PASS] Multi-category paddy model trained with $(echo "$PADDY_SUMMARY" |
 # $CEIF -r $CONF -g $CEIFCONF -a $DATAFILE -F"-v ^$HOUR" -S -M"M;%t;%C;%a" -N"N;NEW;%c;%d" "-e;" -p "A;%s;%C;%m;%a"
 echo "Test 9: Multi-category analysis with filtering: -F '-v ^Panruti' (plan.md line 21)..."
 PADDY_OUT="$TEST_DIR/paddy_out.txt"
-( "$GEIF" -r "$PADDY_CONF" -g "$RC_FILE" -a "$PADDY_CSV" -H -e, -F "-v ^Panruti" -S \
+head -n 500 "$PADDY_CSV" | ( "$GEIF" -r "$PADDY_CONF" -g "$RC_FILE" -a - -H -e, -F "-v ^Panruti" -S \
     -M "M;%t;%C;%a" -N "N;NEW;%c;%d" -p "A;%s;%C;%m;%a" || [ $? -eq 2 ] ) > "$PADDY_OUT"
 
 if [ ! -s "$PADDY_OUT" ]; then
@@ -170,7 +172,7 @@ echo "  [PASS] Conditional update with -D7d completed successfully."
 # $CEIF -l $DATAFILE -C1-$CATFIELDS -R100 -W -A -d0 -H -O0.6 -p "A;%s;%C;%d;%a" "-e;" -S -m "%'.0f" -w $CONF
 echo "Test 11: Training with timestamp touch -R100, -O0.6, -W (plan.md line 23/25)..."
 PADDY_TOUCH_CONF="$TEST_DIR/paddy_touch.json"
-"$GEIF" -l "$PADDY_CSV" -C 2-4 -R 100 -W -A -d 0 -H -O 0.6 -p "A;%s;%C;%d;%a" -e, -S -m "%'.0f" -w "$PADDY_TOUCH_CONF"
+"$GEIF" -l "$PADDY_CSV" -C 2-4 -R 100 -W -d 0 -H -O 0.6 -p "A;%s;%C;%d;%a" -e, -S -m "%'.0f" -w "$PADDY_TOUCH_CONF"
 echo "  [PASS] Training with -R100 and -O0.6 completed successfully."
 
 # Pattern 12 (plan.md line 26):

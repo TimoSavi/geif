@@ -46,7 +46,7 @@ run_geif_score() {
 
 # Test 1: Train model with -L 1 -C 5
 echo "Test 1: Train multi-category model with -L 1 -C 5..."
-$GEIF_BIN -l "$TRAIN_CSV" -w "$MODEL_JSON" -L 1 -C 5 -t 20 -s 64 -W -A
+$GEIF_BIN -l "$TRAIN_CSV" -w "$MODEL_JSON" -L 1 -C 5 -t 20 -s 64 -W
 
 # Test 2: Custom templating with precision -d, RGB %x, score %s, label %l, category %c
 echo "Test 2: Test -p templating with %x (RGB), -d precision, and %s/%l/%c..."

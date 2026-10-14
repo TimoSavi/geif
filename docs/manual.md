@@ -78,12 +78,13 @@ Input data is expected to be character-delimited ASCII/UTF-8 records (default co
 | `-F` | `REGEXP` | Filter out categories matching regular expression (prefix with `-v ` to invert / keep only). |
 | `-R` | `INT` | Minimum row count required to retain a category across training, analysis (`-a`), categorization (`-c`), and maintenance. |
 | `-D` | `INTERVAL`| Drop sub-forest categories older than specified age (e.g. `30d`, `7d`, `24h`, `3600s`). |
+| `-A`, `--aggregate` | (none) | Instead of taking samples as individual rows, sum/aggregate new sample values per category across each `-l`, `-a`, or `-c` invocation. Only one aggregated sample per category is added per `-l` session. Persisted in model JSON and restored automatically. |
 | `-N`, `--new` | `[TMPL]` | Output format template for newly observed, unseen categories during scoring or continuous learning (default: `"%v"`). Evaluated immediately for any new category sample regardless of sample counts. |
 | `-M`, `--missing` | `[TMPL]` | Output format template for missed categories (trained but absent in test stream; default: `"%C"`). |
 | `-p` | `TMPL` | Printf-style format template for scored anomaly rows or categorized data. In analysis mode (`-a`), only outlier rows (`score > threshold`) are printed; nominal inlier rows are suppressed. Default is `"%s %v"`. |
 | `-v` | `[TMPL]` | Print average score and other summary statistics calculated from analyzed data using format `TMPL` (default: `"%C %r %h"`). When specified without an argument, enables verbose mode. |
 | `-m` | `STRING` | Printf format for printing floating-point values for samples and sample averages (default: `"%.*f"`). |
-| `-d` | `INT` | Decimal precision for floating-point values (default: 6). |
+| `-d` | `INT` | Decimal precision for floating-point values (default: 6). Persisted in model JSON and restored automatically. |
 | `-j` | `TMPL` | Printf format for printing all single dimension attribute metrics together via directive `%m`. May contain directives `%d`, `%a`, `%e`, and `%i`. |
 | `-S` | (none) | Silent mode: suppress nominal inlier rows and emit only detected anomalies in default output mode. |
 | `-q` | (none) | Print model summary diagnostics and exit immediately. |
@@ -105,7 +106,7 @@ GEIF scales all anomaly scores to the calibrated range $[0.0, 1.0]$ by default:
 3. **Average Score Threshold (`-O average`)**:
    Sets the anomaly cutoff to the ensemble mean score.
 
-All input formatting options (`-f`, `-e`, `-H`, `-C`, `-L`, `-I`, `-U`, `-O`) are persisted into the JSON model file during training (`-w`) or update (`-z`). When reading models (`-r` or `-z`), these settings are automatically restored and do not need to be re-specified.
+All input formatting and aggregation options (`-f`, `-e`, `-H`, `-A`, `-d`, `-C`, `-L`, `-I`, `-U`, `-O`) are persisted into the JSON model file during training (`-w`) or update (`-z`). When reading models (`-r` or `-z`), these settings are automatically restored and do not need to be re-specified.
 
 ---
 
@@ -147,6 +148,20 @@ The `-p` (outlier), `-v` (summary), `-N` (unseen), and `-M` (missed) options acc
 
 # Print category summary statistics at conclusion of batch analysis
 ./bin/geif -r model.json -a batch.csv -v "SUMMARY: %C rows=%o outliers=%h avg_score=%S"
+```
+
+### Data Value Aggregation (`-A`, `--aggregate`):
+When analyzing daily or hourly summaries (such as network traffic or log volume per category), invoke `geif` with `-A` so that each sub-forest represents an aggregation key and sums all rows per category within each invocation:
+
+```bash
+# Day 1: Train initial aggregated model using columns 1-2 as category key (-C 1-2)
+./bin/geif -l day1_traffic.csv -C 1-2 -H -A -d 0 -w traffic.json
+
+# Subsequent days: Update model in-place (-A, -C, -H, -d are restored automatically)
+./bin/geif -z traffic.json -l day2_traffic.csv
+
+# Analyze a new day's traffic by summing values per category and scoring the daily totals
+./bin/geif -r traffic.json -a today_traffic.csv -O 0.5 -e ';' -p "ANOM;%s;%C;%d;%a" -N "NEW;%c;%d"
 ```
 
 For comprehensive guidance on engine selection (`bubble`, `ceif`, `exemplar`, `voronoi`), visual heatmaps, population drift coverage, categorization accuracy, and throughput benchmarks, see [**`docs/algorithm_selection.md`**](algorithm_selection.md).

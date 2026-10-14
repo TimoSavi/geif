@@ -29,11 +29,34 @@ geif_status_t geif_forest_feed(geif_forest_t *f, const double *point)
     }
 
     uint32_t d = f->dimensions;
-    f->total_rows_seen++;
     f->is_trained = false;
     f->H_max = 0.0;
     f->min_score = 0.0;
     f->average_score = 0.0;
+
+    if (f->aggregate) {
+        if (f->summary_slot < 0) {
+            f->total_rows_seen++;
+            if (f->pool_count < f->pool_capacity) {
+                f->summary_slot = (int64_t)f->pool_count;
+                f->pool_count++;
+            } else {
+                uint64_t rand64 = (((uint64_t)rand() << 32) ^ (uint64_t)rand()) & 0x7FFFFFFFFFFFFFFFULL;
+                f->summary_slot = (int64_t)(rand64 % f->pool_count);
+            }
+            size_t offset = (size_t)f->summary_slot * d;
+            memset(&f->sample_pool[offset], 0, d * sizeof(double));
+        }
+        size_t offset = (size_t)f->summary_slot * d;
+        for (uint32_t j = 0; j < d; j++) {
+            f->sample_pool[offset + j] += point[j];
+            if (f->sample_pool[offset + j] < f->envelope_min[j]) f->envelope_min[j] = f->sample_pool[offset + j];
+            if (f->sample_pool[offset + j] > f->envelope_max[j]) f->envelope_max[j] = f->sample_pool[offset + j];
+        }
+        return GEIF_OK;
+    }
+
+    f->total_rows_seen++;
 
     // Update bounding box coordinates
     for (uint32_t j = 0; j < d; j++) {

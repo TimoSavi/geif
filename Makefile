@@ -109,6 +109,8 @@ test: $(STATIC_LIB) $(CLI_BIN)
 	@./test/test_cli_algorithms.sh
 	@echo "--- Running Feature 12: Bubble Reference Suite & Benchmark Test ---"
 	@./test/test_ref_bubble.sh
+	@echo "--- Running Feature 13: Daily/Category Value Aggregation (-A, --aggregate) Test ---"
+	@./test/test_cli_aggregate.sh
 	@echo "All unit and integration tests passed successfully!"
 
 test-ref: $(STATIC_LIB) $(CLI_BIN)

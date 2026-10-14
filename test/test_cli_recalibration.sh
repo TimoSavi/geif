@@ -44,7 +44,7 @@ MODEL_CLEAN2="$TEST_DIR/model_clean2.json"
 
 # Test 1: Train model with outlier and -O 80%
 echo "Test 1: Train model containing outlier with -O 80%..."
-$GEIF_BIN -l "$TRAIN_CSV" -w "$MODEL_RAW" -L 1 -C 5 -t 10 -s 64 -O "80%" -W -A
+$GEIF_BIN -l "$TRAIN_CSV" -w "$MODEL_RAW" -L 1 -C 5 -t 10 -s 64 -O "80%" -W
 
 # Verify JSON contains outlierScore "80%"
 if ! grep -qE '"outlierScore":\s*"80%"' "$MODEL_RAW"; then

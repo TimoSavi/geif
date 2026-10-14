@@ -124,6 +124,10 @@ void geif_ensemble_destroy(geif_ensemble_t *ens)
                 geif_forest_destroy(ens->entries[i].forest);
                 ens->entries[i].forest = NULL;
             }
+            if (ens->entries[i].summary) {
+                free(ens->entries[i].summary);
+                ens->entries[i].summary = NULL;
+            }
         }
         free(ens->entries);
         ens->entries = NULL;
@@ -237,6 +241,7 @@ geif_forest_t *geif_ensemble_get_or_create(geif_ensemble_t *ens, const char *cat
     forest->input_delimiter = ens->input_delimiter;
     forest->list_separator = ens->list_separator;
     forest->has_header = ens->has_header;
+    forest->aggregate = ens->aggregate;
 
     uint32_t entry_idx = (uint32_t)ens->count++;
     geif_category_entry_t *entry = &ens->entries[entry_idx];
@@ -301,7 +306,7 @@ geif_status_t geif_ensemble_add_forest(geif_ensemble_t *ens,
     if (forest->category_dims_spec[0] == '\0') {
         strncpy(forest->category_dims_spec, ens->category_dims_spec, sizeof(forest->category_dims_spec) - 1);
     }
-    if (ens->decimals > 0 && forest->decimals <= 0) forest->decimals = ens->decimals;
+    if (ens->decimals >= 0) forest->decimals = ens->decimals;
     forest->scale_score = ens->scale_score;
     if (forest->input_delimiter == '\0' || forest->input_delimiter == ',') {
         forest->input_delimiter = ens->input_delimiter ? ens->input_delimiter : ',';
@@ -311,6 +316,9 @@ geif_status_t geif_ensemble_add_forest(geif_ensemble_t *ens,
     }
     if (!forest->has_header && ens->has_header) {
         forest->has_header = ens->has_header;
+    }
+    if (!forest->aggregate && ens->aggregate) {
+        forest->aggregate = ens->aggregate;
     }
 
     // Check if category already exists in hash table
@@ -390,13 +398,17 @@ geif_status_t geif_ensemble_feed(geif_ensemble_t *ens,
     geif_forest_t *forest = geif_ensemble_get_or_create(ens, cat_key);
     if (!forest) return GEIF_ERR_OUT_OF_MEMORY;
 
+    bool first_in_session = (forest->summary_slot < 0);
+
     // Update row counts
     uint32_t h = ensemble_hash(cat_key);
     size_t b = (size_t)(h % ens->hash_size);
     geif_cat_hash_node_t *node = ens->hash_buckets[b];
     while (node) {
         if (strcmp(ens->entries[node->entry_idx].category, cat_key) == 0) {
-            ens->entries[node->entry_idx].total_rows++;
+            if (!forest->aggregate || first_in_session) {
+                ens->entries[node->entry_idx].total_rows++;
+            }
             ens->entries[node->entry_idx].last_updated = time(NULL);
             break;
         }
@@ -427,6 +439,10 @@ geif_status_t geif_ensemble_prune_categories(geif_ensemble_t *ens, uint64_t min_
             if (ens->entries[i].forest) {
                 geif_forest_destroy(ens->entries[i].forest);
                 ens->entries[i].forest = NULL;
+            }
+            if (ens->entries[i].summary) {
+                free(ens->entries[i].summary);
+                ens->entries[i].summary = NULL;
             }
         } else {
             if (new_count != i) {
@@ -484,6 +500,10 @@ geif_status_t geif_ensemble_prune_age(geif_ensemble_t *ens, time_t max_age_secon
             if (ens->entries[i].forest) {
                 geif_forest_destroy(ens->entries[i].forest);
                 ens->entries[i].forest = NULL;
+            }
+            if (ens->entries[i].summary) {
+                free(ens->entries[i].summary);
+                ens->entries[i].summary = NULL;
             }
         } else {
             if (new_count != i) {
@@ -629,7 +649,8 @@ void geif_ensemble_summary(const geif_ensemble_t *ens, char *buffer, size_t buff
                      "  Ignore Columns (-I):  %s\n"
                      "  Input Delimiter (-f): '%c'\n"
                      "  List Separator (-e):  '%c'\n"
-                     "  Skip Header (-H):     %s\n",
+                     "  Skip Header (-H):     %s\n"
+                     "  Aggregate (-A):       %s\n",
                      ens->dimensions,
                      ens->count,
                      ens->total_input_cols,
@@ -639,7 +660,8 @@ void geif_ensemble_summary(const geif_ensemble_t *ens, char *buffer, size_t buff
                      ens->ignore_dims_spec[0] ? ens->ignore_dims_spec : "(none)",
                      ens->input_delimiter ? ens->input_delimiter : ',',
                      ens->list_separator ? ens->list_separator : ',',
-                     ens->has_header ? "Yes" : "No");
+                     ens->has_header ? "Yes" : "No",
+                     ens->aggregate ? "Yes" : "No");
     if (n > 0) written += (size_t)n;
 
     for (size_t i = 0; i < ens->count && written + 80 < buffer_size; i++) {

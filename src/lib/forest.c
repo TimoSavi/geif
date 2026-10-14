@@ -116,6 +116,8 @@ geif_status_t geif_forest_create(geif_forest_t **forest_out,
     f->input_delimiter = ',';
     f->list_separator = ',';
     f->has_header = false;
+    f->aggregate = false;
+    f->summary_slot = -1;
 
     if (f->config.seed == 0) {
         srand((unsigned int)(time(NULL) ^ 0x5DEECE66DULL));

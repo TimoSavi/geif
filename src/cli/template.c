@@ -288,7 +288,7 @@ size_t geif_format_template(char *out,
             }
             break;
 
-        case 'v': // Raw input tokens joined by sep, or feature vector
+        case 'v': // Raw input tokens joined by sep, or category + feature vector when aggregated
             if (ctx && ctx->raw_values && ctx->raw_value_count > 0) {
                 for (uint32_t i = 0; i < ctx->raw_value_count && w + 1 < out_size; i++) {
                     if (i > 0 && sep != '\0') {
@@ -297,6 +297,21 @@ size_t geif_format_template(char *out,
                     }
                     n = snprintf(out + w, out_size - w, "%s", ctx->raw_values[i]);
                     if (n > 0) w += (size_t)n;
+                }
+            } else if (ctx && ctx->vector && ctx->vector_dim > 0 && (!ctx->orig_line || ctx->orig_line[0] == '\0')) {
+                const char *cat_str = (ctx->input_category && ctx->input_category[0] != '\0') ? ctx->input_category :
+                                      (ctx->category && ctx->category[0] != '\0' && strcmp(ctx->category, "default") != 0) ? ctx->category : NULL;
+                if (cat_str) {
+                    n = snprintf(out + w, out_size - w, "%s", cat_str);
+                    if (n > 0) w += (size_t)n;
+                }
+                for (uint32_t i = 0; i < ctx->vector_dim && w + 1 < out_size; i++) {
+                    if ((i > 0 || cat_str) && sep != '\0') {
+                        out[w++] = sep;
+                        if (w + 1 >= out_size) break;
+                    }
+                    int dn = format_double(out + w, out_size - w, ctx->vector[i], dec, ctx->printf_format);
+                    if (dn > 0) w += (size_t)dn;
                 }
             } else if (ctx && ctx->orig_line && ctx->orig_line[0] != '\0') {
                 n = snprintf(out + w, out_size - w, "%s", ctx->orig_line);
