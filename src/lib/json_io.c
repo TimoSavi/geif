@@ -83,10 +83,13 @@ struct json_object *geif_forest_to_json_object(const geif_forest_t *f)
 
     char f_sep[2] = { f->input_delimiter ? f->input_delimiter : ',', '\0' };
     char l_sep[2] = { f->list_separator ? f->list_separator : ',', '\0' };
+    const char *p_str = (f->print_string[0] != '\0') ? f->print_string : "%s %v";
     json_object_object_add(root, "input_separator", json_object_new_string(f_sep));
     json_object_object_add(root, "list_separator", json_object_new_string(l_sep));
     json_object_object_add(root, "has_header", json_object_new_boolean(f->has_header));
     json_object_object_add(root, "aggregate", json_object_new_boolean(f->aggregate));
+    json_object_object_add(root, "print_string", json_object_new_string(p_str));
+    json_object_object_add(root, "printf_format", json_object_new_string(f->printf_format));
 
     // Globals object for CEIF format compatibility
     struct json_object *globals = json_object_new_object();
@@ -99,6 +102,8 @@ struct json_object *geif_forest_to_json_object(const geif_forest_t *f)
     json_object_object_add(globals, "listSeparator", json_object_new_string(l_sep));
     json_object_object_add(globals, "header", json_object_new_int(f->has_header ? 1 : 0));
     json_object_object_add(globals, "aggregate", json_object_new_int(f->aggregate ? 1 : 0));
+    json_object_object_add(globals, "printString", json_object_new_string(p_str));
+    json_object_object_add(globals, "printfFormat", json_object_new_string(f->printf_format));
     json_object_object_add(root, "globals", globals);
 
     // Save sample pool with clean decimal precision
@@ -225,6 +230,22 @@ geif_status_t geif_forest_from_json_object(geif_forest_t **forest_out, struct js
         if (json_object_object_get_ex(globals, "aggregate", &j_val)) {
             f->aggregate = json_object_get_boolean(j_val);
         }
+        if (json_object_object_get_ex(globals, "printString", &j_val) ||
+            json_object_object_get_ex(globals, "print_string", &j_val)) {
+            const char *s = json_object_get_string(j_val);
+            if (s) {
+                strncpy(f->print_string, s, sizeof(f->print_string) - 1);
+                f->print_string[sizeof(f->print_string) - 1] = '\0';
+            }
+        }
+        if (json_object_object_get_ex(globals, "printfFormat", &j_val) ||
+            json_object_object_get_ex(globals, "printf_format", &j_val)) {
+            const char *s = json_object_get_string(j_val);
+            if (s) {
+                strncpy(f->printf_format, s, sizeof(f->printf_format) - 1);
+                f->printf_format[sizeof(f->printf_format) - 1] = '\0';
+            }
+        }
     }
 
     if (json_object_object_get_ex(root, "input_separator", &j_val) ||
@@ -243,6 +264,22 @@ geif_status_t geif_forest_from_json_object(geif_forest_t **forest_out, struct js
     }
     if (json_object_object_get_ex(root, "aggregate", &j_val)) {
         f->aggregate = json_object_get_boolean(j_val);
+    }
+    if (json_object_object_get_ex(root, "print_string", &j_val) ||
+        json_object_object_get_ex(root, "printString", &j_val)) {
+        const char *s = json_object_get_string(j_val);
+        if (s) {
+            strncpy(f->print_string, s, sizeof(f->print_string) - 1);
+            f->print_string[sizeof(f->print_string) - 1] = '\0';
+        }
+    }
+    if (json_object_object_get_ex(root, "printf_format", &j_val) ||
+        json_object_object_get_ex(root, "printfFormat", &j_val)) {
+        const char *s = json_object_get_string(j_val);
+        if (s) {
+            strncpy(f->printf_format, s, sizeof(f->printf_format) - 1);
+            f->printf_format[sizeof(f->printf_format) - 1] = '\0';
+        }
     }
 
     if (json_object_object_get_ex(root, "decimals", &j_val)) {
@@ -346,6 +383,12 @@ geif_status_t geif_ensemble_save_json(const geif_ensemble_t *ens, const char *pa
     json_object_object_add(root, "list_separator", json_object_new_string(list_sep_str));
     json_object_object_add(root, "has_header", json_object_new_boolean(ens->has_header));
     json_object_object_add(root, "aggregate", json_object_new_boolean(ens->aggregate));
+    if (ens->print_string[0] != '\0') {
+        json_object_object_add(root, "print_string", json_object_new_string(ens->print_string));
+    }
+    if (ens->printf_format[0] != '\0') {
+        json_object_object_add(root, "printf_format", json_object_new_string(ens->printf_format));
+    }
 
     // Globals object for CEIF compatibility
     struct json_object *globals = json_object_new_object();
@@ -359,6 +402,12 @@ geif_status_t geif_ensemble_save_json(const geif_ensemble_t *ens, const char *pa
     json_object_object_add(globals, "listSeparator", json_object_new_string(list_sep_str));
     json_object_object_add(globals, "header", json_object_new_int(ens->has_header ? 1 : 0));
     json_object_object_add(globals, "aggregate", json_object_new_int(ens->aggregate ? 1 : 0));
+    if (ens->print_string[0] != '\0') {
+        json_object_object_add(globals, "printString", json_object_new_string(ens->print_string));
+    }
+    if (ens->printf_format[0] != '\0') {
+        json_object_object_add(globals, "printfFormat", json_object_new_string(ens->printf_format));
+    }
     json_object_object_add(root, "globals", globals);
 
     // Save sub-forests array
@@ -535,6 +584,16 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
         if (json_object_object_get_ex(globals, "aggregate", &j_val)) {
             ens->aggregate = json_object_get_boolean(j_val);
         }
+        if (json_object_object_get_ex(globals, "printString", &j_val) ||
+            json_object_object_get_ex(globals, "print_string", &j_val)) {
+            const char *s = json_object_get_string(j_val);
+            if (s) strncpy(ens->print_string, s, sizeof(ens->print_string) - 1);
+        }
+        if (json_object_object_get_ex(globals, "printfFormat", &j_val) ||
+            json_object_object_get_ex(globals, "printf_format", &j_val)) {
+            const char *s = json_object_get_string(j_val);
+            if (s) strncpy(ens->printf_format, s, sizeof(ens->printf_format) - 1);
+        }
     }
 
     if (json_object_object_get_ex(root, "input_separator", &j_val) ||
@@ -553,6 +612,16 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
     }
     if (json_object_object_get_ex(root, "aggregate", &j_val)) {
         ens->aggregate = json_object_get_boolean(j_val);
+    }
+    if (json_object_object_get_ex(root, "print_string", &j_val) ||
+        json_object_object_get_ex(root, "printString", &j_val)) {
+        const char *s = json_object_get_string(j_val);
+        if (s) strncpy(ens->print_string, s, sizeof(ens->print_string) - 1);
+    }
+    if (json_object_object_get_ex(root, "printf_format", &j_val) ||
+        json_object_object_get_ex(root, "printfFormat", &j_val)) {
+        const char *s = json_object_get_string(j_val);
+        if (s) strncpy(ens->printf_format, s, sizeof(ens->printf_format) - 1);
     }
 
     if (json_object_object_get_ex(root, "decimals", &j_val)) {
@@ -633,6 +702,12 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
     if (!ens->aggregate && ens->count > 0 && ens->entries[0].forest && ens->entries[0].forest->aggregate) {
         ens->aggregate = ens->entries[0].forest->aggregate;
     }
+    if (ens->print_string[0] == '\0' && ens->count > 0 && ens->entries[0].forest && ens->entries[0].forest->print_string[0] != '\0') {
+        memcpy(ens->print_string, ens->entries[0].forest->print_string, sizeof(ens->print_string));
+    }
+    if (ens->printf_format[0] == '\0' && ens->count > 0 && ens->entries[0].forest && ens->entries[0].forest->printf_format[0] != '\0') {
+        memcpy(ens->printf_format, ens->entries[0].forest->printf_format, sizeof(ens->printf_format));
+    }
 
     for (size_t i = 0; i < ens->count; i++) {
         if (ens->entries[i].forest) {
@@ -641,6 +716,12 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
             ens->entries[i].forest->list_separator = ens->list_separator;
             ens->entries[i].forest->has_header = ens->has_header;
             ens->entries[i].forest->aggregate = ens->aggregate;
+            if (ens->print_string[0] != '\0') {
+                memcpy(ens->entries[i].forest->print_string, ens->print_string, sizeof(ens->entries[i].forest->print_string));
+            }
+            if (ens->printf_format[0] != '\0') {
+                memcpy(ens->entries[i].forest->printf_format, ens->printf_format, sizeof(ens->entries[i].forest->printf_format));
+            }
             ens->entries[i].forest->summary_slot = -1;
         }
     }

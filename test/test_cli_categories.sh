@@ -41,7 +41,7 @@ echo "  [PASS] CEIF-compatible 'forests' array and 'categoryDims' JSON structure
 # Test 4: Score dataset with automatic category routing
 echo "Test 4: Score dataset with dynamic category routing (auto-restoring -C from model)..."
 set +e
-$BIN -r "$TMP_DIR/model_wine_cat.json" -a "$WINE_CSV" -H -f ';' -o "$TMP_DIR/wine_scores.csv" -T 0.65
+$BIN -r "$TMP_DIR/model_wine_cat.json" -a "$WINE_CSV" -H -f ';' -o "$TMP_DIR/wine_scores.csv" -O -1
 RC=$?
 set -e
 if [ "$RC" -ne 0 ] && [ "$RC" -ne 2 ]; then
@@ -59,7 +59,7 @@ echo "  [PASS] Scored all 1599 rows with per-category isolation (Exit code: $RC)
 echo "Test 5: Score observation with unseen category (quality = 99)..."
 # Create a row with unknown quality 99
 UNSEEN_ROW="7.4;0.7;0;1.9;0.076;11;34;0.9978;3.51;0.56;9.4;99"
-echo "$UNSEEN_ROW" | $BIN -r "$TMP_DIR/model_wine_cat.json" -a - --no-header -f ';' -e ';' -o "$TMP_DIR/unseen_score.csv" -T 0.5 || true
+echo "$UNSEEN_ROW" | $BIN -r "$TMP_DIR/model_wine_cat.json" -a - --no-header -f ';' -e ';' -N "%v;%s;%o;" -o "$TMP_DIR/unseen_score.csv" -O 0.5 || true
 UNSEEN_OUTPUT=$(cat "$TMP_DIR/unseen_score.csv")
 echo "$UNSEEN_OUTPUT" | grep ";1.000000;1;"
 echo "  [PASS] Unseen category successfully flagged as outlier with score 1.000000."

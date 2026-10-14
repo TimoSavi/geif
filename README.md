@@ -281,15 +281,15 @@ The build compiles with `-std=c17 -O3 -march=native -Wall -Wextra -Wpedantic` an
 | `-f` | `<char>` | Input field delimiter (default: `,`; saved in model and restored automatically). |
 | `-e` | `<char>` | List separator for output / field delimiter fallback (saved in model and restored). |
 | `-d` | `<num>` | Output floating-point decimal precision (default: 6). |
-| `-m` | `<fmt>` | Printf numeric format string for dimension output (e.g., `"%'.0f"`). |
-| `-p` | `<tmpl>` | Output template for outlier rows (or all rows if `-S` is omitted). |
-| `-v` | `<tmpl>` | Output template for inlier rows (dual templating). |
+| `-m` | `<fmt>` | Printf numeric format string for dimension output (e.g., `"%'.0f"`). Persisted in model JSON and restored automatically. |
+| `-p` | `<tmpl>` | Output template for outlier rows or categorized data (default: `"%s %v"`). In analysis mode (`-a`), only outlier rows (`score > threshold`) are printed; nominal inliers are suppressed. Persisted in model JSON and restored automatically. |
+| `-v` | `[tmpl]` | Print summary statistics calculated from analyzed data using format `<tmpl>` (default: `"%C %r %h"`), or enable verbose mode when given without argument. |
 | `-N`, `--new` | `[tmpl]` | Output template for newly observed, untrained categories during scoring or continuous learning (default: `"%v"`). |
 | `-M`, `--missing` | `[tmpl]` | Output template for missed categories (trained but absent in stream; default: `"%C"`). |
 | `-j` | `<tmpl>` | Sub-template for `%m` per-dimension expansion. |
 | `-F` | `<spec>` | Category filter: regex (matching categories are filtered out; prefix `-v ` to invert). |
 | `-R` | `<num>` | Minimum training row count required to retain a category sub-forest. |
-| `-S` | *(flag)* | Silent outliers: suppress inliers, output only anomalies. |
+| `-S`, `--set-locale` | *(flag)* | Set program locale from environment variables (`LC_ALL=""`) for input/output formatting while keeping model JSON serialization in `"C"` locale. |
 | `-T` | `[margin]` | Population drift evaluation grid mode with margin (e.g., `-T0.1`). |
 | `-i` | `<res>` | Grid resolution per axis (default: 256). |
 | `-q` | *(flag)* | Diagnostic query summary: print model metadata and exit. |

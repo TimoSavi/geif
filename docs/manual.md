@@ -81,12 +81,12 @@ Input data is expected to be character-delimited ASCII/UTF-8 records (default co
 | `-A`, `--aggregate` | (none) | Instead of taking samples as individual rows, sum/aggregate new sample values per category across each `-l`, `-a`, or `-c` invocation. Only one aggregated sample per category is added per `-l` session. Persisted in model JSON and restored automatically. |
 | `-N`, `--new` | `[TMPL]` | Output format template for newly observed, unseen categories during scoring or continuous learning (default: `"%v"`). Evaluated immediately for any new category sample regardless of sample counts. |
 | `-M`, `--missing` | `[TMPL]` | Output format template for missed categories (trained but absent in test stream; default: `"%C"`). |
-| `-p` | `TMPL` | Printf-style format template for scored anomaly rows or categorized data. In analysis mode (`-a`), only outlier rows (`score > threshold`) are printed; nominal inlier rows are suppressed. Default is `"%s %v"`. |
+| `-p` | `TMPL` | Printf-style format template for scored anomaly rows or categorized data. In analysis mode (`-a`), only outlier rows (`score > threshold`) are printed; nominal inlier rows are suppressed. Default is `"%s %v"`. Persisted in model JSON and restored automatically. |
 | `-v` | `[TMPL]` | Print average score and other summary statistics calculated from analyzed data using format `TMPL` (default: `"%C %r %h"`). When specified without an argument, enables verbose mode. |
-| `-m` | `STRING` | Printf format for printing floating-point values for samples and sample averages (default: `"%.*f"`). |
+| `-m` | `STRING` | Printf format for printing floating-point values for samples and sample averages (default: `"%.*f"`). Persisted in model JSON and restored automatically. |
 | `-d` | `INT` | Decimal precision for floating-point sample and average data values (default: 6; anomaly scores always use 6 decimals). Persisted in model JSON and restored automatically. |
 | `-j` | `TMPL` | Printf format for printing all single dimension attribute metrics together via directive `%m`. May contain directives `%d`, `%a`, `%e`, and `%i`. |
-| `-S` | (none) | Silent mode: suppress nominal inlier rows and emit only detected anomalies in default output mode. |
+| `-S`, `--set-locale` | (none) | Set program locale from environment variables (`LC_ALL=""`) for input/output formatting while keeping model JSON serialization in `"C"` locale. |
 | `-q` | (none) | Print model summary diagnostics and exit immediately. |
 | `-h` | (none) | Display help summary and exit. |
 
@@ -106,7 +106,7 @@ GEIF scales all anomaly scores to the calibrated range $[0.0, 1.0]$ by default:
 3. **Average Score Threshold (`-O average`)**:
    Sets the anomaly cutoff to the ensemble mean score.
 
-All input formatting and aggregation options (`-f`, `-e`, `-H`, `-A`, `-d`, `-C`, `-L`, `-I`, `-U`, `-O`) are persisted into the JSON model file during training (`-w`) or update (`-z`). When reading models (`-r` or `-z`), these settings are automatically restored and do not need to be re-specified.
+All input formatting and aggregation options (`-f`, `-e`, `-H`, `-A`, `-d`, `-p`, `-m`, `-C`, `-L`, `-I`, `-U`, `-O`) are persisted into the JSON model file during training (`-w`) or update (`-z`). When reading models (`-r` or `-z`), these settings are automatically restored and do not need to be re-specified.
 
 ---
 

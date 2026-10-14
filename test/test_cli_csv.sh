@@ -29,7 +29,7 @@ echo "  [PASS] Stdin training and stdout JSON serialization verified."
 
 # Test 4: Stream analysis through stdin with -e ';' output formatting
 echo "Test 4: Analyze streaming via stdin with -H -f ';' -e ';'..."
-head -n 20 "$WINE_CSV" | $BIN -r "$TMP_DIR/model.json" -a - -H -f ';' -e ';' -o "$TMP_DIR/scores.csv" -T 0.99
+head -n 20 "$WINE_CSV" | $BIN -r "$TMP_DIR/model.json" -a - -H -f ';' -e ';' -o "$TMP_DIR/scores.csv" -O -1 || test $? -eq 2
 ROW_COUNT=$(wc -l < "$TMP_DIR/scores.csv")
 echo "  Scored $ROW_COUNT rows."
 test "$ROW_COUNT" -eq 19
@@ -41,10 +41,10 @@ echo "  [PASS] Semicolon output formatting and row count verified."
 echo "Test 5: Verify exit code semantics (2 = outliers detected, 0 = clean)..."
 set +e
 # High threshold (no outliers) -> exit code 0
-$BIN -r "$TMP_DIR/model.json" -a "$WINE_CSV" -H -f ';' -T 0.9999 > /dev/null
+$BIN -r "$TMP_DIR/model.json" -a "$WINE_CSV" -H -f ';' -O 0.9999 > /dev/null
 EC_ZERO=$?
 # Low threshold (outliers present) -> exit code 2
-$BIN -r "$TMP_DIR/model.json" -a "$WINE_CSV" -H -f ';' -T 0.3000 > /dev/null
+$BIN -r "$TMP_DIR/model.json" -a "$WINE_CSV" -H -f ';' -O 0.3000 > /dev/null
 EC_TWO=$?
 set -e
 
@@ -61,7 +61,7 @@ cat << 'EOF' > "$TMP_DIR/nan_test.csv"
 7.4;;0;1.9;null;11;34;0.9978;3.51;0.56;inf;5
 EOF
 # Pass --no-header because nan_test.csv has no header row
-$BIN -r "$TMP_DIR/model.json" -a "$TMP_DIR/nan_test.csv" --no-header -f ';' -e ';' -o "$TMP_DIR/nan_out.csv" || test $? -eq 2
+$BIN -r "$TMP_DIR/model.json" -a "$TMP_DIR/nan_test.csv" --no-header -f ';' -e ';' -O -1 -o "$TMP_DIR/nan_out.csv" || test $? -eq 2
 NAN_SCORED=$(wc -l < "$TMP_DIR/nan_out.csv")
 test "$NAN_SCORED" -eq 2
 echo "  [PASS] NaN, Inf, and empty fields gracefully parsed as 0.0 without errors."
@@ -92,11 +92,11 @@ echo "Test 8: Scoring without -f or -H flags (auto-restoring saved ';' delimiter
 # Extract 1 header line + 20 data lines from WINE_CSV
 head -n 21 "$WINE_CSV" > "$TMP_DIR/wine_subset.csv"
 # Notice: no -f ';' or -H supplied on CLI!
-$BIN -r "$TMP_DIR/model.json" -a "$TMP_DIR/wine_subset.csv" -o "$TMP_DIR/restored_scores.csv" -T 0.99
+$BIN -r "$TMP_DIR/model.json" -a "$TMP_DIR/wine_subset.csv" -o "$TMP_DIR/restored_scores.csv" -O -1 || test $? -eq 2
 RESTORED_COUNT=$(wc -l < "$TMP_DIR/restored_scores.csv")
 test "$RESTORED_COUNT" -eq 20
-# Output delimiter should also default to the model's saved separator
-grep -q ";" "$TMP_DIR/restored_scores.csv"
+# Verify semicolon-delimited input was tokenized into fields and formatted with default '%s %v'
+grep -q "7.4,0.7,0,1.9" "$TMP_DIR/restored_scores.csv"
 echo "  [PASS] Model automatically used saved delimiter ';' and skipped header ($RESTORED_COUNT rows)."
 
 # Test 9: In-place continuous training (-z) without -f or -H flags

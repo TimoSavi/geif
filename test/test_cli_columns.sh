@@ -56,7 +56,7 @@ echo "  [PASS] CEIF globals compatibility block found in model JSON."
 # Test 6: Score with automatic column spec restoration from model JSON
 echo "Test 6: Score test CSV without passing -L / -I on CLI (auto-restore from model)..."
 set +e
-$BIN -r "$TMP_DIR/model_l_i.json" -a "$WINE_CSV" -H -f ';' -o "$TMP_DIR/scores.csv" -T 0.65
+$BIN -r "$TMP_DIR/model_l_i.json" -a "$WINE_CSV" -H -f ';' -o "$TMP_DIR/scores.csv" -O -1
 RC=$?
 set -e
 if [[ "$RC" -ne 0 && "$RC" -ne 2 ]]; then

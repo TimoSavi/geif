@@ -17,6 +17,7 @@
 #include <math.h>
 #include <regex.h>
 #include <time.h>
+#include <locale.h>
 
 #define GEIF_VERSION "1.1.0"
 
@@ -30,7 +31,7 @@ static void print_usage(const char *prog)
     printf("GEIF - Geometric Extended Isolation Forest (v%s)\n\n", GEIF_VERSION);
     printf("Usage:\n");
     printf("  Train a model:     %s -l <train.csv> -w <model.json> [-t trees] [-s samples] [-f sep] [-H] [-I range] [-U range] [-L range] [-C range] [-R min_rows]\n", prog);
-    printf("  Score streaming:   %s -r <model.json> -a <test.csv> [-o <out.csv>] [-T threshold] [-F regex] [-N tmpl] [-M tmpl] [-p tmpl] [-S]\n", prog);
+    printf("  Score streaming:   %s -r <model.json> -a <test.csv> [-o <out.csv>] [-O threshold] [-F regex] [-N tmpl] [-M tmpl] [-p tmpl] [-S]\n", prog);
     printf("  Categorize:        %s -r <model.json> -c <test.csv> [-o <out.csv>] [-O threshold] [-F regex] [-p tmpl]\n", prog);
     printf("  Inspect model:     %s -r <model.json> -q\n\n", prog);
     printf("Options:\n");
@@ -63,13 +64,13 @@ static void print_usage(const char *prog)
     printf("  -D <interval>  Drop / prune categories older than interval (e.g. '30d', '7d', '24h', '3600s')\n");
     printf("  -N [tmpl]      Output template for NEW / unseen categories during learning/analysis (default: '%%v')\n");
     printf("  -M [tmpl]      Output template for MISSED categories (default: '%%C')\n");
-    printf("  -p <tmpl>      Output template for scored rows (%%s=score, %%l=label, %%c=cat, %%m=metric/dims, %%d=vector, %%e=attrib, %%a=avg, %%t=time, %%u=epoch)\n");
-    printf("  -v [tmpl]      Output template for inlier/average rows, or verbose flag\n");
+    printf("  -p <tmpl>      Output template for scored rows (default: '%%s %%v'; %%s=score, %%l=label, %%c=cat, %%m=metric/dims, %%d=vector, %%e=attrib, %%a=avg, %%t=time, %%u=epoch)\n");
+    printf("  -v [tmpl]      Output template for summary/average rows, or verbose flag\n");
     printf("  -d <int>       Floating point decimal precision (default: 6)\n");
     printf("  -j <tmpl>      Per-dimension expansion template for %%m (%%d=val, %%a=avg, %%e=attrib, %%i=index)\n");
     printf("  -W             Enable metric auto-scaling (accepted for backward compatibility)\n");
     printf("  -A, --aggregate Aggregate sample values by category rather than storing/scoring raw rows\n");
-    printf("  -S             Silent / outliers only (suppress inliers from output)\n");
+    printf("  -S, --set-locale Apply environment locale settings (for number and timestamp formatting)\n");
     printf("  -q             Print model summary / diagnostics and exit\n");
     printf("  -h             Show this help message and exit\n");
 }
@@ -205,9 +206,8 @@ static time_t parse_delete_interval(const char *s)
  * @param[in]     threshold                Outlier decision boundary [0, 1].
  * @param[in]     threshold_is_average     True if threshold is calibrated to category mean score.
  * @param[in]     threshold_is_percentage  True if threshold is percentile-based.
- * @param[in]     silent_outliers          True to suppress nominal inlier rows (-S).
- * @param[in]     point_tmpl               Output format template for scored points (-p).
- * @param[in]     average_tmpl             Output format template for nominal inliers (-v).
+ * @param[in]     point_tmpl               Output format template for scored points (-p, default "%s %v").
+ * @param[in]     average_tmpl             Output format template for summary/average rows (-v).
  * @param[in]     new_cat_tmpl             Output format template for unseen categories (-N).
  * @param[in]     decimals                 Floating point precision (-d).
  * @param[in]     printf_format            Dimension format override string (-m).
@@ -233,7 +233,6 @@ static void process_scoring_row(geif_ensemble_t *ensemble,
                                 double threshold,
                                 bool threshold_is_average,
                                 bool threshold_is_percentage,
-                                bool silent_outliers,
                                 const char *point_tmpl,
                                 const char *average_tmpl,
                                 const char *new_cat_tmpl,
@@ -302,10 +301,6 @@ static void process_scoring_row(geif_ensemble_t *ensemble,
             char out_buf[8192];
             geif_format_template(out_buf, sizeof(out_buf), new_cat_tmpl, &ctx);
             fprintf(out_fp, "%s\n", out_buf);
-        } else if (!point_tmpl && !silent_outliers) {
-            fprintf(out_fp, "%s%c%.*f%c%d%c%.*f%c%.*f\n",
-                    orig_line, list_sep, decimals, 1.0, list_sep,
-                    1, list_sep, decimals, 0.0, list_sep, decimals, 999.0);
         }
         return;
     }
@@ -395,16 +390,11 @@ static void process_scoring_row(geif_ensemble_t *ensemble,
             .is_summary       = false
         };
 
-        if (point_tmpl) {
-            if (is_outlier) {
-                char out_buf[8192];
-                geif_format_template(out_buf, sizeof(out_buf), point_tmpl, &ctx);
-                fprintf(out_fp, "%s\n", out_buf);
-            }
-        } else if (!silent_outliers || is_outlier) {
-            fprintf(out_fp, "%s%c%.6f%c%d%c%.6f%c%.6f\n",
-                    orig_line, list_sep, score, list_sep,
-                    is_outlier ? 1 : 0, list_sep, H_metric, list_sep, d_out);
+        if (is_outlier) {
+            const char *tmpl_to_use = (point_tmpl && point_tmpl[0] != '\0') ? point_tmpl : "%s %v";
+            char out_buf[8192];
+            geif_format_template(out_buf, sizeof(out_buf), tmpl_to_use, &ctx);
+            fprintf(out_fp, "%s\n", out_buf);
         }
 
         if (averages) free(averages);
@@ -686,7 +676,7 @@ int main(int argc, char *argv[])
     const char *new_cat_tmpl  = NULL;
     const char *missed_cat_tmpl = NULL;
     const char *point_tmpl    = NULL;
-    bool        silent_outliers = false;
+    bool        set_locale    = false;
     time_t      delete_interval = 0;
     cat_filter_t cat_filter   = {0};
     char delimiter           = ',';
@@ -729,6 +719,8 @@ int main(int argc, char *argv[])
     bool cli_samples_given = false;
     bool cli_decimals_given = false;
     bool cli_print_dim_given = false;
+    bool cli_point_tmpl_given = false;
+    bool cli_printf_format_given = false;
 
     geif_config_t config = geif_config_default();
 
@@ -747,6 +739,7 @@ int main(int argc, char *argv[])
         {"header",       no_argument,       0, 'H'},
         {"no-header",    no_argument,       0, 1001},
         {"aggregate",    no_argument,       0, 'A'},
+        {"set-locale",   no_argument,       0, 'S'},
         {"help",         no_argument,       0, 'h'},
         {"version",      no_argument,       0, 'v'},
         {0, 0, 0, 0}
@@ -815,6 +808,7 @@ int main(int argc, char *argv[])
         case 'm':
             if (strchr(optarg, '%') != NULL) {
                 printf_format = optarg;
+                cli_printf_format_given = true;
             } else {
                 config.max_depth = (uint32_t)atoi(optarg);
             }
@@ -885,9 +879,10 @@ int main(int argc, char *argv[])
             break;
         case 'p':
             point_tmpl = optarg;
+            cli_point_tmpl_given = true;
             break;
         case 'S':
-            silent_outliers = true;
+            set_locale = true;
             break;
         case 'W':
             // Geometric auto-scaling (enabled by default in GEIF, accepted for CEIF compatibility)
@@ -1079,6 +1074,30 @@ int main(int argc, char *argv[])
                 if (ensemble->entries[i].forest) ensemble->entries[i].forest->aggregate = aggregate;
             }
         }
+        if (!cli_point_tmpl_given && ensemble->print_string[0] != '\0') {
+            point_tmpl = ensemble->print_string;
+        } else if (cli_point_tmpl_given && point_tmpl) {
+            snprintf(ensemble->print_string, sizeof(ensemble->print_string), "%s", point_tmpl);
+            for (size_t i = 0; i < ensemble->count; i++) {
+                if (ensemble->entries[i].forest) {
+                    snprintf(ensemble->entries[i].forest->print_string, sizeof(ensemble->entries[i].forest->print_string), "%s", point_tmpl);
+                }
+            }
+        }
+        if (!cli_printf_format_given && ensemble->printf_format[0] != '\0') {
+            printf_format = ensemble->printf_format;
+        } else if (cli_printf_format_given && printf_format) {
+            snprintf(ensemble->printf_format, sizeof(ensemble->printf_format), "%s", printf_format);
+            for (size_t i = 0; i < ensemble->count; i++) {
+                if (ensemble->entries[i].forest) {
+                    snprintf(ensemble->entries[i].forest->printf_format, sizeof(ensemble->entries[i].forest->printf_format), "%s", printf_format);
+                }
+            }
+        }
+    }
+
+    if (set_locale) {
+        setlocale(LC_ALL, "");
     }
 
     // Mode: Model info query (-q)
@@ -1136,6 +1155,8 @@ int main(int argc, char *argv[])
             ensemble->list_separator = list_separator;
             ensemble->has_header = skip_header;
             ensemble->aggregate = aggregate;
+            if (point_tmpl) snprintf(ensemble->print_string, sizeof(ensemble->print_string), "%s", point_tmpl);
+            if (printf_format) snprintf(ensemble->printf_format, sizeof(ensemble->printf_format), "%s", printf_format);
             for (size_t i = 0; i < ensemble->count; i++) {
                 if (ensemble->entries[i].forest) {
                     ensemble->entries[i].forest->decimals = decimals;
@@ -1143,9 +1164,13 @@ int main(int argc, char *argv[])
                     ensemble->entries[i].forest->list_separator = list_separator;
                     ensemble->entries[i].forest->has_header = skip_header;
                     ensemble->entries[i].forest->aggregate = aggregate;
+                    if (point_tmpl) snprintf(ensemble->entries[i].forest->print_string, sizeof(ensemble->entries[i].forest->print_string), "%s", point_tmpl);
+                    if (printf_format) snprintf(ensemble->entries[i].forest->printf_format, sizeof(ensemble->entries[i].forest->printf_format), "%s", printf_format);
                 }
             }
+            if (set_locale) setlocale(LC_ALL, "C");
             geif_status_t status = geif_ensemble_save_json(ensemble, save_file);
+            if (set_locale) setlocale(LC_ALL, "");
             if (status != GEIF_OK) {
                 fprintf(stderr, "Error saving ensemble model to '%s': %s\n",
                         save_file, geif_status_str(status));
@@ -1268,10 +1293,22 @@ int main(int argc, char *argv[])
         ensemble->list_separator = list_separator;
         ensemble->has_header = skip_header;
         ensemble->aggregate = aggregate;
+        if (point_tmpl && point_tmpl != ensemble->print_string) {
+            snprintf(ensemble->print_string, sizeof(ensemble->print_string), "%s", point_tmpl);
+        }
+        if (printf_format && printf_format != ensemble->printf_format) {
+            snprintf(ensemble->printf_format, sizeof(ensemble->printf_format), "%s", printf_format);
+        }
         for (size_t i = 0; i < ensemble->count; i++) {
             if (ensemble->entries[i].forest) {
                 ensemble->entries[i].forest->aggregate = aggregate;
                 ensemble->entries[i].forest->summary_slot = -1;
+                if (point_tmpl && point_tmpl != ensemble->entries[i].forest->print_string) {
+                    snprintf(ensemble->entries[i].forest->print_string, sizeof(ensemble->entries[i].forest->print_string), "%s", point_tmpl);
+                }
+                if (printf_format && printf_format != ensemble->entries[i].forest->printf_format) {
+                    snprintf(ensemble->entries[i].forest->printf_format, sizeof(ensemble->entries[i].forest->printf_format), "%s", printf_format);
+                }
             }
         }
         if (cli_outlier_score_given) {
@@ -1519,6 +1556,12 @@ int main(int argc, char *argv[])
             ensemble->list_separator = list_separator;
             ensemble->has_header = skip_header;
             ensemble->aggregate = aggregate;
+            if (point_tmpl && point_tmpl != ensemble->print_string) {
+                snprintf(ensemble->print_string, sizeof(ensemble->print_string), "%s", point_tmpl);
+            }
+            if (printf_format && printf_format != ensemble->printf_format) {
+                snprintf(ensemble->printf_format, sizeof(ensemble->printf_format), "%s", printf_format);
+            }
             for (size_t i = 0; i < ensemble->count; i++) {
                 if (ensemble->entries[i].forest) {
                     ensemble->entries[i].forest->decimals = decimals;
@@ -1526,9 +1569,17 @@ int main(int argc, char *argv[])
                     ensemble->entries[i].forest->list_separator = list_separator;
                     ensemble->entries[i].forest->has_header = skip_header;
                     ensemble->entries[i].forest->aggregate = aggregate;
+                    if (point_tmpl && point_tmpl != ensemble->entries[i].forest->print_string) {
+                        snprintf(ensemble->entries[i].forest->print_string, sizeof(ensemble->entries[i].forest->print_string), "%s", point_tmpl);
+                    }
+                    if (printf_format && printf_format != ensemble->entries[i].forest->printf_format) {
+                        snprintf(ensemble->entries[i].forest->printf_format, sizeof(ensemble->entries[i].forest->printf_format), "%s", printf_format);
+                    }
                 }
             }
+            if (set_locale) setlocale(LC_ALL, "C");
             status = geif_ensemble_save_json(ensemble, save_file);
+            if (set_locale) setlocale(LC_ALL, "");
             if (status != GEIF_OK) {
                 fprintf(stderr, "Error saving model to '%s': %s\n", save_file, geif_status_str(status));
             } else if (verbose && strcmp(save_file, "-") != 0) {
@@ -1660,7 +1711,7 @@ int main(int argc, char *argv[])
 
             process_scoring_row(ensemble, &col_cfg, &cat_filter, tokens, total_cols,
                                 orig_line, line_num, list_separator, category_sep, label_sep, threshold,
-                                threshold_is_average, threshold_is_percentage, silent_outliers, point_tmpl, average_tmpl,
+                                threshold_is_average, threshold_is_percentage, point_tmpl, average_tmpl,
                                 new_cat_tmpl, decimals, printf_format, print_dimension,
                                 low_rgb, high_rgb, vec, dims,
                                 out_fp, &analyzed, &total_outliers);
@@ -1682,7 +1733,7 @@ int main(int argc, char *argv[])
             if (n_tok >= total_cols) {
                 process_scoring_row(ensemble, &col_cfg, &cat_filter, tokens, n_tok,
                                     orig_line, line_num, list_separator, category_sep, label_sep, threshold,
-                                    threshold_is_average, threshold_is_percentage, silent_outliers, point_tmpl, average_tmpl,
+                                    threshold_is_average, threshold_is_percentage, point_tmpl, average_tmpl,
                                     new_cat_tmpl, decimals, printf_format, print_dimension,
                                     low_rgb, high_rgb, vec, dims,
                                     out_fp, &analyzed, &total_outliers);
@@ -1761,16 +1812,10 @@ int main(int argc, char *argv[])
                 };
 
                 char out_buf[8192];
-                if (point_tmpl) {
-                    if (is_out) {
-                        geif_format_template(out_buf, sizeof(out_buf), point_tmpl, &ctx);
-                        fprintf(out_fp, "%s\n", out_buf);
-                    }
-                } else if (!average_tmpl) {
-                    if (!silent_outliers || is_out) {
-                        geif_format_template(out_buf, sizeof(out_buf), "%s %v", &ctx);
-                        fprintf(out_fp, "%s\n", out_buf);
-                    }
+                if (is_out) {
+                    const char *tmpl_to_use = (point_tmpl && point_tmpl[0] != '\0') ? point_tmpl : "%s %v";
+                    geif_format_template(out_buf, sizeof(out_buf), tmpl_to_use, &ctx);
+                    fprintf(out_fp, "%s\n", out_buf);
                 }
 
                 xfree(attr);
@@ -1911,6 +1956,12 @@ int main(int argc, char *argv[])
             ensemble->list_separator = list_separator;
             ensemble->has_header = skip_header;
             ensemble->aggregate = aggregate;
+            if (point_tmpl && point_tmpl != ensemble->print_string) {
+                snprintf(ensemble->print_string, sizeof(ensemble->print_string), "%s", point_tmpl);
+            }
+            if (printf_format && printf_format != ensemble->printf_format) {
+                snprintf(ensemble->printf_format, sizeof(ensemble->printf_format), "%s", printf_format);
+            }
             for (size_t i = 0; i < ensemble->count; i++) {
                 if (ensemble->entries[i].forest) {
                     ensemble->entries[i].forest->decimals = decimals;
@@ -1918,9 +1969,17 @@ int main(int argc, char *argv[])
                     ensemble->entries[i].forest->list_separator = list_separator;
                     ensemble->entries[i].forest->has_header = skip_header;
                     ensemble->entries[i].forest->aggregate = aggregate;
+                    if (point_tmpl && point_tmpl != ensemble->entries[i].forest->print_string) {
+                        snprintf(ensemble->entries[i].forest->print_string, sizeof(ensemble->entries[i].forest->print_string), "%s", point_tmpl);
+                    }
+                    if (printf_format && printf_format != ensemble->entries[i].forest->printf_format) {
+                        snprintf(ensemble->entries[i].forest->printf_format, sizeof(ensemble->entries[i].forest->printf_format), "%s", printf_format);
+                    }
                 }
             }
+            if (set_locale) setlocale(LC_ALL, "C");
             geif_status_t status = geif_ensemble_save_json(ensemble, save_file);
+            if (set_locale) setlocale(LC_ALL, "");
             if (status != GEIF_OK) {
                 fprintf(stderr, "Error saving model to '%s': %s\n", save_file, geif_status_str(status));
             } else if (verbose && strcmp(save_file, "-") != 0) {
@@ -2116,6 +2175,12 @@ int main(int argc, char *argv[])
             ensemble->list_separator = list_separator;
             ensemble->has_header = skip_header;
             ensemble->aggregate = aggregate;
+            if (point_tmpl && point_tmpl != ensemble->print_string) {
+                snprintf(ensemble->print_string, sizeof(ensemble->print_string), "%s", point_tmpl);
+            }
+            if (printf_format && printf_format != ensemble->printf_format) {
+                snprintf(ensemble->printf_format, sizeof(ensemble->printf_format), "%s", printf_format);
+            }
             for (size_t i = 0; i < ensemble->count; i++) {
                 if (ensemble->entries[i].forest) {
                     ensemble->entries[i].forest->decimals = decimals;
@@ -2123,9 +2188,17 @@ int main(int argc, char *argv[])
                     ensemble->entries[i].forest->list_separator = list_separator;
                     ensemble->entries[i].forest->has_header = skip_header;
                     ensemble->entries[i].forest->aggregate = aggregate;
+                    if (point_tmpl && point_tmpl != ensemble->entries[i].forest->print_string) {
+                        snprintf(ensemble->entries[i].forest->print_string, sizeof(ensemble->entries[i].forest->print_string), "%s", point_tmpl);
+                    }
+                    if (printf_format && printf_format != ensemble->entries[i].forest->printf_format) {
+                        snprintf(ensemble->entries[i].forest->printf_format, sizeof(ensemble->entries[i].forest->printf_format), "%s", printf_format);
+                    }
                 }
             }
+            if (set_locale) setlocale(LC_ALL, "C");
             geif_status_t status = geif_ensemble_save_json(ensemble, save_file);
+            if (set_locale) setlocale(LC_ALL, "");
             if (status != GEIF_OK) {
                 fprintf(stderr, "Error saving model to '%s': %s\n", save_file, geif_status_str(status));
             } else if (verbose && strcmp(save_file, "-") != 0) {

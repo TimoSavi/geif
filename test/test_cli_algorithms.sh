@@ -55,11 +55,9 @@ for ALGO in "${ALGOS[@]}"; do
 
     # Test scoring: inlier should have lower score than extreme outer point
     set +e
-    INLIER_OUT=$("$GEIF_BIN" -r "$MODEL_JSON" -a - -d 4 <<< "10.0,20.0")
-    OUTER_OUT=$("$GEIF_BIN" -r "$MODEL_JSON" -a - -d 4 <<< "500.0,500.0")
+    INLIER_SCORE=$("$GEIF_BIN" -r "$MODEL_JSON" -a - -d 4 -O -1 -p "%s" <<< "10.0,20.0")
+    OUTER_SCORE=$("$GEIF_BIN" -r "$MODEL_JSON" -a - -d 4 -O -1 -p "%s" <<< "500.0,500.0")
     set -e
-    INLIER_SCORE=$(echo "$INLIER_OUT" | cut -d',' -f3)
-    OUTER_SCORE=$(echo "$OUTER_OUT" | cut -d',' -f3)
 
     echo "  Inlier (10, 20) score: $INLIER_SCORE, Outer (500, 500) score: $OUTER_SCORE"
     python3 -c "assert float('$INLIER_SCORE') < float('$OUTER_SCORE'), 'Outer score must be higher than inlier'"

@@ -150,6 +150,8 @@ typedef struct geif_forest {
     char          list_separator;         /**< Output list separator from -e (default: ',') */
     bool          has_header;             /**< Flag indicating input CSV has a header line to skip (-H) */
     bool          aggregate;              /**< Flag indicating sample values are aggregated per category (-A) */
+    char          print_string[256];      /**< Output template string (-p, default: "%s %v") */
+    char          printf_format[64];      /**< Dimension printf format string (-m, e.g. "%'.0f") */
     int64_t       summary_slot;           /**< Ephemeral pool slot index for current session aggregation (-1 if none) */
     bool          is_trained;             /**< Flag indicating whether trees have been built */
     void         *algo_data;              /**< Optional algorithm-specific auxiliary state */
@@ -188,6 +190,8 @@ typedef struct {
     char           list_separator;         /**< Output list separator from -e (default: ',') */
     bool           has_header;             /**< Flag indicating input CSV has a header line to skip (-H) */
     bool           aggregate;              /**< Flag indicating sample values are aggregated per category (-A) */
+    char           print_string[256];      /**< Output template string (-p, default: "%s %v") */
+    char           printf_format[64];      /**< Dimension printf format string (-m, e.g. "%'.0f") */
 
     geif_category_entry_t *entries;        /**< Dynamic array of category sub-forests */
     size_t         count;                  /**< Number of active sub-forests */

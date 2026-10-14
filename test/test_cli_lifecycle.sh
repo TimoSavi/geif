@@ -17,7 +17,7 @@ $BIN -l "$WINE_CSV" -H -f ';' -C 12 -w "$TMP_DIR/model_full.json" -i 20 -s 64
 
 # Test 1: Category Filter (-F) - Filter out categories matching regex
 echo "Test 1: Category Filter (-F '^(5|6)$') - Exclude categories 5 and 6..."
-$BIN -r "$TMP_DIR/model_full.json" -a "$WINE_CSV" -H -f ';' -F '^(5|6)$' -o "$TMP_DIR/filtered_pos.csv" || true
+$BIN -r "$TMP_DIR/model_full.json" -a "$WINE_CSV" -H -f ';' -F '^(5|6)$' -O -1 -o "$TMP_DIR/filtered_pos.csv" || true
 LINES_POS=$(wc -l < "$TMP_DIR/filtered_pos.csv")
 # 1599 total - 1319 (categories 5 & 6) = 280 rows remaining.
 if [ "$LINES_POS" -ne 280 ]; then
@@ -28,7 +28,7 @@ echo "  [PASS] Filter (-F '^(5|6)$') correctly excluded categories 5 and 6 (280 
 
 # Test 2: Category Inverted Filter (-F"-v ...") - Keep only matching categories
 echo "Test 2: Category Inverted Filter (-F'-v ^(5|6)$') - Keep only categories 5 and 6..."
-$BIN -r "$TMP_DIR/model_full.json" -a "$WINE_CSV" -H -f ';' -F "-v ^(5|6)$" -o "$TMP_DIR/filtered_inv.csv" || true
+$BIN -r "$TMP_DIR/model_full.json" -a "$WINE_CSV" -H -f ';' -F "-v ^(5|6)$" -O -1 -o "$TMP_DIR/filtered_inv.csv" || true
 LINES_INV=$(wc -l < "$TMP_DIR/filtered_inv.csv")
 # Categories 5 (681) + 6 (638) = 1319 rows kept.
 if [ "$LINES_INV" -ne 1319 ]; then
@@ -130,16 +130,15 @@ PT_OUT=$(head -n 2 "$TMP_DIR/test_cat5_only.csv" | $BIN -r "$TMP_DIR/model_full.
 echo "$PT_OUT" | grep "^A;[0-9.]*;5;[0-9.]*" > /dev/null
 echo "  [PASS] Custom point output formatted accurately using -p."
 
-# Test 7: Silent / Outliers Only (-S)
-echo "Test 7: Outliers only filtering (-S)..."
-# Score with a threshold where only some points trigger
+# Test 7: Default Outliers Only and -S (--set-locale) with persisted -p template
+echo "Test 7: Default outliers-only filtering and -S (--set-locale)..."
+# Score with a threshold where only some points trigger (by default, only outliers are printed)
 $BIN -r "$TMP_DIR/model_full.json" -a "$WINE_CSV" -H -f ';' -O 0.35 -S -o "$TMP_DIR/outliers_only.csv" || true
 OUTLIER_ROWS=$(wc -l < "$TMP_DIR/outliers_only.csv")
-ALL_ROWS=$(wc -l < "$TMP_DIR/filtered_pos.csv")
 if [ "$OUTLIER_ROWS" -ge 1599 ] || [ "$OUTLIER_ROWS" -le 0 ]; then
-    echo "  [FAIL] Expected only outlier rows with -S, got $OUTLIER_ROWS"
+    echo "  [FAIL] Expected only outlier rows by default, got $OUTLIER_ROWS"
     exit 1
 fi
-echo "  [PASS] -S correctly suppressed normal inliers, outputting only $OUTLIER_ROWS outliers."
+echo "  [PASS] Default analysis suppressed normal inliers, outputting only $OUTLIER_ROWS outliers with -S (--set-locale)."
 
 echo ">>> ALL FEATURE 4 TESTS PASSED SUCCESSFULLY! <<<"
