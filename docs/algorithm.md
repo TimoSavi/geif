@@ -404,21 +404,21 @@ $$
 Raw density $D(x)$ is converted into a calibrated anomaly score $s(x) \in [0.0, 1.0)$ via two complementary stages:
 
 1. **Square-Root Potential Mapping & Zero Kelvin Baseline**:
-   During model finalization, the maximum core density observed across all training exemplars is recorded:
+During model finalization, the maximum core density observed across all training exemplars is recorded:
 
 $$
 D_{\max} = \max_{i=1 \ldots N} D(x_i)
 $$
 
-   The raw continuous anomaly score $s_{\text{raw}}(x)$ is evaluated via square-root potential calibration:
+The raw continuous anomaly score $s_{\text{raw}}(x)$ is evaluated via square-root potential calibration:
 
 $$
 s_{\text{raw}}(x) = 1.0 - \sqrt{\min\left(1.0, \frac{D(x)}{D_{\max}}\right)}
 $$
 
-    - At the densest cluster centroid, $D(x) \approx D_{\max}$, establishing an exact Zero Kelvin baseline: $s_{\text{raw}} \approx 0.000$.
-   - Inside clusters and internal cavities ($s_{\text{raw}} \le 0.52$), the square-root transform linearizes the spatial decay profile ($s(r) \approx 1 - \bar{\sigma} / r$), preserving strong sensitivity inside hollow cavities ($s > 0.50$).
-   - Above the cluster boundary knee ($s_{\text{knee}} = 0.52$), a smooth hyperbolic soft-knee attenuates the post-boundary $1/r$ climb with slope $m = 0.30$ and smoothing radius $\varepsilon = 0.025$:
+- At the densest cluster centroid, $D(x) \approx D_{\max}$, establishing an exact Zero Kelvin baseline: $s_{\text{raw}} \approx 0.000$.
+- Inside clusters and internal cavities ($s_{\text{raw}} \le 0.52$), the square-root transform linearizes the spatial decay profile ($s(r) \approx 1 - \bar{\sigma} / r$), preserving strong sensitivity inside hollow cavities ($s > 0.50$).
+- Above the cluster boundary knee ($s_{\text{knee}} = 0.52$), a smooth hyperbolic soft-knee attenuates the post-boundary $1/r$ climb with slope $m = 0.30$ and smoothing radius $\varepsilon = 0.025$:
 
 $$
 s_{\text{tail}}(x) = s_{\text{knee}} + m \cdot \left(s_{\text{raw}}(x) - s_{\text{knee}}\right)
@@ -428,16 +428,16 @@ $$
 s_{\text{base}}(x) = \frac{1}{2} \left( s_{\text{raw}}(x) + s_{\text{tail}}(x) - \sqrt{\left(s_{\text{raw}}(x) - s_{\text{tail}}(x)\right)^2 + \varepsilon^2} \right)
 $$
 
-     This drops the post-boundary elbow from $0.80$ down to $\approx 0.60$, matching CEIF's gradual outer transition profile.
+This drops the post-boundary elbow from $0.80$ down to $\approx 0.60$, matching CEIF's gradual outer transition profile.
 
 2. **Asymptotic Outer Stadium Decay**:
-   For query points that lie outside the training data bounding box between $x_{\min}$ and $x_{\max}$, the normalized outer Euclidean distance $d_{\text{norm}}(x) = d_{\text{out}}(x) / \text{span}_{\text{target}}$ is evaluated:
+For query points that lie outside the training data bounding box between $x_{\min}$ and $x_{\max}$, the normalized outer Euclidean distance $d_{\text{norm}}(x)$ is evaluated:
 
 $$
-d_{\text{out}}^2(x) = \sum_{j=1}^D \left(\frac{\max(0, x_{\min,j} - x_j, x_j - x_{\max,j}) \cdot \text{span}_{\text{target}}}{\text{span}_j}\right)^2
+d_{\text{norm}}(x) = \frac{d_{\text{out}}(x)}{\text{span}_{\text{target}}} = \sqrt{\sum_{j=1}^D \left(\frac{\max(0, x_{\min,j} - x_j, x_j - x_{\max,j})}{\text{span}_j}\right)^2}
 $$
 
-   If $d_{\text{out}}(x) > 0$, $C^1$-continuous asymptotic exponential stadium attenuation is applied:
+If $d_{\text{out}}(x) > 0$, $C^1$-continuous asymptotic exponential stadium attenuation is applied:
 
 $$
 d_{\text{eff}}(x) = \frac{d_{\text{norm}}^2(x)}{d_{\text{norm}}(x) + 0.15}
@@ -447,7 +447,7 @@ $$
 s(x) = 1.0 - (1.0 - s_{\text{base}}(x)) \exp\left(-\lambda_{\text{out}} \, d_{\text{eff}}(x)\right)
 $$
 
-   where $\lambda_{\text{out}} = 0.10$ (`GEIF_OUTER_DECAY_RATE`). This guarantees $C^1$ slope continuity at the bounding box edge ($d_{\text{norm}} = 0$) and smooth, strictly monotonic asymptotic convergence from $\approx 0.60$ toward $1.0$ as a query point recedes into outer space.
+where $\lambda_{\text{out}} = 0.10$ (`GEIF_OUTER_DECAY_RATE`). This guarantees $C^1$ slope continuity at the bounding box edge ($d_{\text{norm}} = 0$) and smooth, strictly monotonic asymptotic convergence from $\approx 0.60$ toward $1.0$ as a query point recedes into outer space.
 
 ---
 
