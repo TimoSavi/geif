@@ -352,11 +352,11 @@ GEIF provides complete backward and forward compatibility with legacy CEIF model
 # Convert CEIF file to GEIF-1.0 format
 bin/ceif2geif legacy_model.json geif_model.json
 
-# Convert with custom tree and sample overrides
-bin/ceif2geif -v -t 200 -s 512 legacy_model.json geif_model.json
+# Convert and change algorithm (bubble | voronoi | exemplar | ceif) with custom tree/sample overrides
+bin/ceif2geif -v -B bubble -t 200 -s 512 legacy_model.json geif_model.json
 
 # Stream through stdin and stdout
-cat legacy_model.json | bin/ceif2geif - - > geif_model.json
+cat legacy_model.json | bin/ceif2geif -B exemplar - - > geif_model.json
 ```
 
 ---

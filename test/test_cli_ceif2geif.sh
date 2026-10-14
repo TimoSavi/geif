@@ -170,5 +170,37 @@ if ! echo "$OVERRIDE_SUMMARY" | grep -q "trees=35"; then
 fi
 echo "  [PASS] Parameter overrides (-t 35) successfully applied during migration."
 
+# Test 7: Changing algorithm during conversion (-B / --algo)
+echo "Test 7: Changing algorithm during conversion (-B bubble / --algo exemplar)..."
+for ALGO in bubble voronoi exemplar ceif; do
+    ALGO_MIGRATED="$TEST_DIR/model_${ALGO}.json"
+    "$MIGRATE_BIN" -B "$ALGO" "$CEIF_JSON" "$ALGO_MIGRATED"
+    if ! grep -Eq "\"algorithm\"[[:space:]]*:[[:space:]]*\"${ALGO}\"" "$ALGO_MIGRATED"; then
+        echo "ERROR: Algorithm tag '${ALGO}' missing from converted model"
+        cat "$ALGO_MIGRATED"
+        exit 1
+    fi
+    ALGO_SUMMARY=$("$GEIF_BIN" -r "$ALGO_MIGRATED" -q)
+    if ! echo "$ALGO_SUMMARY" | grep -q "Algorithm (-B):      ${ALGO}"; then
+        echo "ERROR: geif -q did not report Algorithm (-B): ${ALGO}"
+        echo "$ALGO_SUMMARY"
+        exit 1
+    fi
+    # Verify scoring works cleanly on the converted model
+    ALGO_SCORE="$TEST_DIR/score_${ALGO}.txt"
+    "$GEIF_BIN" -r "$ALGO_MIGRATED" -a "$DATA_CSV" -L 1 -C 5 -p "%l;%c;%s;%o" -o "$ALGO_SCORE" || true
+    if ! grep -q "^p_outlier;alpha;.*1$" "$ALGO_SCORE"; then
+        echo "ERROR: Outlier point not detected after converting to ${ALGO}"
+        cat "$ALGO_SCORE"
+        exit 1
+    fi
+done
+
+if "$MIGRATE_BIN" -B invalid_algo "$CEIF_JSON" "$TEST_DIR/bad.json" 2>/dev/null; then
+    echo "ERROR: Invalid algorithm should have failed with non-zero exit code"
+    exit 1
+fi
+echo "  [PASS] Algorithm override (-B / --algo) verified across bubble, voronoi, exemplar, and ceif."
+
 echo "=== All ceif2geif Migration Tests Passed! ==="
 

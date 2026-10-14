@@ -640,6 +640,7 @@ void geif_ensemble_summary(const geif_ensemble_t *ens, char *buffer, size_t buff
     size_t written = 0;
     int n = snprintf(buffer + written, buffer_size - written,
                      "GEIF Ensemble Diagnostic Summary:\n"
+                     "  Algorithm (-B):      %s\n"
                      "  Dimensions:          %u\n"
                      "  Sub-forests:         %zu\n"
                      "  Total Input Cols:    %u\n"
@@ -651,6 +652,7 @@ void geif_ensemble_summary(const geif_ensemble_t *ens, char *buffer, size_t buff
                      "  List Separator (-e):  '%c'\n"
                      "  Skip Header (-H):     %s\n"
                      "  Aggregate (-A):       %s\n",
+                     geif_algo_name(ens->config.algo),
                      ens->dimensions,
                      ens->count,
                      ens->total_input_cols,

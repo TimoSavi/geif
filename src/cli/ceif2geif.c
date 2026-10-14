@@ -9,10 +9,32 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <unistd.h>
 #include <getopt.h>
 
 #define CEIF2GEIF_VERSION "1.1.0"
+
+/**
+ * @brief Validates and parses an algorithm name string for -B / --algo.
+ */
+static bool parse_algo_option(const char *name, geif_algo_type_t *algo_out)
+{
+    if (!name || name[0] == '\0') return false;
+    if (strcasecmp(name, "bubble") == 0 ||
+        strcasecmp(name, "spherical") == 0 ||
+        strcasecmp(name, "voronoi") == 0 ||
+        strcasecmp(name, "exemplar") == 0 ||
+        strcasecmp(name, "knn") == 0 ||
+        strcasecmp(name, "density") == 0 ||
+        strcasecmp(name, "ceif") == 0 ||
+        strcasecmp(name, "eif") == 0 ||
+        strcasecmp(name, "gaussian") == 0) {
+        *algo_out = geif_algo_from_name(name);
+        return true;
+    }
+    return false;
+}
 
 /**
  * @brief Prints command-line help and usage instructions for ceif2geif.
@@ -28,6 +50,7 @@ static void print_usage(const char *prog)
     printf("  %s - < input_ceif.json > output_geif.json\n\n", prog);
     printf("Options:\n");
     printf("  -o, --output <file>    Output GEIF model JSON file (default: stdout or 2nd argument)\n");
+    printf("  -B, --algo <name>      Change algorithm during conversion (bubble|voronoi|exemplar|ceif)\n");
     printf("  -t, --trees <int>      Override tree count in forest (default: from CEIF or 100)\n");
     printf("  -s, --samples <int>    Override samples per tree (default: from CEIF or 256)\n");
     printf("  -v, --verbose          Print migration details and sub-forest statistics\n");
@@ -54,9 +77,12 @@ int main(int argc, char *argv[])
     bool quiet = false;
     int tree_override = 0;
     int samples_override = 0;
+    bool algo_override_set = false;
+    geif_algo_type_t algo_override = GEIF_ALGO_DEFAULT;
 
     static struct option long_options[] = {
         {"output",  required_argument, 0, 'o'},
+        {"algo",    required_argument, 0, 'B'},
         {"trees",   required_argument, 0, 't'},
         {"samples", required_argument, 0, 's'},
         {"verbose", no_argument,       0, 'v'},
@@ -67,9 +93,16 @@ int main(int argc, char *argv[])
     };
 
     int opt;
-    while ((opt = getopt_long(argc, argv, "o:t:s:vqhV", long_options, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "o:B:t:s:vqhV", long_options, NULL)) != -1) {
         switch (opt) {
         case 'o': output_file = optarg; break;
+        case 'B':
+            if (!parse_algo_option(optarg, &algo_override)) {
+                fprintf(stderr, "ceif2geif: error: unknown algorithm '%s' (expected bubble, voronoi, exemplar, or ceif)\n", optarg);
+                return 1;
+            }
+            algo_override_set = true;
+            break;
         case 't': tree_override = atoi(optarg); break;
         case 's': samples_override = atoi(optarg); break;
         case 'v': verbose = true; break;
@@ -114,24 +147,38 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    if (verbose && !quiet) {
-        char summary[4096];
-        geif_ensemble_summary(ens, summary, sizeof(summary));
-        fprintf(stderr, "%s", summary);
-    }
-
-    // Retrain if overrides requested
-    if (tree_override > 0 || samples_override > 0) {
+    // Apply algorithm, tree count, and sample count overrides
+    if (algo_override_set || tree_override > 0 || samples_override > 0) {
+        if (algo_override_set) {
+            ens->config.algo = algo_override;
+        }
+        if (tree_override > 0) {
+            ens->config.tree_count = (uint32_t)tree_override;
+        }
+        if (samples_override > 0) {
+            ens->config.samples_per_tree = (uint32_t)samples_override;
+        }
         if (verbose && !quiet) {
-            fprintf(stderr, "ceif2geif: Retraining with trees=%d, samples=%d...\n",
-                    tree_override > 0 ? tree_override : (int)ens->config.tree_count,
-                    samples_override > 0 ? samples_override : (int)ens->config.samples_per_tree);
+            fprintf(stderr, "ceif2geif: Applying overrides (algo=%s, trees=%u, samples=%u)...\n",
+                    geif_algo_name(ens->config.algo),
+                    (unsigned)ens->config.tree_count,
+                    (unsigned)ens->config.samples_per_tree);
         }
         for (size_t i = 0; i < ens->count; i++) {
             geif_forest_t *f = ens->entries[i].forest;
             if (f) {
-                uint32_t new_trees = (tree_override > 0) ? (uint32_t)tree_override : f->tree_count;
+                geif_algo_type_t target_algo = algo_override_set ? algo_override : f->config.algo;
                 uint32_t new_samples = (samples_override > 0) ? (uint32_t)samples_override : f->config.samples_per_tree;
+                uint32_t new_trees;
+                if (target_algo == GEIF_ALGO_EXEMPLAR) {
+                    new_trees = 1;
+                } else if (tree_override > 0) {
+                    new_trees = (uint32_t)tree_override;
+                } else if (f->config.algo == GEIF_ALGO_EXEMPLAR && f->tree_count <= 1) {
+                    new_trees = GEIF_DEFAULT_TREE_COUNT;
+                } else {
+                    new_trees = f->tree_count;
+                }
 
                 // Free old trees
                 for (uint32_t t = 0; t < f->tree_count; t++) {
@@ -141,12 +188,14 @@ int main(int argc, char *argv[])
                 }
                 free(f->trees);
 
+                f->config.algo = target_algo;
                 f->tree_count = new_trees;
                 f->config.tree_count = new_trees;
                 f->config.samples_per_tree = new_samples;
+                f->is_trained = false;
                 f->trees = (geif_tree_t *)calloc(new_trees, sizeof(geif_tree_t));
 
-                size_t needed_cap = (f->config.algo == GEIF_ALGO_EXEMPLAR) ? (size_t)new_samples : (size_t)new_trees * new_samples;
+                size_t needed_cap = (target_algo == GEIF_ALGO_EXEMPLAR) ? (size_t)new_samples : (size_t)new_trees * new_samples;
                 if (needed_cap > f->pool_capacity) {
                     double *new_pool = (double *)realloc(f->sample_pool, needed_cap * f->dimensions * sizeof(double));
                     if (new_pool) {
@@ -154,10 +203,19 @@ int main(int argc, char *argv[])
                         f->pool_capacity = needed_cap;
                     }
                 }
+                if (f->pool_count > needed_cap) {
+                    f->pool_count = needed_cap;
+                }
 
                 geif_forest_train(f);
             }
         }
+    }
+
+    if (verbose && !quiet) {
+        char summary[4096];
+        geif_ensemble_summary(ens, summary, sizeof(summary));
+        fprintf(stderr, "%s", summary);
     }
 
     for (size_t i = 0; i < ens->count; i++) {

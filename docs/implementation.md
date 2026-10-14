@@ -371,8 +371,8 @@ The parser uses `strcasecmp` to match keys case-insensitively, trims comments (`
 Located in [`src/cli/ceif2geif.c`](../src/cli/ceif2geif.c) (compiled as `bin/ceif2geif`), this utility migrates legacy CEIF models to the modern GEIF-1.0 sparse JSON format:
 
 ```bash
-# Ingest legacy model and output validated GEIF-1.0 JSON
-bin/ceif2geif -v legacy_model.json -o geif_model.json
+# Ingest legacy model and output validated GEIF-1.0 JSON (optionally changing algorithm with -B)
+bin/ceif2geif -v -B bubble legacy_model.json -o geif_model.json
 
 # Stdin / stdout pipeline migration
 cat legacy_model.json | bin/ceif2geif - > migrated_model.json

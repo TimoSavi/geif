@@ -196,3 +196,27 @@ In adherence with standard UNIX pipeline conventions:
 - **0**: Clean success; all evaluated observations are nominal inliers (score $< \text{threshold}$).
 - **2**: Outliers detected; at least one observation equaled or exceeded the anomaly threshold.
 - **1**: Error encountered (file not found, corrupted model JSON, invalid options).
+
+---
+
+## 7. Model Migration & Algorithm Conversion (`ceif2geif`)
+
+The `ceif2geif` utility converts legacy CEIF models or existing GEIF models into `GEIF-1.0` JSON models, optionally changing the algorithm (`-B`) or overriding tree/sample counts (`-t`, `-s`):
+
+```bash
+# Convert a CEIF model to GEIF-1.0 format while changing algorithm to 'bubble'
+./bin/ceif2geif -v -B bubble legacy_model.json geif_model.json
+
+# Convert and override algorithm, tree count, and sample count
+./bin/ceif2geif -B voronoi -t 150 -s 256 legacy_model.json -o geif_voronoi.json
+```
+
+| Flag | Long Option | Description |
+| :--- | :--- | :--- |
+| **`-o <file>`** | `--output <file>` | Output GEIF model JSON file (default: stdout or 2nd positional argument). |
+| **`-B <name>`** | `--algo <name>` | Change algorithm during conversion (`bubble` \| `voronoi` \| `exemplar` \| `ceif`). |
+| **`-t <int>`** | `--trees <int>` | Override tree count in forest (default: from input model or `100`). |
+| **`-s <int>`** | `--samples <int>` | Override samples per tree (default: from input model or `256`). |
+| **`-v`** | `--verbose` | Print migration details and sub-forest statistics. |
+| **`-q`** | `--quiet` | Suppress all non-error output. |
+
