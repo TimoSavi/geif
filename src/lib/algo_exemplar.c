@@ -364,12 +364,21 @@ static geif_status_t geif_exemplar_score(const geif_forest_t *f,
     if (ratio > 1.0) ratio = 1.0;
     double raw_score = 1.0 - sqrt(ratio);
 
-    double score = raw_score;
+    // Smooth hyperbolic soft-knee above boundary threshold (s_knee = 0.52):
+    // Preserves inlier and internal cavity scores (s <= 0.53) while dropping the
+    // rapid 1/r post-boundary jump so the outer transition curve bends near ~0.60.
+    const double s_knee = 0.52;
+    const double tail_slope = 0.30;
+    const double knee_eps = 0.025;
+    double tail_score = s_knee + tail_slope * (raw_score - s_knee);
+    double diff = raw_score - tail_score;
+    double score = 0.5 * (raw_score + tail_score - sqrt(diff * diff + knee_eps * knee_eps));
 
-    // Pillar 4: Asymptotic Outer Stadium Decay
+    // Pillar 4: Asymptotic Outer Stadium Decay (with C1-smooth onset at envelope boundary)
     if (d_out > 0.0) {
         double d_norm = (target_range > 1e-12) ? (d_out / target_range) : d_out;
-        score = 1.0 - (1.0 - score) * exp(-GEIF_OUTER_DECAY_RATE * d_norm);
+        double d_eff = (d_norm * d_norm) / (d_norm + 0.15);
+        score = 1.0 - (1.0 - score) * exp(-GEIF_OUTER_DECAY_RATE * d_eff);
     }
     if (score < 0.0) score = 0.0;
     if (score >= 1.0) score = 1.0 - 1e-6;
