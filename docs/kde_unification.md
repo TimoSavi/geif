@@ -80,7 +80,7 @@ $$
   The probability of surviving $d$ levels of partitioning without being separated decays exponentially:
 
 $$
-K_{\text{ceif}}(x, y) \approx \exp\left(-\lambda \, \Vert x - y \Vert\right)
+K_{\text{ceif}}(x, y) \approx \exp\left(-\lambda \Vert x - y \Vert\right)
 $$
 
 * **Kernel Flaw**: Because hyperplanes have **infinite support** (they never stop), a cut made inside a cluster continues millions of units into empty outer space. This causes **starburst rays** and an inability to carve internal cavities (donut holes).

@@ -306,12 +306,12 @@ where pool size $N = |S_{\text{pool}}|$ is bounded by capacity $N_{\text{capacit
    - When the reservoir capacity is reached ($n > N_{\text{capacity}}$), incoming point $x_t$ replaces a randomly selected existing exemplar in the pool with probability:
 
 $$
-P(\text{accept}) = \frac{N_{\text{capacity}}}{\min(N_{\text{seen}}, (C + 1) \, N_{\text{capacity}})}
+P(\text{accept}) = \frac{N_{\text{capacity}}}{\min(N_{\text{seen}}, (C + 1) N_{\text{capacity}})}
 $$
 
 where $C$ is the adaptive ceiling factor (default $C = 3$). This ceiling cap prevents sample freezing over long streams while guaranteeing continuous adaptivity to distribution drift.
 
-4. **Spatial Anchors**: These $N$ exemplar observations serve as non-parametric kernel centroids. Because no decision trees are grown or traversed, memory overhead is minimal ($< 5\,\text{KB}$ per category) and model cold-starts require $< 1\,\text{ms}$.
+4. **Spatial Anchors**: These $N$ exemplar observations serve as non-parametric kernel centroids. Because no decision trees are grown or traversed, memory overhead is minimal ($< 5\text{ KB}$ per category) and model cold-starts require $< 1\text{ ms}$.
 
 ---
 
@@ -325,7 +325,7 @@ $$
 0 \le d_{(1)}(x_i) \le d_{(2)}(x_i) \le \ldots \le d_{(K)}(x_i)
 $$
 
-2. The raw local spacing $r_i$ is the arithmetic mean of the $K = \min(5, \, N - 1)$ nearest neighbor distances:
+2. The raw local spacing $r_i$ is the arithmetic mean of the $K = \min(5, N - 1)$ nearest neighbor distances:
 
 $$
 r_i = \frac{1}{K} \sum_{k=1}^K d_{(k)}(x_i)
@@ -337,20 +337,20 @@ $$
 \mu_\sigma = \frac{1}{N} \sum_{i=1}^N r_i, \qquad s_\sigma = \sqrt{\frac{1}{N} \sum_{i=1}^N (r_i - \mu_\sigma)^2}
 $$
 
-4. Each exemplar bandwidth $\sigma_i$ is clamped to $[\sigma_{\min}, \, \sigma_{\max}]$:
+4. Each exemplar bandwidth $\sigma_i$ is clamped to the interval [$\sigma_{\min}$, $\sigma_{\max}$]:
 
 $$
-\sigma_{\min} = \max\left(0.5 \, \mu_\sigma, \, \mu_\sigma - s_\sigma\right), \qquad \sigma_{\max} = \mu_\sigma + s_\sigma
+\sigma_{\min} = \max\left(0.5 \mu_\sigma, \mu_\sigma - s_\sigma\right), \qquad \sigma_{\max} = \mu_\sigma + s_\sigma
 $$
 
 $$
-\sigma_i = \max\left(\sigma_{\min}, \, \min\left(r_i, \, \sigma_{\max}\right)\right)
+\sigma_i = \max\left(\sigma_{\min}, \min\left(r_i, \sigma_{\max}\right)\right)
 $$
 
-- **Identical-Samples Corner Case ($\mu_\sigma = 0$)**: When all samples in the dataset are identical ($\mu_\sigma = 0, \, s_\sigma = 0$), coordinate offsets from `min` are preserved and bandwidth is set to one-tenth of the mean coordinate magnitude:
+- **Identical-Samples Corner Case ($\mu_\sigma = 0$)**: When all samples in the dataset are identical ($\mu_\sigma = 0, s_\sigma = 0$), coordinate offsets from `min` are preserved and bandwidth is set to one-tenth of the mean coordinate magnitude:
 
 $$
-\sigma_i = \max\left(\frac{1}{10 \, D} \sum_{d=1}^D |x_{1,d}|, \, 10^{-6}\right)
+\sigma_i = \max\left(\frac{1}{10 D} \sum_{d=1}^D |x_{1,d}|, 10^{-6}\right)
 $$
 
 #### 2. Unique-Location Inverse-Bandwidth Credibility Weighting ($w_u$)
@@ -378,10 +378,10 @@ $$
 The final anomaly score $s(x) \in [0.0, 1.0)$ applies fractional decay ($p = \text{decay}$, default $0.5$, configurable via `DECAY` in `~/.geifrc` or `-g <rcfile>`) to the normalized density ratio:
 
 $$
-s(x) = 1.0 - \left(\min\left(1.0, \, \frac{D(x)}{D_{\max}}\right)\right)^{\text{decay}}
+s(x) = 1.0 - \left(\min\left(1.0, \frac{D(x)}{D_{\max}}\right)\right)^{\text{decay}}
 $$
 
-- **Near-Zero Baseline**: At the densest sample $x_{\text{peak}}$, $D(x_{\text{peak}}) / D_{\max} = 1 / 1.05$, yielding $s(x_{\text{peak}}) \approx 0.0241$ (for $\text{decay} = 0.5$).
+- **Near-Zero Baseline**: At the densest sample $x_{\text{peak}}$, the ratio $D(x_{\text{peak}})$ to $D_{\max}$ is $1 / 1.05$, yielding $s(x_{\text{peak}}) \approx 0.0241$ (for $\text{decay} = 0.5$).
 - **Interior Cavity & Multi-Cluster Sharpness**: Inside the sum, each kernel retains sharp $1 / d^2$ Cauchy localization, preventing points on a surrounding ring from flooding hollow cavities ($s \approx 0.52$).
 - **Unified Outer-Space Attenuation & Sensitivity Tuning**: Applying the fractional exponent $\text{decay} = 0.5$ to $D(x) / D_{\max}$ produces a smooth $O(1/d)$ decay to $1.0$ at large distances without requiring a separate outer-stadium bounding-box splice. Setting `DECAY` in `~/.geifrc` tunes outlier strictness globally across existing JSON models without modifying shell scripts (values $> 0.5$ increase score sensitivity/strictness; values $< 0.5$ make outlier detection looser).
 
@@ -418,8 +418,8 @@ The **CEIF Hyperplane Engine** provides data-anchored isotropic Gaussian cuts co
 | **Internal Void Detection** | **Exceptional (Void Leaves)** | Moderate (Polyhedral Cuts) | **Exceptional ($s \approx 0.56$)** | Blind (Hyperplane Bridging) |
 | **Aspect Ratio Robustness** | **Native (Span-Scaled)** | **Native (Sample Bisector)** | **Native (Span-Scaled)** | Scaled Coordinate Metric |
 | **Inference Complexity** | $O(D \log \psi)$ | $O(D \log \psi)$ | $O(D \cdot \psi)$ SIMD Vectorized | $O(D \log \psi)$ |
-| **Scoring Throughput** | Very Fast ($\approx 5\,\text{M}$ rows/sec) | Fast ($\approx 3\,\text{M}$ rows/sec) | **Fastest ($\approx 15.3\,\text{M}$ rows/sec)** | Moderate ($\approx 2.4\,\text{M}$ rows/sec) |
-| **Cold-Start Build Time** | $O(N \log N)$ (Trees built) | $O(N \log N)$ (Trees built) | **Instant ($< 1\,\text{ms}$, Zero Trees)** | $O(N \log N)$ (Trees built) |
+| **Scoring Throughput** | Very Fast ($\approx 5\text{ M}$ rows/sec) | Fast ($\approx 3\text{ M}$ rows/sec) | **Fastest ($\approx 15.3\text{ M}$ rows/sec)** | Moderate ($\approx 2.4\text{ M}$ rows/sec) |
+| **Cold-Start Build Time** | $O(N \log N)$ (Trees built) | $O(N \log N)$ (Trees built) | **Instant ($< 1\text{ ms}$, Zero Trees)** | $O(N \log N)$ (Trees built) |
 | **Categorization Accuracy** | 60.14% | 61.51% | **88.53% (Clear Winner)** | 60.11% |
 
 For detailed multi-algorithm selection guidance, empirical heatmaps, drift analysis, categorization benchmarks, and performance profiles, see [**`docs/algorithm_selection.md`**](algorithm_selection.md).

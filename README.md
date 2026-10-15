@@ -75,15 +75,15 @@ $$
 - **Zero-Variance Feature Masking**: Detects constant features and restricts cuts strictly to informative dimensions.
 
 #### Engine 3: Direct SIMD Exemplar Cauchy Density (`exemplar`)
-A non-tree kernel density estimation engine operating directly over reservoir samples with regularized adaptive bandwidths, pilot density credibility weighting, and Square-Root Potential Mapping:
+A non-tree kernel density estimation engine operating directly over reservoir samples with adaptive $K$-NN bandwidth clamping, unique-location inverse-bandwidth credibility weighting, and fractional decay mapping:
 
 $$
-D(x) = \frac{\sum_{i=1}^N w_i \frac{1}{1 + (\Vert x - s_i \Vert / \sigma_i)^2}}{\sum_{i=1}^N w_i}, \quad s(x) = 1.0 - \sqrt{\frac{D(x)}{D_{\max}}}
+D(x) = \sum_{u \in \mathcal{U}} \frac{w_u}{1 + (\Vert x - x_u \Vert_{\text{scaled}} / \sigma_u)^2}, \quad s(x) = 1.0 - \left(\min\left(1.0, \frac{D(x)}{D_{\max}}\right)\right)^{\text{decay}}
 $$
 
 - Bypasses binary tree construction entirely with instantaneous sub-millisecond build latency.
 - Delivers 88.5% categorization accuracy on complex multi-category tabular benchmarks.
-- Evaluates queries via straight-line AVX2/FMA SIMD vector loops ($> 15\,\text{M}$ pts/sec).
+- Evaluates queries via straight-line AVX2/FMA SIMD vector loops ($> 15\text{ M}$ pts/sec).
 
 #### Engine 4: Continuous Gaussian Cuts (`ceif`)
 Anchored hyperplanes with pairwise margin interpolation and isotropic Gaussian normal vectors, delivering smooth continuous metric depth surfaces.
