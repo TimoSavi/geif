@@ -337,7 +337,7 @@ $$
 \mu_\sigma = \frac{1}{N} \sum_{i=1}^N r_i, \qquad s_\sigma = \sqrt{\frac{1}{N} \sum_{i=1}^N (r_i - \mu_\sigma)^2}
 $$
 
-4. Each exemplar bandwidth $\sigma_i$ is clamped to the interval [$\sigma_{\min}$, $\sigma_{\max}$]:
+4. Each exemplar bandwidth $\sigma_i$ is clamped to the range from $\sigma_{\min}$ to $\sigma_{\max}$:
 
 $$
 \sigma_{\min} = \max\left(0.5 \mu_\sigma, \mu_\sigma - s_\sigma\right), \qquad \sigma_{\max} = \mu_\sigma + s_\sigma
@@ -347,7 +347,7 @@ $$
 \sigma_i = \max\left(\sigma_{\min}, \min\left(r_i, \sigma_{\max}\right)\right)
 $$
 
-- **Identical-Samples Corner Case ($\mu_\sigma = 0$)**: When all samples in the dataset are identical ($\mu_\sigma = 0, s_\sigma = 0$), coordinate offsets from `min` are preserved and bandwidth is set to one-tenth of the mean coordinate magnitude:
+- **Identical-Samples Corner Case ($\mu_\sigma = 0$)**: When all samples in the dataset are identical (sample standard deviation is $0$ across all dimensions, so all pairwise $K$-NN distances $r_i = 0$ and $\mu_\sigma = 0$), coordinate offsets from `min` are preserved and bandwidth is set to one-tenth of the mean coordinate magnitude:
 
 $$
 \sigma_i = \max\left(\frac{1}{10 D} \sum_{d=1}^D |x_{1,d}|, 10^{-6}\right)
