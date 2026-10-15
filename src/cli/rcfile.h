@@ -43,6 +43,9 @@ typedef struct {
 
     bool     header;
     bool     header_set;
+
+    double   decay;
+    bool     decay_set;
 } geif_rc_config_t;
 
 /**

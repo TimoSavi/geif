@@ -142,6 +142,12 @@ bool geif_rc_parse_file(geif_rc_config_t *rc, const char *filepath)
                 rc->header = false;
             }
             rc->header_set = true;
+        } else if ((val = extract_value(line, "DECAY")) != NULL) {
+            double d = atof(val);
+            if (d > 0.0) {
+                rc->decay = d;
+                rc->decay_set = true;
+            }
         } else if (extract_value(line, "AUTO_SCALE") != NULL ||
                    extract_value(line, "AUTO_WEIGTH") != NULL ||
                    extract_value(line, "NEAREST") != NULL ||

@@ -916,6 +916,9 @@ int main(int argc, char *argv[])
     if (!cli_decimals_given && rc_cfg.decimals_set) {
         decimals = rc_cfg.decimals;
     }
+    if (rc_cfg.decay_set) {
+        config.decay = rc_cfg.decay;
+    }
     if (!cli_print_dim_given && rc_cfg.print_dimension_set) {
         print_dimension = rc_cfg.print_dimension;
     }
@@ -977,8 +980,16 @@ int main(int argc, char *argv[])
                    load_file, ensemble->count, ensemble->dimensions);
         }
         ensemble->scale_score = true;
+        if (rc_cfg.decay_set) {
+            ensemble->config.decay = rc_cfg.decay;
+        }
         for (size_t i = 0; i < ensemble->count; i++) {
-            if (ensemble->entries[i].forest) ensemble->entries[i].forest->scale_score = true;
+            if (ensemble->entries[i].forest) {
+                ensemble->entries[i].forest->scale_score = true;
+                if (rc_cfg.decay_set) {
+                    ensemble->entries[i].forest->config.decay = rc_cfg.decay;
+                }
+            }
         }
         if (cli_outlier_score_given) {
             memcpy(ensemble->outlier_score_spec, cli_outlier_score_spec, sizeof(ensemble->outlier_score_spec));
@@ -1029,9 +1040,9 @@ int main(int argc, char *argv[])
                     geif_forest_train(sf);
                 }
             }
-        }
-        if (threshold_is_percentage) {
-            update_ensemble_percentage_scores(ensemble, outlier_percentage, &cat_filter, verbose);
+            if (threshold_is_percentage) {
+                update_ensemble_percentage_scores(ensemble, outlier_percentage, &cat_filter, verbose);
+            }
         }
         if (cli_decimals_given || rc_cfg.decimals_set) {
             ensemble->decimals = decimals;
@@ -1104,11 +1115,15 @@ int main(int argc, char *argv[])
     if (query_mode) {
         if (!ensemble) {
             fprintf(stderr, "Error: -q requires a loaded model via -r <model.json>\n");
+            geif_cat_filter_free(&cat_filter);
             return 1;
         }
-        char summary[4096];
-        geif_ensemble_summary(ensemble, summary, sizeof(summary));
+        size_t summary_cap = 4096 + ensemble->count * 384;
+        char *summary = (char *)xmalloc(summary_cap);
+        geif_ensemble_summary(ensemble, summary, summary_cap);
         printf("%s", summary);
+        xfree(summary);
+        geif_cat_filter_free(&cat_filter);
         geif_ensemble_destroy(ensemble);
         return 0;
     }

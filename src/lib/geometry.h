@@ -33,7 +33,7 @@ void geif_init_c_cache(void);
  */
 static inline double geif_scale_value(double value, double range, double scale_min, double min, double max)
 {
-    if (max == min) return scale_min;
+    if (max == min) return scale_min + (value - min);
     return range * (value - min) / (max - min) + scale_min;
 }
 

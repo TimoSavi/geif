@@ -664,9 +664,14 @@ void geif_ensemble_summary(const geif_ensemble_t *ens, char *buffer, size_t buff
                      ens->list_separator ? ens->list_separator : ',',
                      ens->has_header ? "Yes" : "No",
                      ens->aggregate ? "Yes" : "No");
-    if (n > 0) written += (size_t)n;
+    if (n > 0) {
+        if ((size_t)n >= buffer_size - written) {
+            return;
+        }
+        written += (size_t)n;
+    }
 
-    for (size_t i = 0; i < ens->count && written + 80 < buffer_size; i++) {
+    for (size_t i = 0; i < ens->count && written < buffer_size - 1; i++) {
         const geif_category_entry_t *entry = &ens->entries[i];
         const geif_forest_t *f = entry->forest;
         const char *cat_label = entry->category[0] ? entry->category : "(default)";
@@ -684,7 +689,13 @@ void geif_ensemble_summary(const geif_ensemble_t *ens, char *buffer, size_t buff
             n = snprintf(buffer + written, buffer_size - written,
                          "  - Sub-forest '%s': (empty), updated=%ld\n", cat_label, (long)entry->last_updated);
         }
-        if (n > 0) written += (size_t)n;
+        if (n > 0) {
+            if ((size_t)n >= buffer_size - written) {
+                written = buffer_size - 1;
+                break;
+            }
+            written += (size_t)n;
+        }
     }
 }
 

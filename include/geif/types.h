@@ -20,6 +20,7 @@ extern "C" {
 #define GEIF_DEFAULT_MAX_DEPTH         0
 #define GEIF_DEFAULT_KAPPA             1.25     /**< Headroom for "Zero Kelvin" calibration */
 #define GEIF_DEFAULT_ALPHA             1.0      /**< Metric depth density sensitivity */
+#define GEIF_DEFAULT_DECAY             0.5      /**< Fractional decay exponent for exemplar density ratio */
 #define GEIF_DEFAULT_CEILING_FACTOR    3        /**< Extra rows factor for reservoir ceiling */
 #define GEIF_MIN_REL_DIST              0.033333 /**< Minimum relative distance floor for nearest neighbor */
 /** Boundary half-space geometric calibration multiplier.
@@ -66,6 +67,7 @@ typedef struct geif_config {
     uint32_t         max_depth;            /**< Hard tree depth cap (default: 16) */
     double           kappa;                /**< Absolute Zero Kelvin headroom factor (default: 1.25) */
     double           alpha;                /**< Metric depth density sensitivity (default: 1.0) */
+    double           decay;                /**< Fractional decay exponent for exemplar score (default: 0.5) */
     uint32_t         ceiling_factor;       /**< Reservoir ceiling factor (default: 3) */
     uint32_t         seed;                 /**< RNG seed (0 for auto / time-based) */
     geif_algo_type_t algo;                 /**< Algorithm engine selection (default: GEIF_ALGO_BUBBLE) */

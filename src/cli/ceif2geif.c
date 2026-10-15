@@ -213,9 +213,13 @@ int main(int argc, char *argv[])
     }
 
     if (verbose && !quiet) {
-        char summary[4096];
-        geif_ensemble_summary(ens, summary, sizeof(summary));
-        fprintf(stderr, "%s", summary);
+        size_t summary_cap = 4096 + ens->count * 384;
+        char *summary = (char *)malloc(summary_cap);
+        if (summary) {
+            geif_ensemble_summary(ens, summary, summary_cap);
+            fprintf(stderr, "%s", summary);
+            free(summary);
+        }
     }
 
     for (size_t i = 0; i < ens->count; i++) {

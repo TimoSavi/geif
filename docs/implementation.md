@@ -353,7 +353,7 @@ Supported RC directives:
 TREES 100
 MAX_SAMPLES 256
 OUTLIER_SCORE 0.50
-ALGO bubble
+DECAY 0.5
 
 # Output and display
 DECIMALS 4

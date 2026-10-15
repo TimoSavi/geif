@@ -1,13 +1,16 @@
 /**
  * @file algo_exemplar.c
- * @brief Exemplar Algorithm: Non-tree direct SIMD Cauchy density kernel on reservoir samples.
+ * @brief Exemplar Algorithm: Non-tree direct Cauchy density kernel on reservoir samples.
  *
- * Implements the 5-Pillar Architectural Remedy:
- * 1. Robust Bandwidth Regularization (Clamped sigma_i based on global median spacing)
- * 2. Pilot Density Credibility Weighting (w_i in (0, 1] suppressing isolated noise outliers)
- * 3. Smooth Continuous Kernel Pooling (C-infinity all-reservoir evaluation, eliminating caustic ridges & starburst rays)
- * 4. Asymptotic Outer Stadium Decay (Monotonic Euclidean bounding box attenuation)
- * 5. Zero Kelvin Baseline Calibration (Exact 0.000 anchor at core cluster centroid)
+ * Implements a unified, data-driven Cauchy kernel density formulation:
+ * 1. Bandwidth Clamping: Mean and standard deviation of K=5 nearest-neighbor distances,
+ *    clamping per-sample bandwidths sigma_i in [max(0.5 * avg, avg - std), avg + std].
+ *    Handles identical-sample datasets (avg == 0) via fallback sigma = avg_val / 10.
+ * 2. Credibility Weighting: Inverse-bandwidth weights w_i = (1 / sigma_i) / sum(1 / sigma_m).
+ * 3. Cauchy Kernel Pooling & Fractional Decay:
+ *      D(x) = sum_i w_i / (1 + (||x - x_i|| / sigma_i)^2)
+ *      s(x) = 1 - (D(x) / D_max)^0.5
+ * 4. Near-Zero Baseline Calibration: D_max = 1.05 * max_i D(x_i) (+5% headroom).
  *
  * Author / Maintainer: Timo Savinen (AI-assisted)
  */
@@ -19,21 +22,21 @@
 #include <string.h>
 #include <math.h>
 
-#define EXEMPLAR_K 5
+#define EXEMPLAR_K          5
+#define EXEMPLAR_STD_FACTOR 1.0
+#define EXEMPLAR_MIN_FACTOR 0.5
+#define EXEMPLAR_DMAX_MULT  1.05
 
 typedef struct {
     double *bandwidths;          /* Clamped bandwidth sigma_i [count] */
     double *inv_bandwidths_sq;   /* Precomputed 1.0 / (sigma_i * sigma_i) [count] */
-    double *weights;             /* Pilot density credibility weights w_i [count] */
+    double *weights;             /* Normalized credibility weights w_i [count] */
     size_t  count;               /* Number of reservoir exemplars (N) */
-    double  sigma_median;        /* Global robust median spacing */
-    double  weight_sum;          /* Precomputed sum of all weights w_i */
-    double  max_core_density;    /* Peak observed density (D_max) for Zero Kelvin floor */
-    double  min_core_density;    /* Lowest observed training density */
+    double  d_max;               /* Calibrated peak density (1.05 * max_i D(x_i)) */
 } geif_exemplar_state_t;
 
 /**
- * @brief Releases heap-allocated adaptive bandwidth state for the exemplar model.
+ * @brief Releases heap-allocated state for the exemplar model.
  *
  * @param f Pointer to the forest instance.
  */
@@ -50,31 +53,16 @@ static void geif_exemplar_destroy(geif_forest_t *f)
 }
 
 /**
- * @brief Double comparison callback for qsort.
- */
-static int compare_doubles(const void *a, const void *b)
-{
-    double da = *(const double *)a;
-    double db = *(const double *)b;
-    if (da < db) return -1;
-    if (da > db) return 1;
-    return 0;
-}
-
-/**
- * @brief Computes smooth all-reservoir Cauchy kernel density D(x).
+ * @brief Computes pooled Cauchy kernel density D(x) across all reservoir samples.
  *
- * D(x) = sum_i(w_i / (1 + dist_i^2 / sigma_i^2)) / sum_i(w_i)
+ * D(x) = sum_i w_i / (1 + ||x - x_i||^2 / sigma_i^2)
  *
- * Infinitely differentiable (C-infinity) everywhere. Eliminates order-K Voronoi
- * boundary derivative jumps (caustic fringes) and starburst rays.
- *
- * @param st           Exemplar internal state.
+ * @param st           Exemplar internal state (with normalized weights sum(w_i) = 1).
  * @param scaled_point Scaled observation vector.
- * @param scaled_pool  Array of reservoir sample coordinates.
+ * @param scaled_pool  Array of scaled reservoir sample coordinates.
  * @param count        Number of reservoir samples.
  * @param d            Dimensionality.
- * @return Aggregated normalized kernel density D in [0, 1].
+ * @return Pooled Cauchy density D(x) in [0, 1].
  */
 static inline double geif_exemplar_compute_density(const geif_exemplar_state_t *st,
                                                    const double *scaled_point,
@@ -84,27 +72,16 @@ static inline double geif_exemplar_compute_density(const geif_exemplar_state_t *
 {
     double density_sum = 0.0;
     for (size_t i = 0; i < count; i++) {
+        if (st->weights[i] <= 0.0) continue;
         const double *sample = &scaled_pool[i * d];
-        double dsq = 0.0;
-        for (uint32_t j = 0; j < d; j++) {
-            double diff = scaled_point[j] - sample[j];
-            dsq += diff * diff;
-        }
-        double ratio_sq = dsq * st->inv_bandwidths_sq[i];
-        density_sum += st->weights[i] / (1.0 + ratio_sq);
+        double dsq = geif_dist_sq(scaled_point, sample, d);
+        density_sum += st->weights[i] / (1.0 + dsq * st->inv_bandwidths_sq[i]);
     }
-    return (st->weight_sum > 0.0) ? (density_sum / st->weight_sum) : 0.0;
+    return density_sum;
 }
 
 /**
- * @brief Trains the Exemplar model by computing regularized bandwidths and credibility weights.
- *
- * Bypasses binary tree construction entirely. For each sample in the reservoir pool:
- * 1. Computes mean distance to K=5 nearest neighbors in scaled space.
- * 2. Computes global robust median spacing sigma_median.
- * 3. Clamps bandwidths: sigma_i in [0.5 * sigma_median, 1.5 * sigma_median].
- * 4. Computes pilot density credibility weights w_i = 1 / (1 + (excess / sigma_median)^2).
- * 5. Precomputes max core density D_max for Zero Kelvin calibration.
+ * @brief Trains the Exemplar model by computing clamped bandwidths, 1/sigma weights, and D_max.
  *
  * @param f Pointer to the forest instance.
  * @return GEIF_OK on success, or error status.
@@ -115,7 +92,7 @@ static geif_status_t geif_exemplar_train(geif_forest_t *f)
 
     init_dimension_scales(f);
 
-    // Free any existing tree nodes since exemplar is tree-less
+    /* Free any existing tree nodes since exemplar is tree-less */
     for (uint32_t t = 0; t < f->tree_count; t++) {
         geif_tree_t *tree = &f->trees[t];
         if (tree->nodes) { free(tree->nodes); tree->nodes = NULL; }
@@ -134,7 +111,9 @@ static geif_status_t geif_exemplar_train(geif_forest_t *f)
     st->bandwidths = (double *)malloc(n * sizeof(double));
     st->inv_bandwidths_sq = (double *)malloc(n * sizeof(double));
     st->weights = (double *)malloc(n * sizeof(double));
-    if (!st->bandwidths || !st->inv_bandwidths_sq || !st->weights) {
+    double *raw_d_k = (double *)malloc(n * sizeof(double));
+    if (!st->bandwidths || !st->inv_bandwidths_sq || !st->weights || !raw_d_k) {
+        if (raw_d_k) free(raw_d_k);
         if (st->bandwidths) free(st->bandwidths);
         if (st->inv_bandwidths_sq) free(st->inv_bandwidths_sq);
         if (st->weights) free(st->weights);
@@ -143,135 +122,147 @@ static geif_status_t geif_exemplar_train(geif_forest_t *f)
     }
 
     uint32_t d = f->dimensions;
-    double *raw_d_k = (double *)malloc(n * sizeof(double));
-    double *sorted_d_k = (double *)malloc(n * sizeof(double));
-    size_t *mult = (size_t *)malloc(n * sizeof(size_t));
-    if (!raw_d_k || !sorted_d_k || !mult) {
-        if (raw_d_k) free(raw_d_k);
-        if (sorted_d_k) free(sorted_d_k);
-        if (mult) free(mult);
-        if (st->bandwidths) free(st->bandwidths);
-        if (st->inv_bandwidths_sq) free(st->inv_bandwidths_sq);
-        if (st->weights) free(st->weights);
+    const double *scaled_pool = f->scaled_pool ? f->scaled_pool : f->sample_pool;
+
+    /* 1. Identify unique locations so duplicates are not summed multiple times in D(x) */
+    int32_t *dup_of = (int32_t *)malloc(n * sizeof(int32_t));
+    if (!dup_of) {
+        free(raw_d_k);
+        free(st->bandwidths);
+        free(st->inv_bandwidths_sq);
+        free(st->weights);
         free(st);
         return GEIF_ERR_OUT_OF_MEMORY;
     }
 
-    size_t k_nn = (n < EXEMPLAR_K) ? n : EXEMPLAR_K;
-    if (k_nn < 2 && n > 1) k_nn = 2;
+    for (size_t i = 0; i < n; i++) {
+        dup_of[i] = -1;
+        const double *si = &scaled_pool[i * d];
+        for (size_t j = 0; j < i; j++) {
+            if (dup_of[j] != -1) continue;
+            const double *sj = &scaled_pool[j * d];
+            if (geif_dist_sq(si, sj, d) <= 1e-12) {
+                dup_of[i] = (int32_t)j;
+                break;
+            }
+        }
+    }
 
-    const double *scaled_pool = f->scaled_pool ? f->scaled_pool : f->sample_pool;
-
+    /* 2. Compute mean distance to K nearest neighbors across all N samples */
     if (n <= 1) {
-        raw_d_k[0] = (f->avg_sample_dist > 1e-6) ? f->avg_sample_dist : 1.0;
-        sorted_d_k[0] = raw_d_k[0];
-        mult[0] = 1;
+        for (size_t i = 0; i < n; i++) raw_d_k[i] = 0.0;
     } else {
+        size_t k_nn = (n - 1 < EXEMPLAR_K) ? (n - 1) : EXEMPLAR_K;
         double best_dist_sq[EXEMPLAR_K];
+
         for (size_t i = 0; i < n; i++) {
+            if (dup_of[i] != -1) {
+                raw_d_k[i] = raw_d_k[dup_of[i]];
+                continue;
+            }
             const double *si = &scaled_pool[i * d];
             for (size_t k = 0; k < k_nn; k++) best_dist_sq[k] = 1e300;
-            size_t m_cnt = 0;
 
             for (size_t j = 0; j < n; j++) {
+                if (i == j) continue;
                 const double *sj = &scaled_pool[j * d];
                 double dsq = geif_dist_sq(si, sj, d);
-                if (dsq <= 1e-18) {
-                    m_cnt++;
-                    continue;
-                }
-                int is_dup_dist = 0;
-                for (size_t m = 0; m < k_nn; m++) {
-                    if (best_dist_sq[m] < 1e299 &&
-                        fabs(dsq - best_dist_sq[m]) <= 1e-12 * (1.0 + dsq)) {
-                        is_dup_dist = 1;
-                        break;
-                    }
-                }
-                if (!is_dup_dist && dsq < best_dist_sq[k_nn - 1]) {
+                if (dsq < best_dist_sq[k_nn - 1]) {
                     best_dist_sq[k_nn - 1] = dsq;
                     for (size_t m = k_nn - 1; m > 0; m--) {
                         if (best_dist_sq[m] < best_dist_sq[m - 1]) {
                             double tmp = best_dist_sq[m];
                             best_dist_sq[m] = best_dist_sq[m - 1];
                             best_dist_sq[m - 1] = tmp;
-                        } else break;
+                        } else {
+                            break;
+                        }
                     }
                 }
             }
-            mult[i] = (m_cnt > 0) ? m_cnt : 1;
 
             double sum_d = 0.0;
-            size_t valid_k = 0;
             for (size_t k = 0; k < k_nn; k++) {
-                if (best_dist_sq[k] < 1e299) {
-                    sum_d += sqrt(best_dist_sq[k]);
-                    valid_k++;
-                }
+                sum_d += sqrt(best_dist_sq[k]);
             }
-            double mean_d = (valid_k > 0) ? (sum_d / (double)valid_k) : ((f->avg_sample_dist > 1e-6) ? f->avg_sample_dist : 1.0);
-            if (mean_d < 1e-6) mean_d = 1e-6;
-            raw_d_k[i] = mean_d;
-            sorted_d_k[i] = mean_d;
+            raw_d_k[i] = sum_d / (double)k_nn;
         }
     }
 
-    // Compute global robust median spacing
-    qsort(sorted_d_k, n, sizeof(double), compare_doubles);
-    double sigma_med;
-    if (n % 2 == 1) {
-        sigma_med = sorted_d_k[n / 2];
-    } else {
-        sigma_med = 0.5 * (sorted_d_k[n / 2 - 1] + sorted_d_k[n / 2]);
-    }
-    if (sigma_med < 1e-6) sigma_med = 1e-6;
-    st->sigma_median = sigma_med;
-    free(sorted_d_k);
-
-    // Pillar 1: Clamped Bandwidth & Pillar 2: Pilot Credibility Weighting
-    // Sublinear multiplicity attenuation (1/sqrt(m_i)) prevents discrete duplicate
-    // pileups from dominating D_max while preserving continuous density gradients.
-    double min_sigma = 0.5 * sigma_med;
-    double max_sigma = 1.5 * sigma_med;
-    double weight_sum = 0.0;
-
+    /* 3. Compute mean (avg_sigma) and standard deviation (std_sigma) of K-NN distances */
+    double sum_d = 0.0;
     for (size_t i = 0; i < n; i++) {
-        double d_k_val = raw_d_k[i];
-        double sigma = d_k_val;
+        sum_d += raw_d_k[i];
+    }
+    double avg_sigma = sum_d / (double)n;
+
+    double sum_sq = 0.0;
+    for (size_t i = 0; i < n; i++) {
+        double diff = raw_d_k[i] - avg_sigma;
+        sum_sq += diff * diff;
+    }
+    double std_sigma = sqrt(sum_sq / (double)n);
+
+    /* 4. Determine bandwidth clamping bounds (handling identical-samples corner case) */
+    double min_sigma, max_sigma;
+    if (avg_sigma <= 1e-12) {
+        /* All samples are identical: set bandwidth to avg_val / 10.0 */
+        double avg_mag = 0.0;
+        for (uint32_t j = 0; j < d; j++) {
+            avg_mag += fabs(f->sample_pool[j]);
+        }
+        avg_mag /= (double)d;
+        double fallback_sigma = avg_mag / 10.0;
+        if (fallback_sigma < 1e-6) fallback_sigma = 0.1;
+        min_sigma = fallback_sigma;
+        max_sigma = fallback_sigma;
+    } else {
+        double floor_sigma = EXEMPLAR_MIN_FACTOR * avg_sigma;
+        double lower = avg_sigma - EXEMPLAR_STD_FACTOR * std_sigma;
+        min_sigma = (lower > floor_sigma) ? lower : floor_sigma;
+        if (min_sigma < 1e-6) min_sigma = 1e-6;
+        max_sigma = avg_sigma + EXEMPLAR_STD_FACTOR * std_sigma;
+        if (max_sigma < min_sigma) max_sigma = min_sigma;
+    }
+
+    /* 5. Clamp bandwidths and assign 1/sigma credibility weights to unique locations only */
+    double weight_sum = 0.0;
+    for (size_t i = 0; i < n; i++) {
+        double sigma = raw_d_k[i];
         if (sigma < min_sigma) sigma = min_sigma;
         if (sigma > max_sigma) sigma = max_sigma;
-        if (sigma < 1e-6) sigma = 1e-6;
 
         st->bandwidths[i] = sigma;
         st->inv_bandwidths_sq[i] = 1.0 / (sigma * sigma);
-
-        double excess = (d_k_val > sigma_med) ? (d_k_val - sigma_med) : 0.0;
-        double ratio = excess / sigma_med;
-        double w = (1.0 / sqrt((double)mult[i])) / (1.0 + ratio * ratio);
-        st->weights[i] = w;
-        weight_sum += w;
+        if (dup_of[i] == -1) {
+            st->weights[i] = 1.0 / sigma;
+            weight_sum += st->weights[i];
+        } else {
+            st->weights[i] = 0.0;
+        }
     }
+    free(dup_of);
     free(raw_d_k);
-    free(mult);
 
-    if (weight_sum < 1e-12) weight_sum = 1.0;
-    st->weight_sum = weight_sum;
-    f->algo_data = st;
+    if (weight_sum > 0.0) {
+        for (size_t i = 0; i < n; i++) {
+            st->weights[i] /= weight_sum;
+        }
+    }
 
-    // Pillar 5: Zero Kelvin baseline calibration
+    /* 6. Near-zero baseline calibration: D_max = 1.05 * max_i D(x_i) */
     double max_d = 0.0;
-    double min_d = 1e300;
     for (size_t i = 0; i < n; i++) {
+        if (st->weights[i] <= 0.0) continue;
         const double *si = &scaled_pool[i * d];
         double d_val = geif_exemplar_compute_density(st, si, scaled_pool, n, d);
         if (d_val > max_d) max_d = d_val;
-        if (d_val < min_d) min_d = d_val;
     }
-    if (max_d < 1e-6) max_d = 1.0;
-    st->max_core_density = max_d;
-    st->min_core_density = (min_d < 1e299) ? min_d : 0.0;
+    if (max_d < 1e-12) max_d = 1.0;
+    st->d_max = max_d * EXEMPLAR_DMAX_MULT;
+    f->algo_data = st;
 
-    // Calibrate min_score and score bounds
+    /* 6. Calibrate forest score statistics and feature averages */
     f->min_score = 0.0;
     f->max_score = 1.0;
 
@@ -302,18 +293,16 @@ static geif_status_t geif_exemplar_train(geif_forest_t *f)
 }
 
 /**
- * @brief Scores a query point via direct Cauchy kernel density estimation.
+ * @brief Scores a query point via Cauchy kernel pooling and fractional decay.
  *
- * Smoothly aggregates kernel density across all reservoir exemplars:
- * D(x) = sum_i(w_i / (1 + (d_i / sigma_i)^2)) / sum_i(w_i).
- * Anomaly score is evaluated via Zero Kelvin calibration:
- * s_raw = (D_max - D(x)) / D_max, followed by outer space stadium attenuation.
+ * D(x) = sum_i w_i / (1 + (||x - x_i|| / sigma_i)^2)
+ * s(x) = 1 - (D(x) / D_max)^0.5
  *
- * @param[in]  f               Pointer to the forest.
- * @param[in]  point           Raw unscaled observation vector.
- * @param[out] score_out       Pointer to receive calibrated anomaly score.
+ * @param[in]  f                Pointer to the forest.
+ * @param[in]  point            Raw unscaled observation vector.
+ * @param[out] score_out        Pointer to receive calibrated anomaly score.
  * @param[out] metric_depth_out Optional pointer to receive density-based depth.
- * @param[out] d_out_out       Optional pointer to receive outer distance d_out.
+ * @param[out] d_out_out        Optional pointer to receive outer distance (0.0, handled by Cauchy tail).
  * @return GEIF_OK on success, or error status.
  */
 static geif_status_t geif_exemplar_score(const geif_forest_t *f,
@@ -350,67 +339,19 @@ static geif_status_t geif_exemplar_score(const geif_forest_t *f,
         memcpy(scaled_point, point, d * sizeof(double));
     }
 
-    // Outer space Euclidean distance calculation
-    double dist_out_sq = 0.0;
-    double target_range = (f->scale_range_idx >= 0 && f->envelope_span) ? f->envelope_span[f->scale_range_idx] : 1.0;
-    if (f->envelope_min && f->envelope_max) {
-        for (uint32_t j = 0; j < d; j++) {
-            double d_low = f->envelope_min[j] - point[j];
-            double d_high = point[j] - f->envelope_max[j];
-            double delta = 0.0;
-            if (d_low > 0.0) delta = d_low;
-            else if (d_high > 0.0) delta = d_high;
+    if (d_out_out) *d_out_out = 0.0;
 
-            if (delta > 0.0 && f->envelope_span && f->envelope_span[j] > 1e-12) {
-                double norm = delta * (target_range / f->envelope_span[j]);
-                dist_out_sq += norm * norm;
-            }
-        }
-    }
-    double d_out = sqrt(dist_out_sq);
-    if (d_out_out) *d_out_out = d_out;
-
-    // Pillar 3: Smooth All-Reservoir Pooling
     const double *scaled_pool = f->scaled_pool ? f->scaled_pool : f->sample_pool;
     double D = geif_exemplar_compute_density(st, scaled_point, scaled_pool, f->pool_count, d);
 
     if (scaled_point != stack_buf) free(scaled_point);
 
-    // Pillar 5: Zero Kelvin Baseline Calibration with Square-Root Potential Mapping
-    double max_core = (st->max_core_density > 1e-12) ? st->max_core_density : 1.0;
-    double ratio = D / max_core;
+    double ratio = (st->d_max > 1e-12) ? (D / st->d_max) : 0.0;
     if (ratio < 0.0) ratio = 0.0;
     if (ratio > 1.0) ratio = 1.0;
-    double raw_score = 1.0 - sqrt(ratio);
 
-    // Smooth hyperbolic soft-knee above boundary threshold (s_knee = 0.52):
-    // Preserves inlier and internal cavity scores (s <= 0.53) while dropping the
-    // rapid 1/r post-boundary jump so the outer transition curve bends near ~0.60.
-    const double s_knee = 0.52;
-    const double tail_slope = 0.30;
-    const double knee_eps = 0.025;
-    double tail_score = s_knee + tail_slope * (raw_score - s_knee);
-    double diff = raw_score - tail_score;
-    double score = 0.5 * (raw_score + tail_score - sqrt(diff * diff + knee_eps * knee_eps));
-
-    // Pillar 4: Asymptotic Outer Stadium Decay (with C1-smooth onset at envelope boundary
-    // and intrinsic Cauchy effective radius fallback when isolated outliers stretch envelope_max)
-    double d_cauchy = 0.0;
-    double d_knee = max_core * (1.0 - s_knee) * (1.0 - s_knee);
-    if (D < d_knee && d_knee < 1.0 && st->sigma_median > 1e-12) {
-        double d_clamped = (D > 1e-15) ? D : 1e-15;
-        double r_eff = st->sigma_median * sqrt(1.0 / d_clamped - 1.0);
-        double r_knee = st->sigma_median * sqrt(1.0 / d_knee - 1.0);
-        if (r_eff > r_knee) {
-            d_cauchy = r_eff - r_knee;
-        }
-    }
-    double d_outer = (d_out > d_cauchy) ? d_out : d_cauchy;
-    if (d_outer > 0.0) {
-        double d_norm = (target_range > 1e-12) ? (d_outer / target_range) : d_outer;
-        double d_eff = (d_norm * d_norm) / (d_norm + 0.15);
-        score = 1.0 - (1.0 - score) * exp(-GEIF_OUTER_DECAY_RATE * d_eff);
-    }
+    double decay = (f->config.decay > 0.0) ? f->config.decay : GEIF_DEFAULT_DECAY;
+    double score = (fabs(decay - 0.5) < 1e-9) ? (1.0 - sqrt(ratio)) : (1.0 - pow(ratio, decay));
     if (score < 0.0) score = 0.0;
     if (score >= 1.0) score = 1.0 - 1e-6;
 
@@ -418,20 +359,7 @@ static geif_status_t geif_exemplar_score(const geif_forest_t *f,
         *metric_depth_out = (1.0 - score) * 10.0;
     }
 
-    if (f->scale_score) {
-        double max_s = (f->max_score > 0.0) ? f->max_score : 1.0;
-        double min_s = f->min_score;
-        double scaled_score = score;
-        if (max_s > min_s) {
-            scaled_score = (score - min_s) / (max_s - min_s);
-            if (scaled_score < 0.0) scaled_score = 0.0;
-            if (scaled_score >= 1.0) scaled_score = 1.0 - 1e-6;
-        }
-        *score_out = scaled_score;
-    } else {
-        *score_out = score;
-    }
-
+    *score_out = score;
     return GEIF_OK;
 }
 

@@ -175,10 +175,10 @@ GEIF automatically loads user defaults from `~/.geifrc` (falling back to legacy 
 ### Sample `~/.geifrc`:
 ```ini
 # Core parameters
-ALGO bubble
 TREES 100
 MAX_SAMPLES 256
 OUTLIER_SCORE 0.50
+DECAY 0.5
 HEADER true
 
 # Output preferences
@@ -187,6 +187,8 @@ LOW_RGB_COLOR 4DF64D
 HIGH_RGB_COLOR F25DF2
 PRINT_DIMENSION 1
 ```
+
+- **`DECAY <float>`**: Sets the Exemplar density decay exponent $\text{decay} > 0$ ($s(x) = 1 - (D(x)/D_{\max})^{\text{decay}}$, default `0.5`). Applies dynamically to both newly trained models and existing loaded JSON models (`-r`), allowing stricter ($\text{decay} > 0.5$) or looser ($\text{decay} < 0.5$) outlier sensitivity across a fleet of models without modifying shell scripts.
 
 ---
 

@@ -315,148 +315,75 @@ where $C$ is the adaptive ceiling factor (default $C = 3$). This ceiling cap pre
 
 ---
 
-### 5.2 The 5-Pillar Architectural Remedy
-To resolve the classical pitfalls of raw $K$-nearest-neighbor estimation—specifically, boundary derivative jumps, caustic ridges, starburst ray artifacts, isolated noise bubble inflation, and outer-space boundary cliffs—the Exemplar engine implements a 5-pillar mathematical remedy:
+### 5.2 Mathematical Formulation
+The Exemplar engine evaluates anomaly scores using a unified, data-driven Cauchy kernel formulation that handles multi-cluster geometries, heavy duplicate distributions, and identical-sample corner cases without piecewise outer-space splices:
 
-#### Pillar 1: Multi-Scale Adaptive Bandwidth ($\sigma_i$) via $K$-NN
-Rather than using a fixed global smoothing bandwidth, each exemplar $x_i$ computes a personalized local bandwidth $\sigma_i$ based on the density of its immediate neighborhood:
-1. For exemplar $x_i$, the span-scaled Euclidean distance to every other exemplar $x_j$ ($j \ne i$) is computed:
-
-$$
-\text{dist}_{\text{scaled}}(x_i, x_j) = \sqrt{\sum_{d=1}^D \left(\frac{x_{i,d} - x_{j,d}}{\text{span}_d}\right)^2}
-$$
-
-2. The $K = 5$ nearest *distinct non-zero* neighbor distance shells to $x_i$ are identified (skipping coincident duplicates where $\text{dist}_{\text{scaled}}(x_i, x_j) = 0$ and deduplicating identical distance shells so discrete/integer datasets do not collapse $\sigma_i$ to zero):
+#### 1. Local $K$-NN Spacing & Mean/Stddev Bandwidth Clamping ($\sigma_i$)
+1. For each exemplar $x_i$ ($i = 1 \ldots N$), the span-scaled Euclidean distances to all other exemplars $x_j$ ($j \ne i$, including co-located duplicates) are sorted:
 
 $$
-0 < d_{(1)}(x_i) < d_{(2)}(x_i) < \ldots < d_{(K)}(x_i)
+0 \le d_{(1)}(x_i) \le d_{(2)}(x_i) \le \ldots \le d_{(K)}(x_i)
 $$
 
-3. The raw adaptive bandwidth $\sigma_i$ is the arithmetic mean of these $K$-NN distances:
+2. The raw local spacing $r_i$ is the arithmetic mean of the $K = \min(5, \, N - 1)$ nearest neighbor distances:
 
 $$
-\sigma_i = \frac{1}{K} \sum_{k=1}^K d_{(k)}(x_i)
+r_i = \frac{1}{K} \sum_{k=1}^K d_{(k)}(x_i)
 $$
 
-(guarded with a numerical floor $\sigma_i \ge 10^{-6}$). In dense cluster cores, $\sigma_i$ shrinks to capture fine geometric contours; in diffuse regions, $\sigma_i$ naturally expands.
-
-#### Pillar 2: Robust Median Clamping ($\sigma_i^{\text{clamped}}$)
-Unconstrained adaptive bandwidths risk two failure modes: dense clusters collapse into needle-sharp delta spikes, and distant outliers blow up into gigantic blurring globes. Exemplar prevents both by clamping all local bandwidths to a tight band around the global median spacing:
-1. The global robust median spacing $\sigma_{\text{med}}$ across all $N$ exemplars is calculated via $O(N)$ quickselect:
+3. Across the reservoir, the dataset mean $\mu_\sigma$ and standard deviation $s_\sigma$ of $\{r_1, \ldots, r_N\}$ are computed:
 
 $$
-\sigma_{\text{med}} = \text{median}(\sigma_1, \sigma_2, \ldots, \sigma_N)
+\mu_\sigma = \frac{1}{N} \sum_{i=1}^N r_i, \qquad s_\sigma = \sqrt{\frac{1}{N} \sum_{i=1}^N (r_i - \mu_\sigma)^2}
 $$
 
-2. Each raw bandwidth $\sigma_i$ is clamped to the bounded interval $[0.5, 1.5] \times \sigma_{\text{med}}$ around the global median $\sigma_{\text{med}}$:
+4. Each exemplar bandwidth $\sigma_i$ is clamped to $[\sigma_{\min}, \, \sigma_{\max}]$:
 
 $$
-\sigma_i^{\text{clamped}} = \max\left(0.5 \, \sigma_{\text{med}}, \min\left(\sigma_i, 1.5 \, \sigma_{\text{med}}\right)\right) = \begin{cases} 0.5 \, \sigma_{\text{med}} & \text{if } \sigma_i < 0.5 \, \sigma_{\text{med}} \\ \sigma_i & \text{if } 0.5 \, \sigma_{\text{med}} \le \sigma_i \le 1.5 \, \sigma_{\text{med}} \\ 1.5 \, \sigma_{\text{med}} & \text{if } \sigma_i > 1.5 \, \sigma_{\text{med}} \end{cases}
-$$
-
-This guarantees:
-
-$$
-0.5 \, \sigma_{\text{med}} \le \sigma_i^{\text{clamped}} \le 1.5 \, \sigma_{\text{med}}
-$$
-
-preserving local multi-scale resolution while bounding maximum dispersion.
-
-#### Pillar 3: Pilot Density Credibility & Multiplicity Weighting ($w_i$)
-To prevent solitary noise samples or stray outliers in the training data from creating false inlier islands ("noise bubbles")—and to prevent exact duplicate pileups in discrete or integer datasets from dominating $D_{\max}$—each exemplar is assigned an objective credibility weight $w_i \in (0, 1]$:
-1. The excess dispersion $\text{excess}_i$ of exemplar $x_i$ beyond the global median spacing is computed:
-
-$$
-\text{excess}_i = \max\left(0, \sigma_i - \sigma_{\text{med}}\right)
-$$
-
-2. Let $m_i \ge 1$ denote the coincidence multiplicity of $x_i$ (the number of reservoir samples at the identical coordinate $\text{dist}_{\text{scaled}}(x_i, x_j) \le 10^{-9}$). The credibility weight $w_i$ combines sublinear multiplicity attenuation ($1/\sqrt{m_i}$) with quadratic Cauchy damping:
-
-$$
-w_i = \frac{1}{\sqrt{m_i} \left(1 + \left(\frac{\text{excess}_i}{\sigma_{\text{med}}}\right)^2\right)}
-$$
-
-- For continuous data without exact duplicates ($m_i = 1$) in a nominal region ($\sigma_i \le \sigma_{\text{med}}$), $\text{excess}_i = 0$ and $w_i = 1.0$.
-- For discrete or quantized data where $m_i$ identical samples coincide at the same value, their combined kernel contribution scales sublinearly as $m_i \cdot (1/\sqrt{m_i}) = \sqrt{m_i}$, preventing mode pileups from dwarfing secondary clusters.
-- If exemplar $x_i$ is an isolated peripheral sample ($\sigma_i > \sigma_{\text{med}}$), its credibility weight $w_i$ decays rapidly toward zero, preventing solitary anomalies from distorting the density landscape.
-
-#### Pillar 4: Smooth Continuous Cauchy Kernel Pooling ($D(x)$)
-Given an unlabelled query point $x \in \mathbb{R}^D$, continuous density $D(x)$ is evaluated by pooling Cauchy kernels across all $N$ reservoir exemplars:
-
-$$
-D(x) = \frac{1}{\sum_{i=1}^N w_i} \sum_{i=1}^N \frac{w_i}{1 + \left(\frac{\Vert x - x_i \Vert_{\text{scaled}}}{\sigma_i^{\text{clamped}}}\right)^2}
-$$
-
-Where:
-- $N$: Total number of reservoir exemplars in the active sample pool ($N = |S_{\text{pool}}|$, default 256).
-- $x_i$: The $i$-th exemplar coordinate vector in the reservoir pool.
-- Normalized distance metric: The squared span-scaled Euclidean distance to exemplar $x_i$:
-
-$$
-\Vert x - x_i \Vert_{\text{scaled}}^2 = \sum_{d=1}^D \left(\frac{x_d - x_{i,d}}{\text{span}_d}\right)^2
-$$
-
-- $\sigma_i^{\text{clamped}}$: The clamped adaptive bandwidth of exemplar $x_i$ from Pillar 2.
-- $w_i$: The pilot credibility weight of exemplar $x_i$ from Pillar 3.
-
-**Smoothness Guarantee**: Because $D(x)$ is a rational function with positive denominators everywhere, $D(x) \in C^\infty(\mathbb{R}^D)$ (infinitely differentiable). Unlike Voronoi-tessellated cell cutoffs which produce sharp derivative discontinuities (caustic ridges and starburst rays), all-reservoir pooling produces a glass-smooth density gradient across the entire domain.
-
-#### Pillar 5: Zero Kelvin Potential Mapping & Asymptotic Outer Stadium Decay
-Raw density $D(x)$ is converted into a calibrated anomaly score $s(x) \in [0.0, 1.0)$ via two complementary stages:
-
-1. **Square-Root Potential Mapping & Zero Kelvin Baseline**:
-During model finalization, the maximum core density observed across all training exemplars is recorded:
-
-$$
-D_{\max} = \max_{i=1 \ldots N} D(x_i)
-$$
-
-The raw continuous anomaly score $s_{\text{raw}}(x)$ is evaluated via square-root potential calibration:
-
-$$
-s_{\text{raw}}(x) = 1.0 - \sqrt{\min\left(1.0, \frac{D(x)}{D_{\max}}\right)}
-$$
-
-- At the densest cluster centroid, $D(x) \approx D_{\max}$, establishing an exact Zero Kelvin baseline: $s_{\text{raw}} \approx 0.000$.
-- Inside clusters and internal cavities ($s_{\text{raw}} \le 0.52$), the square-root transform linearizes the spatial decay profile ($s(r) \approx 1 - \bar{\sigma} / r$), preserving strong sensitivity inside hollow cavities ($s > 0.50$).
-- Above the cluster boundary knee ($s_{\text{knee}} = 0.52$), a smooth hyperbolic soft-knee attenuates the post-boundary $1/r$ climb with slope $m = 0.30$ and smoothing radius $\varepsilon = 0.025$:
-
-$$
-s_{\text{tail}}(x) = s_{\text{knee}} + m \cdot \left(s_{\text{raw}}(x) - s_{\text{knee}}\right)
+\sigma_{\min} = \max\left(0.5 \, \mu_\sigma, \, \mu_\sigma - s_\sigma\right), \qquad \sigma_{\max} = \mu_\sigma + s_\sigma
 $$
 
 $$
-s_{\text{base}}(x) = \frac{1}{2} \left( s_{\text{raw}}(x) + s_{\text{tail}}(x) - \sqrt{\left(s_{\text{raw}}(x) - s_{\text{tail}}(x)\right)^2 + \varepsilon^2} \right)
+\sigma_i = \max\left(\sigma_{\min}, \, \min\left(r_i, \, \sigma_{\max}\right)\right)
 $$
 
-This drops the post-boundary elbow from $0.80$ down to $\approx 0.60$, matching CEIF's gradual outer transition profile.
-
-2. **Asymptotic Outer Stadium Decay**:
-For query points outside the core cluster envelope, Exemplar combines the bounding-box Euclidean distance $d_{\text{out}}(x)$ with the intrinsic Cauchy effective outer radius $d_{\text{cauchy}}(x)$ beyond the boundary knee density $D_{\text{knee}}$:
+- **Identical-Samples Corner Case ($\mu_\sigma = 0$)**: When all samples in the dataset are identical ($\mu_\sigma = 0, \, s_\sigma = 0$), coordinate offsets from `min` are preserved and bandwidth is set to one-tenth of the mean coordinate magnitude:
 
 $$
-D_{\text{knee}} = D_{\max} \left(1 - s_{\text{knee}}\right)^2
+\sigma_i = \max\left(\frac{1}{10 \, D} \sum_{d=1}^D |x_{1,d}|, \, 10^{-6}\right)
 $$
 
-$$
-d_{\text{cauchy}}(x) = \max\left(0, \, \sigma_{\text{med}} \left(\sqrt{\frac{1}{D(x)} - 1} - \sqrt{\frac{1}{D_{\text{knee}}} - 1}\right)\right)
-$$
+#### 2. Unique-Location Inverse-Bandwidth Credibility Weighting ($w_u$)
+While co-located duplicates participate in $K$-NN distance calculation (shrinking $r_u \to 0$ so repeated values achieve maximum credibility $1 / \sigma_{\min}$), only the $U$ **unique locations** ($u \in \mathcal{U}$) receive non-zero kernel weights in the density sum ($w_i = 0$ for duplicate copies):
 
 $$
-d_{\text{norm}}(x) = \frac{\max\left(d_{\text{out}}(x), \, d_{\text{cauchy}}(x)\right)}{\text{span}_{\text{target}}}
+w_u = \frac{1 / \sigma_u}{\sum_{v \in \mathcal{U}} (1 / \sigma_v)}
 $$
 
-When $d_{\text{norm}}(x) > 0$, $C^1$-continuous asymptotic exponential stadium attenuation is applied:
+This prevents a single high-multiplicity value (e.g., 46 identical integer observations) from stacking redundant kernels and dwarfing smaller valid clusters (e.g., 5 observations at another value), while leaving continuous datasets without duplicates ($U = N$) completely unchanged.
+
+#### 3. Cauchy Kernel Pooling & Fractional Decay ($D(x)$ and $s(x)$)
+Given a query vector $x \in \mathbb{R}^D$, the pooled Cauchy density $D(x) \in (0, 1]$ is evaluated across the unique exemplar locations $u \in \mathcal{U}$:
 
 $$
-d_{\text{eff}}(x) = \frac{d_{\text{norm}}^2(x)}{d_{\text{norm}}(x) + 0.15}
+D(x) = \sum_{u \in \mathcal{U}} \frac{w_u}{1 + \left(\frac{\Vert x - x_u \Vert_{\text{scaled}}}{\sigma_u}\right)^2}
 $$
 
+During training, the peak density across the reservoir is calibrated with a 5% headroom factor ($1.05$) above the densest exemplar to establish a near-zero baseline ("Zero Kelvin"):
+
 $$
-s(x) = 1.0 - (1.0 - s_{\text{base}}(x)) \exp\left(-\lambda_{\text{out}} \, d_{\text{eff}}(x)\right)
+D_{\max} = 1.05 \times \max_{u \in \mathcal{U}} D(x_u)
 $$
 
-where $\lambda_{\text{out}} = 0.50$ (`GEIF_OUTER_DECAY_RATE`). Combining $d_{\text{out}}(x)$ and $d_{\text{cauchy}}(x)$ guarantees that even if a solitary extreme training outlier stretches $x_{\max}$ or $x_{\min}$, the outer decay still activates smoothly past the true high-credibility cluster boundary.
+The final anomaly score $s(x) \in [0.0, 1.0)$ applies fractional decay ($p = \text{decay}$, default $0.5$, configurable via `DECAY` in `~/.geifrc` or `-g <rcfile>`) to the normalized density ratio:
+
+$$
+s(x) = 1.0 - \left(\min\left(1.0, \, \frac{D(x)}{D_{\max}}\right)\right)^{\text{decay}}
+$$
+
+- **Near-Zero Baseline**: At the densest sample $x_{\text{peak}}$, $D(x_{\text{peak}}) / D_{\max} = 1 / 1.05$, yielding $s(x_{\text{peak}}) \approx 0.0241$ (for $\text{decay} = 0.5$).
+- **Interior Cavity & Multi-Cluster Sharpness**: Inside the sum, each kernel retains sharp $1 / d^2$ Cauchy localization, preventing points on a surrounding ring from flooding hollow cavities ($s \approx 0.52$).
+- **Unified Outer-Space Attenuation & Sensitivity Tuning**: Applying the fractional exponent $\text{decay} = 0.5$ to $D(x) / D_{\max}$ produces a smooth $O(1/d)$ decay to $1.0$ at large distances without requiring a separate outer-stadium bounding-box splice. Setting `DECAY` in `~/.geifrc` tunes outlier strictness globally across existing JSON models without modifying shell scripts (values $> 0.5$ increase score sensitivity/strictness; values $< 0.5$ make outlier detection looser).
 
 ---
 

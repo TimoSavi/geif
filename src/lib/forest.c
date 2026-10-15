@@ -31,6 +31,7 @@ geif_config_t geif_config_default(void)
     cfg.max_depth         = GEIF_DEFAULT_MAX_DEPTH;
     cfg.kappa             = GEIF_DEFAULT_KAPPA;
     cfg.alpha             = GEIF_DEFAULT_ALPHA;
+    cfg.decay             = GEIF_DEFAULT_DECAY;
     cfg.ceiling_factor    = GEIF_DEFAULT_CEILING_FACTOR;
     cfg.seed              = 0;
     cfg.algo              = GEIF_ALGO_DEFAULT;
