@@ -10,6 +10,7 @@
 *.dSYM
 
 # Test outputs & temporary files
+/untrack/
 /test/bin/
 *.out
 *.tmp
