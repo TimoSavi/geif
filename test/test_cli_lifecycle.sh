@@ -24,7 +24,10 @@ if [ "$LINES_POS" -ne 280 ]; then
     echo "  [FAIL] Expected 280 filtered rows (excluding 5 & 6), got $LINES_POS"
     exit 1
 fi
-echo "  [PASS] Filter (-F '^(5|6)$') correctly excluded categories 5 and 6 (280 rows kept)."
+# Verify -F also sets filtered status for -q summary (6 total - 2 filtered = 4 sub-forests)
+F_SUMMARY=$($BIN -r "$TMP_DIR/model_full.json" -F '^(5|6)$' -q)
+echo "$F_SUMMARY" | grep "Sub-forests:         4" > /dev/null
+echo "  [PASS] Filter (-F '^(5|6)$') correctly excluded categories 5 and 6 in -a (280 rows kept) and -q (4 sub-forests)."
 
 # Test 2: Category Inverted Filter (-F"-v ...") - Keep only matching categories
 echo "Test 2: Category Inverted Filter (-F'-v ^(5|6)$') - Keep only categories 5 and 6..."
@@ -37,29 +40,49 @@ if [ "$LINES_INV" -ne 1319 ]; then
 fi
 echo "  [PASS] Inverted filter (-F'-v ^(5|6)$') correctly retained only categories 5 and 6 (1319 rows kept)."
 
-# Test 3: Category Pruning by Minimum Row Count (-R <min_rows>)
-echo "Test 3: Train with Category Minimum Row Threshold (-R 100)..."
+# Test 3: Category Filtering by Minimum Row Count (-R <min_rows>)
+echo "Test 3: Train and Query with Category Minimum Row Threshold (-R 100)..."
 # Quality counts: 3: 10, 4: 53, 5: 681, 6: 638, 7: 199, 8: 18.
-# With -R 100, categories 3, 4, 8 must be pruned. Exactly 3 categories (5, 6, 7) must remain.
-$BIN -l "$WINE_CSV" -H -f ';' -C 12 -R 100 -w "$TMP_DIR/model_r100.json" -i 15 -s 32 -v > "$TMP_DIR/r100.log" 2>&1
-R100_SUMMARY=$($BIN -r "$TMP_DIR/model_r100.json" -q)
+# With -R 100, categories 3, 4, 8 are marked as filtered (not deleted from model).
+$BIN -l "$WINE_CSV" -H -f ';' -C 12 -R 100 -w "$TMP_DIR/model_r100.json" -i 15 -s 32 > "$TMP_DIR/r100.log" 2>&1
+if grep -q '"filtered"' "$TMP_DIR/model_r100.json"; then
+    echo "  [FAIL] 'filtered' status must NEVER be saved in JSON file!"
+    exit 1
+fi
+# Saved model retains all 6 categories when queried without -R
+R100_UNFILTERED=$($BIN -r "$TMP_DIR/model_r100.json" -q)
+echo "$R100_UNFILTERED" | grep "Sub-forests:         6"
+# Querying with -R 100 filters categories 3, 4, 8 and displays only 3 active sub-forests (5, 6, 7)
+R100_SUMMARY=$($BIN -r "$TMP_DIR/model_r100.json" -R 100 -q)
 echo "$R100_SUMMARY" | grep "Sub-forests:         3"
 echo "$R100_SUMMARY" | grep "Sub-forest '5'"
 echo "$R100_SUMMARY" | grep "Sub-forest '6'"
 echo "$R100_SUMMARY" | grep "Sub-forest '7'"
-# Verify pruned categories do not exist
 if echo "$R100_SUMMARY" | grep -E "Sub-forest '(3|4|8)'"; then
-    echo "  [FAIL] Categories with <100 rows were not pruned!"
+    echo "  [FAIL] Categories with <100 rows were not filtered by -R 100!"
     exit 1
 fi
-echo "  [PASS] -R 100 correctly pruned categories below 100 rows, retaining exactly 3 sub-forests."
+echo "  [PASS] -R 100 non-destructively filtered categories below 100 rows while preserving all categories in the model (and not writing filtered to JSON)."
 
-# Test 4: NEW / Unseen Category Template Formatting (-N [tmpl] / --new [tmpl])
-echo "Test 4: Format NEW / Unseen category with custom and default template (-N, --new)..."
+# Test 4: NEW / Unseen Category Template Formatting (-N [tmpl] / --new [tmpl]) and -R / -F + -N interaction
+echo "Test 4: Format NEW / Unseen category with custom and default template (-N, --new) and verify -R/-F + -N..."
 UNSEEN_INPUT="7.4;0.7;0;1.9;0.076;11;34;0.9978;3.51;0.56;9.4;99"
 NEW_OUT=$(echo "$UNSEEN_INPUT" | $BIN -r "$TMP_DIR/model_full.json" -a - --no-header -f ';' -N "NEW;cat=%c;metric=%m;outlier=%o;epoch=%u" || true)
 if ! echo "$NEW_OUT" | grep -q "^NEW;cat=99;metric=7\.400000.*;outlier=1;epoch=[0-9][0-9]*"; then
     echo "  [FAIL] Unexpected NEW category formatted output: '$NEW_OUT'"
+    exit 1
+fi
+# Verify that a known category with < 100 rows (e.g. category 3, which has 10 rows) is filtered by -R 100 and NOT reported as NEW by -N
+FILTERED_CAT_INPUT="7.4;0.7;0;1.9;0.076;11;34;0.9978;3.51;0.56;9.4;3"
+R_AND_N_OUT=$(printf "%s\n%s\n" "$FILTERED_CAT_INPUT" "$UNSEEN_INPUT" | $BIN -r "$TMP_DIR/model_r100.json" -a - --no-header -f ';' -R 100 -N "NEW;cat=%c" || true)
+if [ "$R_AND_N_OUT" != "NEW;cat=99" ]; then
+    echo "  [FAIL] Expected -R 100 -N to skip filtered category 3 and only report unseen category 99, got: '$R_AND_N_OUT'"
+    exit 1
+fi
+# Verify that a known category filtered by -F '^3$' is also NOT reported as NEW by -N
+F_AND_N_OUT=$(printf "%s\n%s\n" "$FILTERED_CAT_INPUT" "$UNSEEN_INPUT" | $BIN -r "$TMP_DIR/model_full.json" -a - --no-header -f ';' -F '^3$' -N "NEW;cat=%c" || true)
+if [ "$F_AND_N_OUT" != "NEW;cat=99" ]; then
+    echo "  [FAIL] Expected -F '^3$' -N to skip filtered category 3 and only report unseen category 99, got: '$F_AND_N_OUT'"
     exit 1
 fi
 # Test default -N (defaults to %v)
@@ -74,7 +97,7 @@ if [ "$LONG_NEW_OUT" != "$UNSEEN_INPUT" ]; then
     echo "  [FAIL] Expected default --new to output raw line '%v', got '$LONG_NEW_OUT'"
     exit 1
 fi
-echo "  [PASS] Unseen category formatted with custom and default -N / --new templates."
+echo "  [PASS] Unseen category formatted with custom and default -N / --new templates, and -R filtered categories are not falsely flagged as NEW."
 
 # Test 5: MISSED Category Reporting (-M [tmpl] / --missing [tmpl])
 echo "Test 5: Report MISSED categories at end of analysis batch (-M, --missing)..."

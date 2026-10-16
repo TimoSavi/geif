@@ -9,6 +9,7 @@ set -euo pipefail
 GEIF_BIN="./bin/geif"
 TEST_DIR=$(mktemp -d /tmp/geif_test_grid_XXXXXX)
 trap 'rm -rf "$TEST_DIR"' EXIT
+export HOME="$TEST_DIR"
 
 echo "=== Running GEIF Test Grid & Population Drift Integration Tests ==="
 

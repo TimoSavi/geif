@@ -164,6 +164,7 @@ typedef struct {
     geif_forest_t *forest;
     time_t         last_updated;
     uint64_t       total_rows;
+    bool           filtered;          /**< Ephemeral runtime flag indicating category is filtered out by -R or -F */
     bool           seen_in_analysis;  /**< Ephemeral tracking flag for missed category detection (-M) */
     bool           is_new_category;   /**< Ephemeral tracking flag indicating category was newly created during training */
     uint64_t       analyzed_rows;     /**< Ephemeral counter of rows evaluated during analysis */

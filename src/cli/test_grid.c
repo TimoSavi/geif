@@ -142,9 +142,10 @@ void geif_generate_test_grid(const geif_ensemble_t *ens,
 {
     if (!ens || !out_fp) return;
 
+    (void)filter;
     for (size_t c = 0; c < ens->count; c++) {
+        if (ens->entries[c].filtered) continue;
         const char *cat_name = ens->entries[c].category;
-        if (!geif_cat_filter_allows(filter, cat_name)) continue;
 
         geif_forest_t *f = ens->entries[c].forest;
         if (!f || f->dimensions == 0) continue;

@@ -253,14 +253,13 @@ static void process_scoring_row(geif_ensemble_t *ensemble,
     geif_extract_category(col_cfg, tokens, n_tok, cat_sep, cat_buf, sizeof(cat_buf));
     geif_extract_label(col_cfg, tokens, n_tok, label_sep, label_buf, sizeof(label_buf));
 
-    // Category filter check (-F)
-    if (!geif_cat_filter_allows(cat_filter, cat_buf)) {
-        return; // Filtered out
-    }
-
-    geif_forest_t *sub_forest = geif_ensemble_find(ensemble, cat_buf);
+    geif_category_entry_t *matched_entry = geif_ensemble_get_entry(ensemble, cat_buf);
+    geif_forest_t *sub_forest = matched_entry ? matched_entry->forest : NULL;
     if (!sub_forest) {
-        // Unseen / NEW category!
+        // Unseen / NEW category: check regex filter (-F) before reporting
+        if (!geif_cat_filter_allows(cat_filter, cat_buf)) {
+            return;
+        }
         (*analyzed)++;
         (*total_outliers)++;
 
@@ -305,18 +304,19 @@ static void process_scoring_row(geif_ensemble_t *ensemble,
         return;
     }
 
+    if (matched_entry->filtered) {
+        return; // Known category, but filtered out by -R or -F
+    }
+
     // Known category: extract features and score (or accumulate if aggregate mode -A)
     if (geif_extract_features(col_cfg, tokens, n_tok, vec)) {
         if (ensemble->aggregate) {
-            geif_category_entry_t *matched_entry = geif_ensemble_get_entry(ensemble, cat_buf);
-            if (matched_entry) {
-                matched_entry->seen_in_analysis = true;
-                if (!matched_entry->summary) {
-                    matched_entry->summary = (double *)xcalloc(dims, sizeof(double));
-                }
-                for (uint32_t j = 0; j < dims; j++) {
-                    matched_entry->summary[j] += vec[j];
-                }
+            matched_entry->seen_in_analysis = true;
+            if (!matched_entry->summary) {
+                matched_entry->summary = (double *)xcalloc(dims, sizeof(double));
+            }
+            for (uint32_t j = 0; j < dims; j++) {
+                matched_entry->summary[j] += vec[j];
             }
             return;
         }
@@ -335,15 +335,12 @@ static void process_scoring_row(geif_ensemble_t *ensemble,
         bool is_outlier = (score > eff_threshold);
         if (is_outlier) (*total_outliers)++;
 
-        geif_category_entry_t *matched_entry = geif_ensemble_get_entry(ensemble, cat_buf);
-        time_t cat_ts = (matched_entry && matched_entry->last_updated > 0) ? matched_entry->last_updated : time(NULL);
+        time_t cat_ts = (matched_entry->last_updated > 0) ? matched_entry->last_updated : time(NULL);
 
-        if (matched_entry) {
-            matched_entry->analyzed_rows++;
-            matched_entry->sum_score += score;
-            if (is_outlier) {
-                matched_entry->high_analyzed_rows++;
-            }
+        matched_entry->analyzed_rows++;
+        matched_entry->sum_score += score;
+        if (is_outlier) {
+            matched_entry->high_analyzed_rows++;
         }
 
         if (is_outlier) {
@@ -367,7 +364,7 @@ static void process_scoring_row(geif_ensemble_t *ensemble,
                 .category         = cat_buf,
                 .input_category   = cat_buf,
                 .score            = score,
-                .test_average_score = (matched_entry && matched_entry->analyzed_rows > 0)
+                .test_average_score = (matched_entry->analyzed_rows > 0)
                                      ? (matched_entry->sum_score / (double)matched_entry->analyzed_rows)
                                      : score,
                 .metric_depth     = H_metric,
@@ -376,8 +373,8 @@ static void process_scoring_row(geif_ensemble_t *ensemble,
                 .is_outlier       = 1,
                 .timestamp        = cat_ts,
                 .total_rows       = sub_forest ? sub_forest->total_rows_seen : 0,
-                .analyzed_rows    = matched_entry ? matched_entry->analyzed_rows : *analyzed,
-                .high_analyzed_rows = matched_entry ? matched_entry->high_analyzed_rows : 1,
+                .analyzed_rows    = matched_entry->analyzed_rows,
+                .high_analyzed_rows = matched_entry->high_analyzed_rows,
                 .row_idx          = line_num,
                 .vector           = vec,
                 .averages         = averages,
@@ -443,9 +440,9 @@ static void score_and_print_categorize_vec(geif_ensemble_t *ensemble,
     double best_metric_depth = 0.0;
     double best_d_out = 0.0;
 
+    (void)cat_filter;
     for (size_t i = 0; i < ensemble->count; i++) {
-        const char *cat_name = ensemble->entries[i].category;
-        if (!geif_cat_filter_allows(cat_filter, cat_name)) {
+        if (ensemble->entries[i].filtered) {
             continue;
         }
         geif_forest_t *sub_forest = ensemble->entries[i].forest;
@@ -639,12 +636,13 @@ static void process_categorize_row(geif_ensemble_t *ensemble,
  */
 static void update_ensemble_percentage_scores(geif_ensemble_t *ens, double pct, const cat_filter_t *filter, bool verbose)
 {
+    (void)filter;
     if (!ens) return;
     for (size_t c = 0; c < ens->count; c++) {
-        const char *cat_name = ens->entries[c].category;
-        if (filter && !geif_cat_filter_allows(filter, cat_name)) {
+        if (ens->entries[c].filtered) {
             continue;
         }
+        const char *cat_name = ens->entries[c].category;
         geif_forest_t *sf = ens->entries[c].forest;
         if (sf) {
             sf->percentage_score = geif_forest_calculate_percentile_score(sf, pct);
@@ -654,6 +652,33 @@ static void update_ensemble_percentage_scores(geif_ensemble_t *ens, double pct, 
                        sf->percentage_score, pct);
             }
         }
+    }
+}
+
+static void apply_category_filters(geif_ensemble_t *ens, uint64_t min_cat_rows, const cat_filter_t *cat_filter, bool verbose)
+{
+    if (!ens) return;
+    size_t filtered_before = 0;
+    for (size_t i = 0; i < ens->count; i++) {
+        if (ens->entries[i].filtered) filtered_before++;
+    }
+    if (min_cat_rows > 0) {
+        geif_ensemble_prune_categories(ens, min_cat_rows);
+    }
+    if (cat_filter && cat_filter->active && cat_filter->count > 0) {
+        for (size_t i = 0; i < ens->count; i++) {
+            if (!geif_cat_filter_allows(cat_filter, ens->entries[i].category)) {
+                ens->entries[i].filtered = true;
+            }
+        }
+    }
+    size_t filtered_after = 0;
+    for (size_t i = 0; i < ens->count; i++) {
+        if (ens->entries[i].filtered) filtered_after++;
+    }
+    if (verbose && filtered_after != filtered_before) {
+        printf("Filtered %zu categories (%zu active of %zu total).\n",
+               filtered_after, ens->count - filtered_after, ens->count);
     }
 }
 
@@ -1027,20 +1052,12 @@ int main(int argc, char *argv[])
                            before - ensemble->count, ensemble->count);
                 }
             }
-            if (min_cat_rows > 0) {
-                size_t before = ensemble->count;
-                geif_ensemble_prune_categories(ensemble, min_cat_rows);
-                if (verbose && before != ensemble->count) {
-                    printf("Pruned categories with fewer than %llu rows (%zu -> %zu categories retained).\n",
-                           (unsigned long long)min_cat_rows, before, ensemble->count);
-                }
-            }
+            apply_category_filters(ensemble, min_cat_rows, &cat_filter, verbose);
         }
 
         if (!learn_file && !query_mode) {
             for (size_t i = 0; i < ensemble->count; i++) {
-                const char *cat_name = ensemble->entries[i].category;
-                if (!geif_cat_filter_allows(&cat_filter, cat_name)) {
+                if (ensemble->entries[i].filtered) {
                     continue;
                 }
                 geif_forest_t *sf = ensemble->entries[i].forest;
@@ -1136,7 +1153,7 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    // Standalone model maintenance (-D pruning, -R row threshold pruning, and/or -k outlier recalibration): -r <model> [-D <interval>] [-R <min_rows>] [-k] -w <model>
+    // Standalone model maintenance (-D pruning, -R/-F filtering, and/or -k outlier recalibration): -r <model> [-D <interval>] [-R <min_rows>] [-F <regex>] [-k] -w <model>
     if (!learn_file && !analyze_file && !categorize_file && (delete_interval > 0 || kill_outliers_count > 0 || min_cat_rows > 0)) {
         if (!ensemble) {
             fprintf(stderr, "Error: maintenance operations (-D, -R, -k) require a loaded model via -r <model.json>\n");
@@ -1150,14 +1167,7 @@ int main(int argc, char *argv[])
                        before - ensemble->count, ensemble->count);
             }
         }
-        if (min_cat_rows > 0) {
-            size_t before = ensemble->count;
-            geif_ensemble_prune_categories(ensemble, min_cat_rows);
-            if (verbose && before != ensemble->count) {
-                printf("Pruned categories with fewer than %llu rows (%zu -> %zu categories retained).\n",
-                       (unsigned long long)min_cat_rows, before, ensemble->count);
-            }
-        }
+        apply_category_filters(ensemble, min_cat_rows, &cat_filter, verbose);
         if (kill_outliers_count > 0) {
             if (verbose) {
                 printf("Pruning %d outlier(s) per category and recalibrating ensemble...\n", kill_outliers_count);
@@ -1526,14 +1536,7 @@ int main(int argc, char *argv[])
             }
         }
 
-        if (min_cat_rows > 0) {
-            size_t before = ensemble->count;
-            geif_ensemble_prune_categories(ensemble, min_cat_rows);
-            if (verbose && before != ensemble->count) {
-                printf("Pruned categories with fewer than %llu rows (%zu -> %zu categories retained).\n",
-                       (unsigned long long)min_cat_rows, before, ensemble->count);
-            }
-        }
+        apply_category_filters(ensemble, min_cat_rows, &cat_filter, verbose);
 
         if (verbose) {
             printf("Ingested %llu rows from '%s' (%u feature dimensions, %zu categories). Training ensemble...\n",
@@ -1629,14 +1632,7 @@ int main(int argc, char *argv[])
             }
         }
 
-        if (min_cat_rows > 0) {
-            size_t before = ensemble->count;
-            geif_ensemble_prune_categories(ensemble, min_cat_rows);
-            if (verbose && before != ensemble->count) {
-                printf("Pruned categories with fewer than %llu rows (%zu -> %zu categories retained).\n",
-                       (unsigned long long)min_cat_rows, before, ensemble->count);
-            }
-        }
+        apply_category_filters(ensemble, min_cat_rows, &cat_filter, verbose);
 
         if (kill_outliers_count > 0) {
             if (verbose) {
@@ -1769,7 +1765,7 @@ int main(int argc, char *argv[])
                 geif_category_entry_t *matched_entry = &ensemble->entries[i];
                 if (!matched_entry->summary || !matched_entry->forest) continue;
                 const char *cat_name = matched_entry->category;
-                if (!geif_cat_filter_allows(&cat_filter, cat_name)) {
+                if (matched_entry->filtered) {
                     xfree(matched_entry->summary);
                     matched_entry->summary = NULL;
                     continue;
@@ -1854,10 +1850,10 @@ int main(int argc, char *argv[])
         // Emit Average summary (-v <format>) if specified
         if (average_tmpl) {
             for (size_t i = 0; i < ensemble->count; i++) {
-                const char *cat_name = ensemble->entries[i].category;
-                if (!geif_cat_filter_allows(&cat_filter, cat_name)) {
+                if (ensemble->entries[i].filtered) {
                     continue;
                 }
+                const char *cat_name = ensemble->entries[i].category;
                 if (ensemble->entries[i].analyzed_rows > 0) {
                     geif_forest_t *sub_f = ensemble->entries[i].forest;
                     time_t cat_ts = ensemble->entries[i].last_updated;
@@ -1916,10 +1912,10 @@ int main(int argc, char *argv[])
         // Emit Missed categories (-M) if specified
         if (missed_cat_tmpl) {
             for (size_t i = 0; i < ensemble->count; i++) {
-                const char *cat_name = ensemble->entries[i].category;
-                if (!geif_cat_filter_allows(&cat_filter, cat_name)) {
+                if (ensemble->entries[i].filtered) {
                     continue;
                 }
+                const char *cat_name = ensemble->entries[i].category;
                 if (!ensemble->entries[i].seen_in_analysis) {
                     total_outliers++;
                     geif_forest_t *sub_f = ensemble->entries[i].forest;
@@ -2032,14 +2028,7 @@ int main(int argc, char *argv[])
             }
         }
 
-        if (min_cat_rows > 0) {
-            size_t before = ensemble->count;
-            geif_ensemble_prune_categories(ensemble, min_cat_rows);
-            if (verbose && before != ensemble->count) {
-                printf("Pruned categories with fewer than %llu rows (%zu -> %zu categories retained).\n",
-                       (unsigned long long)min_cat_rows, before, ensemble->count);
-            }
-        }
+        apply_category_filters(ensemble, min_cat_rows, &cat_filter, verbose);
 
         if (ensemble->count == 0) {
             fprintf(stderr, "Error: Categorization requires at least one category in the model.\n");

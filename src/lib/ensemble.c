@@ -419,59 +419,23 @@ geif_status_t geif_ensemble_feed(geif_ensemble_t *ens,
 }
 
 /**
- * @brief Prunes categories having fewer than min_rows training samples (-R).
+ * @brief Marks categories having fewer than min_rows training samples as filtered (-R).
  *
- * Destroys underpopulated sub-forests, compacts the active category entries list,
- * and rebuilds the category hash table.
+ * Categories with total_rows < min_rows are kept in the ensemble (so they are not
+ * falsely treated as unseen/new categories by -N and remain persisted in models),
+ * but are marked with filtered = true so active operations skip them.
  *
  * @param[in,out] ens      Ensemble instance.
- * @param[in]     min_rows Minimum sample count required to keep a category sub-forest.
+ * @param[in]     min_rows Minimum sample count required for a category to be active.
  * @return GEIF_OK on success, or GEIF_ERR_INVALID_ARG on NULL.
  */
 geif_status_t geif_ensemble_prune_categories(geif_ensemble_t *ens, uint64_t min_rows)
 {
     if (!ens) return GEIF_ERR_INVALID_ARG;
-    if (min_rows == 0 || ens->count == 0) return GEIF_OK;
-
-    size_t new_count = 0;
-    for (size_t i = 0; i < ens->count; i++) {
-        if (ens->entries[i].total_rows < min_rows) {
-            if (ens->entries[i].forest) {
-                geif_forest_destroy(ens->entries[i].forest);
-                ens->entries[i].forest = NULL;
-            }
-            if (ens->entries[i].summary) {
-                free(ens->entries[i].summary);
-                ens->entries[i].summary = NULL;
-            }
-        } else {
-            if (new_count != i) {
-                ens->entries[new_count] = ens->entries[i];
-            }
-            new_count++;
-        }
-    }
-    ens->count = new_count;
-
-    // Clear and rebuild hash table
-    for (size_t b = 0; b < ens->hash_size; b++) {
-        geif_cat_hash_node_t *node = ens->hash_buckets[b];
-        while (node) {
-            geif_cat_hash_node_t *next = node->next;
-            free(node);
-            node = next;
-        }
-        ens->hash_buckets[b] = NULL;
-    }
 
     for (size_t i = 0; i < ens->count; i++) {
-        uint32_t h = ensemble_hash(ens->entries[i].category);
-        size_t b = (size_t)(h % ens->hash_size);
-        geif_cat_hash_node_t *node = (geif_cat_hash_node_t *)malloc(sizeof(geif_cat_hash_node_t));
-        if (node) {
-            node->entry_idx = (uint32_t)i;
-            node->next = ens->hash_buckets[b];
-            ens->hash_buckets[b] = node;
+        if (min_rows > 0 && ens->entries[i].total_rows < min_rows) {
+            ens->entries[i].filtered = true;
         }
     }
 
@@ -540,10 +504,10 @@ geif_status_t geif_ensemble_prune_age(geif_ensemble_t *ens, time_t max_age_secon
 }
 
 /**
- * @brief Trains all sub-forests in the ensemble that contain reservoir samples.
+ * @brief Trains all unfiltered sub-forests in the ensemble that contain reservoir samples.
  *
  * Iterates through each category entry, calling geif_forest_train() on any
- * sub-forest with pool_count > 0.
+ * unfiltered sub-forest with pool_count > 0.
  *
  * @param[in,out] ens Ensemble instance.
  * @return GEIF_OK on success, GEIF_ERR_EMPTY_DATASET if no sub-forests exist, or an error code.
@@ -553,6 +517,7 @@ geif_status_t geif_ensemble_train(geif_ensemble_t *ens)
     if (!ens || ens->count == 0) return GEIF_ERR_EMPTY_DATASET;
 
     for (size_t i = 0; i < ens->count; i++) {
+        if (ens->entries[i].filtered) continue;
         geif_forest_t *forest = ens->entries[i].forest;
         if (forest && forest->pool_count > 0 && !forest->is_trained) {
             geif_status_t status = geif_forest_train(forest);
@@ -578,7 +543,7 @@ geif_status_t geif_ensemble_train(geif_ensemble_t *ens)
  * @param[out] score_out        Receives calibrated anomaly score.
  * @param[out] metric_depth_out Optional pointer to receive metric depth.
  * @param[out] d_out_out        Optional pointer to receive exterior distance.
- * @return GEIF_OK on success, or GEIF_ERR_INVALID_ARG if category is unknown.
+ * @return GEIF_OK on success, or GEIF_ERR_INVALID_ARG if category is unknown or filtered.
  */
 geif_status_t geif_ensemble_score_detailed(const geif_ensemble_t *ens,
                                            const char *category,
@@ -598,6 +563,9 @@ geif_status_t geif_ensemble_score_detailed(const geif_ensemble_t *ens,
     while (node) {
         uint32_t idx = node->entry_idx;
         if (strcmp(ens->entries[idx].category, cat_key) == 0) {
+            if (ens->entries[idx].filtered) {
+                return GEIF_ERR_INVALID_ARG;
+            }
             forest = ens->entries[idx].forest;
             ((geif_ensemble_t *)ens)->entries[idx].seen_in_analysis = true;
             break;
@@ -624,10 +592,10 @@ geif_status_t geif_ensemble_score_detailed(const geif_ensemble_t *ens,
 }
 
 /**
- * @brief Formats a diagnostic summary of the ensemble and all sub-forests.
+ * @brief Formats a diagnostic summary of the ensemble and all active sub-forests.
  *
  * Prints total dimensions, sub-forest count, column specs, and detailed statistics
- * for each sub-forest (rows seen, pool size, tree count, calibrated H_max, timestamp).
+ * for each active sub-forest (rows seen, pool size, tree count, calibrated H_max, timestamp).
  *
  * @param[in]  ens         Ensemble instance.
  * @param[out] buffer      Destination text buffer.
@@ -636,6 +604,11 @@ geif_status_t geif_ensemble_score_detailed(const geif_ensemble_t *ens,
 void geif_ensemble_summary(const geif_ensemble_t *ens, char *buffer, size_t buffer_size)
 {
     if (!ens || !buffer || buffer_size == 0) return;
+
+    size_t active_count = 0;
+    for (size_t i = 0; i < ens->count; i++) {
+        if (!ens->entries[i].filtered) active_count++;
+    }
 
     size_t written = 0;
     int n = snprintf(buffer + written, buffer_size - written,
@@ -654,7 +627,7 @@ void geif_ensemble_summary(const geif_ensemble_t *ens, char *buffer, size_t buff
                      "  Aggregate (-A):       %s\n",
                      geif_algo_name(ens->config.algo),
                      ens->dimensions,
-                     ens->count,
+                     active_count,
                      ens->total_input_cols,
                      ens->category_dims_spec[0] ? ens->category_dims_spec : "(none - global forest)",
                      ens->label_dims_spec[0] ? ens->label_dims_spec : "(none)",
@@ -673,6 +646,7 @@ void geif_ensemble_summary(const geif_ensemble_t *ens, char *buffer, size_t buff
 
     for (size_t i = 0; i < ens->count && written < buffer_size - 1; i++) {
         const geif_category_entry_t *entry = &ens->entries[i];
+        if (entry->filtered) continue;
         const geif_forest_t *f = entry->forest;
         const char *cat_label = entry->category[0] ? entry->category : "(default)";
 
@@ -682,7 +656,7 @@ void geif_ensemble_summary(const geif_ensemble_t *ens, char *buffer, size_t buff
                          cat_label,
                          (unsigned long long)entry->total_rows,
                          f->pool_count,
-                         f->tree_count,
+                         f->tree_count > 0 ? f->tree_count : f->config.tree_count,
                          f->H_max,
                          (long)entry->last_updated);
         } else {
@@ -755,7 +729,7 @@ geif_status_t geif_forest_remove_outliers(geif_forest_t *f, uint32_t k)
 }
 
 /**
- * @brief Prunes the k worst outlier samples across all sub-forests in an ensemble.
+ * @brief Prunes the k worst outlier samples across all unfiltered sub-forests in an ensemble.
  *
  * @param[in,out] ens Ensemble instance.
  * @param[in]     k   Number of outlier samples to prune per category.
@@ -767,6 +741,7 @@ geif_status_t geif_ensemble_remove_outliers(geif_ensemble_t *ens, uint32_t k)
     if (k == 0) return GEIF_OK;
 
     for (size_t i = 0; i < ens->count; i++) {
+        if (ens->entries[i].filtered) continue;
         if (ens->entries[i].forest) {
             geif_status_t st = geif_forest_remove_outliers(ens->entries[i].forest, k);
             if (st != GEIF_OK) return st;
