@@ -1781,7 +1781,7 @@ int main(int argc, char *argv[])
                 if (dims > 0) geif_forest_dimension_attribution(sub_forest, matched_entry->summary, attr);
 
                 analyzed++;
-                bool is_out = (score >= effective_threshold);
+                bool is_out = (score > effective_threshold);
                 if (is_out) total_outliers++;
 
                 matched_entry->analyzed_rows++;
@@ -1959,7 +1959,7 @@ int main(int argc, char *argv[])
         geif_column_config_free(&col_cfg);
 
         if (verbose) {
-            fprintf(stderr, "Scored %llu rows. Outliers (>= %.2f): %llu (%.2f%%)\n",
+            fprintf(stderr, "Scored %llu rows. Outliers (> %.2f): %llu (%.2f%%)\n",
                     (unsigned long long)analyzed, threshold,
                     (unsigned long long)total_outliers,
                     analyzed > 0 ? (100.0 * (double)total_outliers / (double)analyzed) : 0.0);

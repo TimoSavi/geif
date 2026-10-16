@@ -198,7 +198,7 @@ void geif_generate_test_grid(const geif_ensemble_t *ens,
             geif_forest_score_detailed(f, test_dimension, &score, &H_metric, &d_out);
 
             if (score > cutoff) {
-                bool is_outlier = (score >= cutoff);
+                bool is_outlier = (score > cutoff);
                 geif_template_context_t ctx = {
                     .score           = score,
                     .metric_depth    = H_metric,
