@@ -346,59 +346,63 @@ static void process_scoring_row(geif_ensemble_t *ensemble,
             }
         }
 
-        double *averages = NULL;
-        double *attr_scores = NULL;
-        if (dims > 0) {
-            averages = (double *)malloc(dims * sizeof(double));
-            attr_scores = (double *)malloc(dims * sizeof(double));
-            if (averages) geif_forest_get_averages(sub_forest, averages);
-            if (attr_scores) geif_forest_dimension_attribution(sub_forest, vec, attr_scores);
-        }
-
-        geif_template_context_t ctx = {
-            .orig_line        = orig_line,
-            .label            = label_buf,
-            .category         = cat_buf,
-            .input_category   = cat_buf,
-            .score            = score,
-            .test_average_score = (matched_entry && matched_entry->analyzed_rows > 0)
-                                 ? (matched_entry->sum_score / (double)matched_entry->analyzed_rows)
-                                 : score,
-            .metric_depth     = H_metric,
-            .d_out            = d_out,
-            .H_max            = sub_forest ? sub_forest->H_max : 0.0,
-            .is_outlier       = is_outlier ? 1 : 0,
-            .timestamp        = cat_ts,
-            .total_rows       = sub_forest ? sub_forest->total_rows_seen : 0,
-            .analyzed_rows    = matched_entry ? matched_entry->analyzed_rows : *analyzed,
-            .high_analyzed_rows = matched_entry ? matched_entry->high_analyzed_rows : (is_outlier ? 1 : 0),
-            .row_idx          = line_num,
-            .vector           = vec,
-            .averages         = averages,
-            .attr_scores      = attr_scores,
-            .vector_dim       = dims,
-            .raw_values       = tokens,
-            .raw_value_count  = n_tok,
-            .list_separator   = list_sep,
-            .category_sep     = cat_sep,
-            .label_sep        = label_sep,
-            .decimals         = decimals,
-            .printf_format    = printf_format,
-            .print_dimension  = print_dimension,
-            .low_rgb          = low_rgb,
-            .high_rgb         = high_rgb,
-            .is_summary       = false
-        };
-
         if (is_outlier) {
             const char *tmpl_to_use = (point_tmpl && point_tmpl[0] != '\0') ? point_tmpl : "%s %v";
+            double *averages = NULL;
+            double *attr_scores = NULL;
+            if (dims > 0) {
+                if (geif_template_uses_spec(tmpl_to_use, print_dimension, 'a')) {
+                    averages = (double *)malloc(dims * sizeof(double));
+                    if (averages) geif_forest_get_averages(sub_forest, averages);
+                }
+                if (geif_template_uses_spec(tmpl_to_use, print_dimension, 'e')) {
+                    attr_scores = (double *)malloc(dims * sizeof(double));
+                    if (attr_scores) geif_forest_dimension_attribution(sub_forest, vec, attr_scores);
+                }
+            }
+
+            geif_template_context_t ctx = {
+                .orig_line        = orig_line,
+                .label            = label_buf,
+                .category         = cat_buf,
+                .input_category   = cat_buf,
+                .score            = score,
+                .test_average_score = (matched_entry && matched_entry->analyzed_rows > 0)
+                                     ? (matched_entry->sum_score / (double)matched_entry->analyzed_rows)
+                                     : score,
+                .metric_depth     = H_metric,
+                .d_out            = d_out,
+                .H_max            = sub_forest ? sub_forest->H_max : 0.0,
+                .is_outlier       = 1,
+                .timestamp        = cat_ts,
+                .total_rows       = sub_forest ? sub_forest->total_rows_seen : 0,
+                .analyzed_rows    = matched_entry ? matched_entry->analyzed_rows : *analyzed,
+                .high_analyzed_rows = matched_entry ? matched_entry->high_analyzed_rows : 1,
+                .row_idx          = line_num,
+                .vector           = vec,
+                .averages         = averages,
+                .attr_scores      = attr_scores,
+                .vector_dim       = dims,
+                .raw_values       = tokens,
+                .raw_value_count  = n_tok,
+                .list_separator   = list_sep,
+                .category_sep     = cat_sep,
+                .label_sep        = label_sep,
+                .decimals         = decimals,
+                .printf_format    = printf_format,
+                .print_dimension  = print_dimension,
+                .low_rgb          = low_rgb,
+                .high_rgb         = high_rgb,
+                .is_summary       = false
+            };
+
             char out_buf[8192];
             geif_format_template(out_buf, sizeof(out_buf), tmpl_to_use, &ctx);
             fprintf(out_fp, "%s\n", out_buf);
-        }
 
-        if (averages) free(averages);
-        if (attr_scores) free(attr_scores);
+            if (averages) free(averages);
+            if (attr_scores) free(attr_scores);
+        }
     }
 }
 
@@ -482,13 +486,18 @@ static void score_and_print_categorize_vec(geif_ensemble_t *ensemble,
     (*analyzed)++;
     ensemble->entries[best_idx].total_rows++;
 
+    const char *tmpl_to_use = (point_tmpl && point_tmpl[0] != '\0') ? point_tmpl : "%s %v";
     double *averages = NULL;
     double *attr_scores = NULL;
     if (dims > 0) {
-        averages = (double *)malloc(dims * sizeof(double));
-        attr_scores = (double *)malloc(dims * sizeof(double));
-        if (averages) geif_forest_get_averages(best_forest, averages);
-        if (attr_scores) geif_forest_dimension_attribution(best_forest, vec, attr_scores);
+        if (geif_template_uses_spec(tmpl_to_use, print_dimension, 'a')) {
+            averages = (double *)malloc(dims * sizeof(double));
+            if (averages) geif_forest_get_averages(best_forest, averages);
+        }
+        if (geif_template_uses_spec(tmpl_to_use, print_dimension, 'e')) {
+            attr_scores = (double *)malloc(dims * sizeof(double));
+            if (attr_scores) geif_forest_dimension_attribution(best_forest, vec, attr_scores);
+        }
     }
 
     geif_template_context_t ctx = {
@@ -524,7 +533,6 @@ static void score_and_print_categorize_vec(geif_ensemble_t *ensemble,
         .is_summary       = false
     };
 
-    const char *tmpl_to_use = point_tmpl ? point_tmpl : "%s %v";
     char out_buf[8192];
     geif_format_template(out_buf, sizeof(out_buf), tmpl_to_use, &ctx);
     fprintf(out_fp, "%s\n", out_buf);
@@ -1777,8 +1785,6 @@ int main(int argc, char *argv[])
 
                 double score = 0.0, h_M = 0.0, d_out = 0.0;
                 geif_forest_score_detailed(sub_forest, matched_entry->summary, &score, &h_M, &d_out);
-                double *attr = (double *)xcalloc(dims, sizeof(double));
-                if (dims > 0) geif_forest_dimension_attribution(sub_forest, matched_entry->summary, attr);
 
                 analyzed++;
                 bool is_out = (score > effective_threshold);
@@ -1788,52 +1794,58 @@ int main(int argc, char *argv[])
                 matched_entry->sum_score += score;
                 if (is_out) matched_entry->high_analyzed_rows++;
 
-                time_t cat_ts = matched_entry->last_updated;
-                if (cat_ts == 0) cat_ts = time(NULL);
-
-                double test_avg = matched_entry->sum_score / (double)matched_entry->analyzed_rows;
-
-                geif_template_context_t ctx = {
-                    .orig_line        = "",
-                    .label            = "",
-                    .category         = cat_name,
-                    .input_category   = cat_name,
-                    .score            = score,
-                    .test_average_score = test_avg,
-                    .metric_depth     = h_M,
-                    .d_out            = d_out,
-                    .H_max            = sub_forest->H_max,
-                    .is_outlier       = is_out ? 1 : 0,
-                    .timestamp        = cat_ts,
-                    .total_rows       = matched_entry->total_rows,
-                    .analyzed_rows    = matched_entry->analyzed_rows,
-                    .high_analyzed_rows = matched_entry->high_analyzed_rows,
-                    .row_idx          = analyzed,
-                    .vector           = matched_entry->summary,
-                    .averages         = sub_forest->averages,
-                    .attr_scores      = attr,
-                    .vector_dim       = dims,
-                    .raw_values       = NULL,
-                    .raw_value_count  = 0,
-                    .list_separator   = list_separator,
-                    .category_sep     = category_sep,
-                    .label_sep        = label_sep,
-                    .decimals         = decimals,
-                    .printf_format    = printf_format,
-                    .print_dimension  = print_dimension,
-                    .low_rgb          = low_rgb,
-                    .high_rgb         = high_rgb,
-                    .is_summary       = false
-                };
-
-                char out_buf[8192];
                 if (is_out) {
                     const char *tmpl_to_use = (point_tmpl && point_tmpl[0] != '\0') ? point_tmpl : "%s %v";
+                    double *attr = NULL;
+                    if (dims > 0 && geif_template_uses_spec(tmpl_to_use, print_dimension, 'e')) {
+                        attr = (double *)xcalloc(dims, sizeof(double));
+                        geif_forest_dimension_attribution(sub_forest, matched_entry->summary, attr);
+                    }
+
+                    time_t cat_ts = matched_entry->last_updated;
+                    if (cat_ts == 0) cat_ts = time(NULL);
+
+                    double test_avg = matched_entry->sum_score / (double)matched_entry->analyzed_rows;
+
+                    geif_template_context_t ctx = {
+                        .orig_line        = "",
+                        .label            = "",
+                        .category         = cat_name,
+                        .input_category   = cat_name,
+                        .score            = score,
+                        .test_average_score = test_avg,
+                        .metric_depth     = h_M,
+                        .d_out            = d_out,
+                        .H_max            = sub_forest->H_max,
+                        .is_outlier       = 1,
+                        .timestamp        = cat_ts,
+                        .total_rows       = matched_entry->total_rows,
+                        .analyzed_rows    = matched_entry->analyzed_rows,
+                        .high_analyzed_rows = matched_entry->high_analyzed_rows,
+                        .row_idx          = analyzed,
+                        .vector           = matched_entry->summary,
+                        .averages         = sub_forest->averages,
+                        .attr_scores      = attr,
+                        .vector_dim       = dims,
+                        .raw_values       = NULL,
+                        .raw_value_count  = 0,
+                        .list_separator   = list_separator,
+                        .category_sep     = category_sep,
+                        .label_sep        = label_sep,
+                        .decimals         = decimals,
+                        .printf_format    = printf_format,
+                        .print_dimension  = print_dimension,
+                        .low_rgb          = low_rgb,
+                        .high_rgb         = high_rgb,
+                        .is_summary       = false
+                    };
+
+                    char out_buf[8192];
                     geif_format_template(out_buf, sizeof(out_buf), tmpl_to_use, &ctx);
                     fprintf(out_fp, "%s\n", out_buf);
+                    if (attr) xfree(attr);
                 }
 
-                xfree(attr);
                 xfree(matched_entry->summary);
                 matched_entry->summary = NULL;
             }

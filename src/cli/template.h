@@ -92,6 +92,13 @@ size_t geif_format_template(char *out,
                             const char *tmpl,
                             const geif_template_context_t *ctx);
 
+/**
+ * @brief Checks if a template string (or its %m dimension sub-template) uses a given specifier.
+ */
+bool geif_template_uses_spec(const char *tmpl,
+                             const char *print_dimension,
+                             char spec);
+
 #ifdef __cplusplus
 }
 #endif

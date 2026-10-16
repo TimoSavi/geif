@@ -387,3 +387,26 @@ size_t geif_format_template(char *out,
     out[w] = '\0';
     return w;
 }
+
+bool geif_template_uses_spec(const char *tmpl,
+                             const char *print_dimension,
+                             char spec)
+{
+    if (!tmpl) return false;
+    for (const char *p = tmpl; *p != '\0'; p++) {
+        if (*p != '%') continue;
+        p++;
+        if (*p == '\0') break;
+        if (*p == spec) return true;
+        if (*p == 'm' && (spec == 'e' || spec == 'a' || spec == 'd' || spec == 'i')) {
+            const char *d = (print_dimension && print_dimension[0] != '\0') ? print_dimension : "%d";
+            for (; *d != '\0'; d++) {
+                if (*d != '%') continue;
+                d++;
+                if (*d == '\0') break;
+                if (*d == spec) return true;
+            }
+        }
+    }
+    return false;
+}

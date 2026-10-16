@@ -191,9 +191,10 @@ geif_status_t geif_forest_get_averages(const geif_forest_t *forest,
 /**
  * @brief Computes single-dimension attribution / impact scores (%e) for an observation.
  *
- * Isolates each feature's marginal contribution to anomaly score by replacing that
- * dimension in the category baseline average vector with the observation's value,
- * evaluating the resulting score.
+ * Isolates each feature's marginal contribution to anomaly score by selecting the
+ * reservoir sample with the highest soft count of matching dimensions as a template
+ * (falling back to category averages if the sample pool is empty), replacing one
+ * dimension at a time with the observation's value, and evaluating the resulting score.
  *
  * @param[in]  forest          Forest instance.
  * @param[in]  point           Observation feature vector.
@@ -211,10 +212,40 @@ geif_status_t geif_forest_dimension_attribution(const geif_forest_t *forest,
     double *baseline = (double *)malloc(d * sizeof(double));
     if (!baseline) return GEIF_ERR_OUT_OF_MEMORY;
 
-    geif_status_t st = geif_forest_get_averages(forest, baseline);
-    if (st != GEIF_OK) {
-        free(baseline);
-        return st;
+    if (forest->pool_count > 0 && forest->sample_pool) {
+        size_t best_idx = 0;
+        double best_votes = -1.0;
+
+        for (size_t i = 0; i < forest->pool_count; i++) {
+            const double *sp = &forest->sample_pool[i * d];
+            double votes = 0.0;
+            for (uint32_t k = 0; k < d; k++) {
+                double span = 1.0;
+                if (forest->effective_span && forest->effective_span[k] > 0.0) {
+                    span = forest->effective_span[k];
+                } else if (forest->envelope_span && forest->envelope_span[k] > 0.0) {
+                    span = forest->envelope_span[k];
+                } else if (forest->envelope_min && forest->envelope_max &&
+                           forest->envelope_max[k] > forest->envelope_min[k]) {
+                    span = forest->envelope_max[k] - forest->envelope_min[k];
+                }
+                double scale = 0.1 * span;
+                if (scale < 1e-12) scale = 1e-12;
+                double dk = (point[k] - sp[k]) / scale;
+                votes += 1.0 / (1.0 + dk * dk);
+            }
+            if (votes > best_votes) {
+                best_votes = votes;
+                best_idx = i;
+            }
+        }
+        memcpy(baseline, &forest->sample_pool[best_idx * d], d * sizeof(double));
+    } else {
+        geif_status_t st = geif_forest_get_averages(forest, baseline);
+        if (st != GEIF_OK) {
+            free(baseline);
+            return st;
+        }
     }
 
     double *test = (double *)malloc(d * sizeof(double));

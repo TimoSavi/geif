@@ -199,33 +199,39 @@ void geif_generate_test_grid(const geif_ensemble_t *ens,
 
             if (score > cutoff) {
                 bool is_outlier = (score > cutoff);
-                geif_template_context_t ctx = {
-                    .score           = score,
-                    .metric_depth    = H_metric,
-                    .H_max           = f->H_max,
-                    .d_out           = d_out,
-                    .is_outlier      = is_outlier ? 1 : 0,
-                    .vector          = test_dimension,
-                    .vector_dim      = dims,
-                    .averages        = f->averages,
-                    .attr_scores     = NULL,
-                    .orig_line       = NULL,
-                    .category        = cat_name,
-                    .label           = NULL,
-                    .total_rows      = ens->entries[c].total_rows,
-                    .timestamp       = ens->entries[c].last_updated,
-                    .decimals        = decimals,
-                    .list_separator  = list_sep,
-                    .low_rgb         = low_rgb,
-                    .high_rgb        = high_rgb,
-                    .printf_format   = printf_format,
-                    .print_dimension = print_dimension
-                };
-
                 if (point_tmpl && point_tmpl[0] != '\0') {
+                    double *attr = NULL;
+                    if (dims > 0 && geif_template_uses_spec(point_tmpl, print_dimension, 'e')) {
+                        attr = (double *)malloc(dims * sizeof(double));
+                        if (attr) geif_forest_dimension_attribution(f, test_dimension, attr);
+                    }
+                    geif_template_context_t ctx = {
+                        .score           = score,
+                        .metric_depth    = H_metric,
+                        .H_max           = f->H_max,
+                        .d_out           = d_out,
+                        .is_outlier      = is_outlier ? 1 : 0,
+                        .vector          = test_dimension,
+                        .vector_dim      = dims,
+                        .averages        = f->averages,
+                        .attr_scores     = attr,
+                        .orig_line       = NULL,
+                        .category        = cat_name,
+                        .label           = NULL,
+                        .total_rows      = ens->entries[c].total_rows,
+                        .timestamp       = ens->entries[c].last_updated,
+                        .decimals        = decimals,
+                        .list_separator  = list_sep,
+                        .low_rgb         = low_rgb,
+                        .high_rgb        = high_rgb,
+                        .printf_format   = printf_format,
+                        .print_dimension = print_dimension
+                    };
+
                     char out_buf[8192];
                     geif_format_template(out_buf, sizeof(out_buf), point_tmpl, &ctx);
                     fprintf(out_fp, "%s\n", out_buf);
+                    if (attr) free(attr);
                 } else {
                     for (uint32_t i = 0; i < dims; i++) {
                         fprintf(out_fp, "%.*f%c", decimals, test_dimension[i], list_sep);
