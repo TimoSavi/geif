@@ -315,17 +315,21 @@ $$
 
 ### 5.3 Exemplar Kernel Density (`algo_exemplar.c`)
 
-Non-parametric spatial density kernel evaluating regularized Cauchy kernel distances across the reservoir pool:
-1. **Training Phase (`geif_exemplar_train`)**: For each sample $i$ in the reservoir pool, finds its $K$-nearest neighbors ($K = 5$), calculates local adaptive bandwidth $\sigma_i$ clamped to $[0.5, 1.5] \times \sigma_{\text{med}}$, and assigns credibility pilot weights $w_i$.
-2. **Inference Phase (`geif_exemplar_score`)**: Unrolled AVX2/FMA vector loop aggregates weighted Cauchy kernel density across the entire sample pool:
+Non-parametric spatial density kernel evaluating unified Cauchy kernel distances across the unique locations $u_i$ in the reservoir pool:
+1. **Training Phase (`geif_exemplar_train`)**: Extracts unique exemplar coordinates $u_i$ and duplicate counts $c_i$, computes mean distance $b_i$ to the $K = 5$ nearest neighbors (with each duplicate set capped at 5 samples so the 5th neighbor always comes from a distinct location), floors $b_i$ at $b_{\min} = \max(0.5 \mu_b, \mu_b - s_b)$ (no high-end clamp), and precomputes $b_i^2$ and $\sqrt{c_i} \cdot b_i$.
+2. **Inference Phase (`geif_exemplar_score`)**: Unrolled AVX2/FMA vector loop aggregates unified Cauchy kernel density across the unique locations:
 
-$$D(x) = \frac{1}{\sum_i w_i} \sum_{i=1}^N \frac{w_i}{1 + (\Vert x - s_i \Vert / \sigma_i)^2}$$
+$$
+D(x) = \sum_{i=1}^{U_{\text{unique}}} \frac{\sqrt{c_i} \cdot b_i}{b_i^2 + \Vert x - u_i \Vert_{\text{scaled}}^2}
+$$
 
-Score is evaluated using Zero Kelvin Square-Root Potential Mapping:
+Score is evaluated using Fractional Decay Potential Mapping (`DECAY`, default $0.5$) relative to calibrated peak density $D_{\max} = 1.05 \times \max_i D(u_i)$:
 
-$$s(x) = 1.0 - \sqrt{\min\left(1.0, \frac{D(x)}{D_{\max}}\right)}$$
+$$
+s(x) = 1.0 - \left(\min\left(1.0, \frac{D(x)}{D_{\max}}\right)\right)^{\text{decay}}
+$$
 
-Linearizing radial decay ($s(r) \approx 1 - \bar{\sigma}/r$) and attenuating monotonically into outer space via stadium metrics without boundary cliff jumps.
+This single expression attenuates smoothly and monotonically into outer space ($O(1/d)$ for $\text{decay} = 0.5$) without boundary cliff jumps or piecewise outer-stadium splices.
 
 ---
 

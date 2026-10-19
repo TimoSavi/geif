@@ -75,14 +75,14 @@ $$
 - **Zero-Variance Feature Masking**: Detects constant features and restricts cuts strictly to informative dimensions.
 
 #### Engine 3: Direct SIMD Exemplar Cauchy Density (`exemplar`)
-A non-tree kernel density estimation engine operating directly over reservoir samples with adaptive $K$-NN bandwidth clamping, unique-location inverse-bandwidth credibility weighting, and fractional decay mapping:
+A non-tree kernel density estimation engine operating directly over unique reservoir locations $u_i$ with cap-5 $K$-NN bandwidths $b_i$ (low-end floored at $b_{\min}$), sublinear duplicate weighting $\sqrt{c_i}$, and fractional decay mapping:
 
 $$
-D(x) = \sum_{u \in \mathcal{U}} \frac{w_u}{1 + (\Vert x - x_u \Vert_{\text{scaled}} / \sigma_u)^2}, \quad s(x) = 1.0 - \left(\min\left(1.0, \frac{D(x)}{D_{\max}}\right)\right)^{\text{decay}}
+D(x) = \sum_{i=1}^{U_{\text{unique}}} \frac{\sqrt{c_i} \cdot b_i}{b_i^2 + \Vert x - u_i \Vert_{\text{scaled}}^2}, \quad s(x) = 1.0 - \left(\min\left(1.0, \frac{D(x)}{D_{\max}}\right)\right)^{\text{decay}}
 $$
 
 - Bypasses binary tree construction entirely with instantaneous sub-millisecond build latency.
-- Delivers 88.5% categorization accuracy on complex multi-category tabular benchmarks.
+- Naturally suppresses isolated training outliers ($b_i \gg 1 \implies 1/b_i \to 0$) while growing inlier contours sublinearly with duplicate multiplicity $\sqrt{c_i}$.
 - Evaluates queries via straight-line AVX2/FMA SIMD vector loops ($> 15\text{ M}$ pts/sec).
 
 #### Engine 4: Continuous Gaussian Cuts (`ceif`)

@@ -316,63 +316,53 @@ where $C$ is the adaptive ceiling factor (default $C = 3$). This ceiling cap pre
 ---
 
 ### 5.2 Mathematical Formulation
-The Exemplar engine evaluates anomaly scores using a unified, data-driven Cauchy kernel formulation that handles multi-cluster geometries, heavy duplicate distributions, and identical-sample corner cases without piecewise outer-space splices:
+The Exemplar engine evaluates anomaly scores using a simple, unified Cauchy kernel formulation over the $U_{\text{unique}}$ unique exemplar locations $u_i$ (each with duplicate count $c_i \ge 1$) that handles multi-cluster geometries, heavy duplicate distributions, isolated outliers, and identical-sample corner cases without high-end clamping or outer-space splices:
 
-#### 1. Local $K$-NN Spacing & Mean/Stddev Bandwidth Clamping ($\sigma_i$)
-1. For each exemplar $x_i$ ($i = 1 \ldots N$), the span-scaled Euclidean distances to all other exemplars $x_j$ ($j \ne i$, including co-located duplicates) are sorted:
-
-$$
-0 \le d_{(1)}(x_i) \le d_{(2)}(x_i) \le \ldots \le d_{(K)}(x_i)
-$$
-
-2. The raw local spacing $r_i$ is the arithmetic mean of the $K = \min(5, N - 1)$ nearest neighbor distances:
+#### 1. Cap-5 $K$-NN Spacing & Low-End Bandwidth Floor ($b_i$)
+1. For each unique exemplar location $u_i$ ($i = 1 \ldots U_{\text{unique}}$), duplicate multiplicity is capped at $m_i = \min(c_i, 5)$ during the $K = 5$ nearest-neighbor search (contributing at most $m_i - 1 \le 4$ self-duplicates at distance $0$). Because at most 4 neighbors can lie at distance $0$, the 5th nearest neighbor always comes from a distinct location ($b_i > 0$ whenever $U_{\text{unique}} \ge 2$):
 
 $$
-r_i = \frac{1}{K} \sum_{k=1}^K d_{(k)}(x_i)
+0 \le d_{(1)}(u_i) \le d_{(2)}(u_i) \le \ldots \le d_{(K)}(u_i)
 $$
 
-3. Across the reservoir, the dataset mean $\mu_\sigma$ and standard deviation $s_\sigma$ of $\{r_1, \ldots, r_N\}$ are computed:
+2. The raw local bandwidth $r_i$ is the arithmetic mean of the $K = \min(5, N_{\text{knn}} - 1)$ nearest neighbor distances (where $N_{\text{knn}} = \sum_i m_i$):
 
 $$
-\mu_\sigma = \frac{1}{N} \sum_{i=1}^N r_i, \qquad s_\sigma = \sqrt{\frac{1}{N} \sum_{i=1}^N (r_i - \mu_\sigma)^2}
+r_i = \frac{1}{K} \sum_{k=1}^K d_{(k)}(u_i)
 $$
 
-4. Each exemplar bandwidth $\sigma_i$ is clamped to the range from $\sigma_{\min}$ to $\sigma_{\max}$:
+3. Across the capped $K$-NN sample set, the weighted mean $\mu_b$ and standard deviation $s_b$ are computed:
 
 $$
-\sigma_{\min} = \max\left(0.5 \mu_\sigma, \mu_\sigma - s_\sigma\right), \qquad \sigma_{\max} = \mu_\sigma + s_\sigma
+\mu_b = \frac{1}{N_{\text{knn}}} \sum_{i=1}^{U_{\text{unique}}} m_i r_i, \qquad s_b = \sqrt{\frac{1}{N_{\text{knn}}} \sum_{i=1}^{U_{\text{unique}}} m_i (r_i - \mu_b)^2}
 $$
 
-$$
-\sigma_i = \max\left(\sigma_{\min}, \min\left(r_i, \sigma_{\max}\right)\right)
-$$
-
-- **Identical-Samples Corner Case ($\mu_\sigma = 0$)**: When all samples in the dataset are identical (sample standard deviation is $0$ across all dimensions, so all pairwise $K$-NN distances $r_i = 0$ and $\mu_\sigma = 0$), coordinate offsets from `min` are preserved and bandwidth is set to one-tenth of the mean coordinate magnitude:
+4. Each unique location's bandwidth $b_i$ is floored at $b_{\min}$ (**low-end clamping only**; no upper clamp is applied):
 
 $$
-\sigma_i = \max\left(\frac{1}{10 D} \sum_{d=1}^D |x_{1,d}|, 10^{-6}\right)
+b_{\min} = \max\left(0.5 \mu_b, \mu_b - s_b\right), \qquad b_i = \max\left(b_{\min}, r_i\right)
 $$
 
-#### 2. Unique-Location Inverse-Bandwidth Credibility Weighting ($w_u$)
-While co-located duplicates participate in $K$-NN distance calculation (shrinking $r_u \to 0$ so repeated values achieve maximum credibility $1 / \sigma_{\min}$), only the $U$ **unique locations** ($u \in \mathcal{U}$) receive non-zero kernel weights in the density sum ($w_i = 0$ for duplicate copies):
+- **Why High-End Clamping Is Omitted**: Because the unified kernel peak scales as $\sqrt{c_i} / b_i$ at $x = u_i$, an isolated outlier far from the inlier clusters naturally receives a large $b_i$ and negligible self-density ($1 / b_i \to 0$). It cannot form a false inlier halo on its own, yet if real population drift later accumulates $\ge 6$ samples in that region, their local $b_i$ shrinks and they organically form a new inlier cluster without needing `-k` outlier deletion.
+- **Identical-Samples Corner Case ($\mu_b = 0$)**: When all samples in the dataset are identical ($U_{\text{unique}} = 1$, so $\mu_b = 0$), coordinate offsets from `min` are preserved and $b_{\min}$ falls back to one-tenth of the mean coordinate magnitude:
 
 $$
-w_u = \frac{1 / \sigma_u}{\sum_{v \in \mathcal{U}} (1 / \sigma_v)}
+b_1 = \max\left(\frac{1}{10 D} \sum_{d=1}^D |u_{1,d}|, 10^{-6}\right)
 $$
 
-This prevents a single high-multiplicity value (e.g., 46 identical integer observations) from stacking redundant kernels and dwarfing smaller valid clusters (e.g., 5 observations at another value), while leaving continuous datasets without duplicates ($U = N$) completely unchanged.
-
-#### 3. Cauchy Kernel Pooling & Fractional Decay ($D(x)$ and $s(x)$)
-Given a query vector $x \in \mathbb{R}^D$, the pooled Cauchy density $D(x) \in (0, 1]$ is evaluated across the unique exemplar locations $u \in \mathcal{U}$:
+#### 2. Sublinear Duplicate Growth & Unified Cauchy Kernel Pooling ($D(x)$ and $s(x)$)
+Instead of normalizing weights to sum to $1$, inverse-bandwidth credibility ($1 / b_i$), sublinear duplicate scaling ($\sqrt{c_i}$), and the Cauchy kernel $1 / (1 + (d / b_i)^2)$ are combined into a single unified sum over the $U_{\text{unique}}$ unique locations:
 
 $$
-D(x) = \sum_{u \in \mathcal{U}} \frac{w_u}{1 + \left(\frac{\Vert x - x_u \Vert_{\text{scaled}}}{\sigma_u}\right)^2}
+D(x) = \sum_{i=1}^{U_{\text{unique}}} \frac{\sqrt{c_i}}{b_i \left(1 + \frac{\Vert x - u_i \Vert_{\text{scaled}}^2}{b_i^2}\right)} = \sum_{i=1}^{U_{\text{unique}}} \frac{\sqrt{c_i} \cdot b_i}{b_i^2 + \Vert x - u_i \Vert_{\text{scaled}}^2}
 $$
 
-During training, the peak density across the reservoir is calibrated with a 5% headroom factor ($1.05$) above the densest exemplar to establish a near-zero baseline ("Zero Kelvin"):
+- **Sublinear Duplicate Growth ($\sqrt{c_i}$)**: Repeated observations at $u_i$ reinforce local density sublinearly via $\sqrt{c_i}$, widening the inlier contour smoothly as duplicate counts grow (e.g., from $c_i = 2$ to $c_i = 14$) without allowing extreme integer duplicate spikes (e.g., hundreds of identical status codes) to linearly blow up $D_{\max}$ and eclipse smaller valid modes.
+
+During training, the peak density across the unique exemplars is calibrated with a 5% headroom factor ($1.05$) above the densest location to establish a near-zero baseline:
 
 $$
-D_{\max} = 1.05 \times \max_{u \in \mathcal{U}} D(x_u)
+D_{\max} = 1.05 \times \max_{1 \le i \le U_{\text{unique}}} D(u_i)
 $$
 
 The final anomaly score $s(x) \in [0.0, 1.0)$ applies fractional decay ($p = \text{decay}$, default $0.5$, configurable via `DECAY` in `~/.geifrc` or `-g <rcfile>`) to the normalized density ratio:
@@ -381,8 +371,8 @@ $$
 s(x) = 1.0 - \left(\min\left(1.0, \frac{D(x)}{D_{\max}}\right)\right)^{\text{decay}}
 $$
 
-- **Near-Zero Baseline**: At the densest sample $x_{\text{peak}}$, the ratio $D(x_{\text{peak}})$ to $D_{\max}$ is $1 / 1.05$, yielding $s(x_{\text{peak}}) \approx 0.0241$ (for $\text{decay} = 0.5$).
-- **Interior Cavity & Multi-Cluster Sharpness**: Inside the sum, each kernel retains sharp $1 / d^2$ Cauchy localization, preventing points on a surrounding ring from flooding hollow cavities ($s \approx 0.52$).
+- **Near-Zero Baseline**: At the densest sample $u_{\text{peak}}$, the ratio $D(u_{\text{peak}})$ to $D_{\max}$ is $1 / 1.05$, yielding $s(u_{\text{peak}}) \approx 0.0241$ (for $\text{decay} = 0.5$).
+- **Interior Cavity & Multi-Cluster Sharpness**: Inside the sum, each kernel retains sharp $1 / (b_i^2 + d^2)$ Cauchy localization, preventing points on a surrounding ring from flooding hollow cavities ($s \approx 0.52$).
 - **Unified Outer-Space Attenuation & Sensitivity Tuning**: Applying the fractional exponent $\text{decay} = 0.5$ to $D(x) / D_{\max}$ produces a smooth $O(1/d)$ decay to $1.0$ at large distances without requiring a separate outer-stadium bounding-box splice. Setting `DECAY` in `~/.geifrc` tunes outlier strictness globally across existing JSON models without modifying shell scripts (values $> 0.5$ increase score sensitivity/strictness; values $< 0.5$ make outlier detection looser).
 
 ---

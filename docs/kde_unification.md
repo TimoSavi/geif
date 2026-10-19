@@ -140,19 +140,18 @@ $$
   **Why approximate the kernel via random trees when you can evaluate the exact continuous kernel field directly?**
 
 * **The Mathematical Formulation**:
-  Exemplar bypasses the tree entirely and evaluates a smooth rational Cauchy density kernel across all $N = 256$ reservoir exemplars:
+  Exemplar bypasses the tree entirely and evaluates a smooth rational Cauchy density kernel across the $U_{\text{unique}}$ unique reservoir locations $u_i$ (with duplicate counts $c_i$):
 
 $$
-D(x) = \frac{1}{\sum_{i=1}^N w_i} \sum_{i=1}^N \frac{w_i}{1 + \left(\frac{\Vert x - x_i \Vert_{\text{scaled}}}{\sigma_i^{\text{clamped}}}\right)^2}
+D(x) = \sum_{i=1}^{U_{\text{unique}}} \frac{\sqrt{c_i} \cdot b_i}{b_i^2 + \Vert x - u_i \Vert_{\text{scaled}}^2}
 $$
 
 * **Continuous Metric Potential**:
   Instead of discrete integer hops ($1, 2, 3 \ldots$), Exemplar evaluates an infinitely differentiable ($C^\infty$) field with:
-  * Multi-scale $K$-NN bandwidths ($\sigma_i$)
-  * Robust median clamping ($0.5 \sigma_m \le \sigma_i \le 1.5 \sigma_m$ around median $\sigma_{\text{med}}$)
-  * Pilot credibility damping ($w_i$) to neutralize noise bubbles
-  * Zero Kelvin potential calibration ($s = 1 - \sqrt{D / D_{\max}}$)
-  * Asymptotic exponential outer stadium decay ($\exp(-\lambda d_{\text{out}})$)
+  * Cap-5 $K$-NN adaptive bandwidths ($b_i$) ensuring $b_i > 0$ even in duplicate-heavy datasets
+  * Low-end bandwidth floor only ($b_i \ge b_{\min} = \max(0.5 \mu_b, \mu_b - s_b)$), allowing isolated outliers to naturally vanish ($1 / b_i \to 0$) without high-end clamping
+  * Sublinear duplicate scaling ($\sqrt{c_i}$) to grow dense clusters smoothly without linear duplicate blow-up
+  * Unified fractional decay mapping ($s(x) = 1 - (D(x) / D_{\max})^{\text{decay}}$ with $D_{\max} = 1.05 \max_i D(u_i)$) that attenuates smoothly into outer space without piecewise stadium splices
 
 ---
 
