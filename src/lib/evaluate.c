@@ -214,7 +214,7 @@ geif_status_t geif_forest_dimension_attribution(const geif_forest_t *forest,
 
     if (forest->pool_count > 0 && forest->sample_pool) {
         size_t best_idx = 0;
-        double best_votes = -1.0;
+        double best_quality = -1.0;
 
         for (size_t i = 0; i < forest->pool_count; i++) {
             const double *sp = &forest->sample_pool[i * d];
@@ -234,8 +234,12 @@ geif_status_t geif_forest_dimension_attribution(const geif_forest_t *forest,
                 double dk = (point[k] - sp[k]) / scale;
                 votes += 1.0 / (1.0 + dk * dk);
             }
-            if (votes > best_votes) {
-                best_votes = votes;
+            double s_sp = 0.5;
+            geif_forest_score(forest, sp, &s_sp);
+            double inlier_w = (s_sp < 1.0) ? (1.0 - s_sp) : 0.0;
+            double quality = (0.1 + votes) * inlier_w * inlier_w;
+            if (quality > best_quality) {
+                best_quality = quality;
                 best_idx = i;
             }
         }
