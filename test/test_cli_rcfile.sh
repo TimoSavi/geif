@@ -45,7 +45,7 @@ NEAREST 1
 EOF
 
 MODEL1="$TEST_DIR/model1.json"
-$GEIF_BIN -g "$RC1" -l "$DATA_CSV" -L 1 -C 5 -w "$MODEL1"
+$GEIF_BIN -B voronoi -g "$RC1" -l "$DATA_CSV" -L 1 -C 5 -w "$MODEL1"
 
 # Verify tree count 35 in model JSON
 if ! grep -q '"tree_count": 35' "$MODEL1" && ! grep -q '"tree_count":35' "$MODEL1"; then
@@ -59,9 +59,9 @@ if ! grep -q '"samples_per_tree": 128' "$MODEL1" && ! grep -q '"samples_per_tree
     exit 1
 fi
 
-# Verify outlierScore 85% in model JSON
-if ! grep -qE '"outlierScore":\s*"85%"' "$MODEL1"; then
-    echo "ERROR: outlierScore 85% from RC file not found in model"
+# Verify outlier_score 85% in model JSON
+if ! grep -qE '"outlier_score":\s*"85%"' "$MODEL1"; then
+    echo "ERROR: outlier_score 85% from RC file not found in model"
     exit 1
 fi
 echo "  [PASS] Training respected TREES, MAX_SAMPLES, and OUTLIER_SCORE from RC file."
@@ -69,7 +69,7 @@ echo "  [PASS] Training respected TREES, MAX_SAMPLES, and OUTLIER_SCORE from RC 
 # Test 2: CLI overrides RC file
 echo "Test 2: CLI option overrides RC file..."
 MODEL2="$TEST_DIR/model2.json"
-$GEIF_BIN -g "$RC1" -t 50 -l "$DATA_CSV" -L 1 -C 5 -w "$MODEL2"
+$GEIF_BIN -B voronoi -g "$RC1" -t 50 -l "$DATA_CSV" -L 1 -C 5 -w "$MODEL2"
 
 if ! grep -q '"tree_count": 50' "$MODEL2" && ! grep -q '"tree_count":50' "$MODEL2"; then
     echo "ERROR: CLI -t 50 did not override TREES 35 from RC file"

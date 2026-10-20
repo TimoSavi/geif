@@ -45,12 +45,12 @@ echo "[2/5] Training Day 1 with -A and updating Days 2-16 via -z (verifying -A p
 
 # Verify Day 1 model has 1 sample per category and aggregate=true saved
 Q1=$("$GEIF" -r "$MODEL" -q)
-if ! echo "$Q1" | grep -q "Aggregate (-A):.*Yes"; then
+if ! grep -q "Aggregate (-A):.*Yes" <<< "$Q1"; then
     echo "FAIL: Aggregate (-A): Yes not reported in -q summary"
     echo "$Q1"
     exit 1
 fi
-if ! echo "$Q1" | grep -q "rows=1, samples=1"; then
+if ! grep -q "rows=1, samples=1" <<< "$Q1"; then
     echo "FAIL: Expected 1 aggregated sample per category after Day 1"
     echo "$Q1"
     exit 1
@@ -62,7 +62,7 @@ for day in $(seq 2 16); do
 done
 
 Q16=$("$GEIF" -r "$MODEL" -q)
-if ! echo "$Q16" | grep -q "rows=16, samples=16"; then
+if ! grep -q "rows=16, samples=16" <<< "$Q16"; then
     echo "FAIL: Expected 16 aggregated samples per category after Day 16"
     echo "$Q16"
     exit 1

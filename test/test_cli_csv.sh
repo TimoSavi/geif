@@ -72,9 +72,7 @@ $BIN -r "$TMP_DIR/model.json" -q | grep -F "Input Delimiter (-f): ';'"
 $BIN -r "$TMP_DIR/model.json" -q | grep -F "List Separator (-e):  ','"
 $BIN -r "$TMP_DIR/model.json" -q | grep -F "Skip Header (-H):     Yes"
 grep -E -q '"input_separator":[[:space:]]*";"' "$TMP_DIR/model.json"
-grep -E -q '"inputSeparator":[[:space:]]*";"' "$TMP_DIR/model.json"
 grep -E -q '"has_header":[[:space:]]*true' "$TMP_DIR/model.json"
-grep -E -q '"header":[[:space:]]*1' "$TMP_DIR/model.json"
 
 # Also verify explicit -e '|' persistence and no-header model
 $BIN -l "$WINE_CSV" -f ';' -e '|' --no-header -w "$TMP_DIR/custom_sep.json" -i 10 -s 32
@@ -82,10 +80,8 @@ $BIN -r "$TMP_DIR/custom_sep.json" -q | grep -F "Input Delimiter (-f): ';'"
 $BIN -r "$TMP_DIR/custom_sep.json" -q | grep -F "List Separator (-e):  '|'"
 $BIN -r "$TMP_DIR/custom_sep.json" -q | grep -F "Skip Header (-H):     No"
 grep -E -q '"list_separator":[[:space:]]*"\|"' "$TMP_DIR/custom_sep.json"
-grep -E -q '"listSeparator":[[:space:]]*"\|"' "$TMP_DIR/custom_sep.json"
 grep -E -q '"has_header":[[:space:]]*false' "$TMP_DIR/custom_sep.json"
-grep -E -q '"header":[[:space:]]*0' "$TMP_DIR/custom_sep.json"
-echo "  [PASS] Delimiters and header state properly serialized in root and CEIF-compatible globals."
+echo "  [PASS] Delimiters and header state properly serialized in root JSON."
 
 # Test 8: Auto-restoration of delimiter and header skip during scoring without -f or -H flags
 echo "Test 8: Scoring without -f or -H flags (auto-restoring saved ';' delimiter and header skip)..."

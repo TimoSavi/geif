@@ -29,14 +29,14 @@ echo "$SUMMARY" | grep "Sub-forest '5': rows=681"
 echo "$SUMMARY" | grep "Sub-forest '8': rows=18"
 echo "  [PASS] Query inspection accurately reported 6 sub-forests with exact row counts."
 
-# Test 3: Verify CEIF-compatible JSON serialization of forests array and globals
-echo "Test 3: Verify JSON model structure (forests array and categoryDims globals)..."
-grep -E '"categoryDims"\s*:\s*"12"' "$TMP_DIR/model_wine_cat.json" > /dev/null
+# Test 3: Verify clean GEIF JSON serialization of forests array and root category_dims
+echo "Test 3: Verify JSON model structure (forests array and category_dims)..."
+grep -E '"category_dims"\s*:\s*"12"' "$TMP_DIR/model_wine_cat.json" > /dev/null
 grep -E '"forests"\s*:' "$TMP_DIR/model_wine_cat.json" > /dev/null
 grep -E '"category"\s*:\s*"3"' "$TMP_DIR/model_wine_cat.json" > /dev/null
 grep -E '"category"\s*:\s*"5"' "$TMP_DIR/model_wine_cat.json" > /dev/null
 grep -E '"category"\s*:\s*"8"' "$TMP_DIR/model_wine_cat.json" > /dev/null
-echo "  [PASS] CEIF-compatible 'forests' array and 'categoryDims' JSON structure confirmed."
+echo "  [PASS] Clean 'forests' array and 'category_dims' JSON structure confirmed."
 
 # Test 4: Score dataset with automatic category routing
 echo "Test 4: Score dataset with dynamic category routing (auto-restoring -C from model)..."

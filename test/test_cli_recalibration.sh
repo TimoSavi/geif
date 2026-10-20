@@ -46,15 +46,15 @@ MODEL_CLEAN2="$TEST_DIR/model_clean2.json"
 echo "Test 1: Train model containing outlier with -O 80%..."
 $GEIF_BIN -l "$TRAIN_CSV" -w "$MODEL_RAW" -L 1 -C 5 -t 10 -s 64 -O "80%" -W
 
-# Verify JSON contains outlierScore "80%"
-if ! grep -qE '"outlierScore":\s*"80%"' "$MODEL_RAW"; then
-    echo "ERROR: outlierScore '80%' was not persisted in model globals"
+# Verify JSON contains outlier_score "80%"
+if ! grep -qE '"outlier_score":\s*"80%"' "$MODEL_RAW"; then
+    echo "ERROR: outlier_score '80%' was not persisted in model JSON"
     exit 1
 fi
 echo "  [PASS] -O 80% persisted in model JSON."
 
 # Check initial sample count in catA (should be 7)
-SAMPLE_COUNT_RAW=$(grep -oE '"pool_count":\s*[0-9]+' "$MODEL_RAW" | head -n 1 | grep -oE '[0-9]+')
+SAMPLE_COUNT_RAW=$($GEIF_BIN -r "$MODEL_RAW" -q | grep -oE 'samples=[0-9]+' | head -n 1 | grep -oE '[0-9]+')
 if [ "$SAMPLE_COUNT_RAW" -ne 7 ]; then
     echo "ERROR: Expected 7 samples in raw model, got $SAMPLE_COUNT_RAW"
     exit 1
@@ -65,7 +65,7 @@ echo "  [PASS] Initial model has 7 reservoir samples."
 echo "Test 2: Recalibrate with -r ... -k -w ... (prune 1 outlier)..."
 $GEIF_BIN -r "$MODEL_RAW" -k -w "$MODEL_CLEAN1"
 
-SAMPLE_COUNT_CLEAN1=$(grep -oE '"pool_count":\s*[0-9]+' "$MODEL_CLEAN1" | head -n 1 | grep -oE '[0-9]+')
+SAMPLE_COUNT_CLEAN1=$($GEIF_BIN -r "$MODEL_CLEAN1" -q | grep -oE 'samples=[0-9]+' | head -n 1 | grep -oE '[0-9]+')
 if [ "$SAMPLE_COUNT_CLEAN1" -ne 6 ]; then
     echo "ERROR: Expected 6 samples in clean model after -k, got $SAMPLE_COUNT_CLEAN1"
     exit 1
@@ -76,18 +76,18 @@ if grep -qw '999.0' "$MODEL_CLEAN1"; then
     echo "ERROR: Contaminant 999.0 is still present in model sample pool after -k"
     exit 1
 fi
-echo "  [PASS] -k successfully pruned the extreme outlier from the reservoir pool (pool_count 7 -> 6)."
+echo "  [PASS] -k successfully pruned the extreme outlier from the reservoir pool (samples 7 -> 6)."
 
 # Test 3: Multiple -k flags (-k -k)
 echo "Test 3: Recalibrate with multiple -k flags (-k -k)..."
 $GEIF_BIN -r "$MODEL_RAW" -k -k -w "$MODEL_CLEAN2"
 
-SAMPLE_COUNT_CLEAN2=$(grep -oE '"pool_count":\s*[0-9]+' "$MODEL_CLEAN2" | head -n 1 | grep -oE '[0-9]+')
+SAMPLE_COUNT_CLEAN2=$($GEIF_BIN -r "$MODEL_CLEAN2" -q | grep -oE 'samples=[0-9]+' | head -n 1 | grep -oE '[0-9]+')
 if [ "$SAMPLE_COUNT_CLEAN2" -ne 5 ]; then
     echo "ERROR: Expected 5 samples after -k -k, got $SAMPLE_COUNT_CLEAN2"
     exit 1
 fi
-echo "  [PASS] Repeated -k (-k -k) successfully pruned 2 outliers (pool_count 7 -> 5)."
+echo "  [PASS] Repeated -k (-k -k) successfully pruned 2 outliers (samples 7 -> 5)."
 
 # Test 4: Implicit threshold restoration from model JSON
 echo "Test 4: Verify implicit threshold restoration from loaded model..."
@@ -135,12 +135,12 @@ echo "Test 7: In-line outlier pruning during analysis (-r ... -a ... -k -w ...).
 MODEL_INLINE="$TEST_DIR/model_inline.json"
 run_geif_score -r "$MODEL_RAW" -a "$TEST_CSV" -L 1 -C 5 -k -w "$MODEL_INLINE"
 
-SAMPLE_COUNT_INLINE=$(grep -oE '"pool_count":\s*[0-9]+' "$MODEL_INLINE" | head -n 1 | grep -oE '[0-9]+')
+SAMPLE_COUNT_INLINE=$($GEIF_BIN -r "$MODEL_INLINE" -q | grep -oE 'samples=[0-9]+' | head -n 1 | grep -oE '[0-9]+')
 if [ "$SAMPLE_COUNT_INLINE" -ne 6 ]; then
     echo "ERROR: Expected 6 samples in inline-pruned model, got $SAMPLE_COUNT_INLINE"
     exit 1
 fi
-echo "  [PASS] In-line pruning during analysis produced clean model with pool_count 6."
+echo "  [PASS] In-line pruning during analysis produced clean model with 6 samples."
 
 # Test 8: Explicit Percentile Threshold (-O 95%)
 echo "Test 8: Percentage-based percentile threshold (-O 95%)..."

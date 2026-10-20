@@ -46,12 +46,29 @@ echo "$SUMMARY_LI" | grep "Label Columns (-L):  1"
 echo "$SUMMARY_LI" | grep "Ignore Columns (-I):  12"
 echo "  [PASS] Combined -L 1 -I 12 resolved to 10 feature dimensions."
 
-# Test 5: Verify CEIF JSON compatibility fields
-echo "Test 5: Verify globals JSON fields for CEIF compatibility..."
-grep -E '"globals"\s*:' "$TMP_DIR/model_l_i.json" > /dev/null
-grep -E '"labelDims"\s*:\s*"1"' "$TMP_DIR/model_l_i.json" > /dev/null
-grep -E '"ignoreDims"\s*:\s*"12"' "$TMP_DIR/model_l_i.json" > /dev/null
-echo "  [PASS] CEIF globals compatibility block found in model JSON."
+# Test 5: Verify clean GEIF JSON schema and unknown field stripping
+echo "Test 5: Verify clean GEIF JSON schema and unknown field stripping..."
+grep -E '"label_dims"\s*:\s*"1"' "$TMP_DIR/model_l_i.json" > /dev/null
+grep -E '"ignore_dims"\s*:\s*"12"' "$TMP_DIR/model_l_i.json" > /dev/null
+for FORBIDDEN in '"globals"' '"kappa"' '"alpha"' '"seed"' '"max_depth"' '"pool_count"' '"total_rows_seen"' '"subforest_count"'; do
+    if grep -q "$FORBIDDEN" "$TMP_DIR/model_l_i.json"; then
+        echo "Error: Redundant/runtime field $FORBIDDEN found in saved JSON!"
+        exit 1
+    fi
+done
+# Inject unknown fields at root and inside forests[0], then run -z update and verify they are stripped
+sed -E -e 's/"format"\s*:\s*"GEIF-1.0",/"format": "GEIF-1.0", "unknown_root_field": 42, "kappa": 8.0,/' \
+       -e 's/"total_rows"\s*:/"unknown_forest_field": "abc", "pool_count": 64, "total_rows":/' \
+    "$TMP_DIR/model_l_i.json" > "$TMP_DIR/model_unknown.json"
+grep -q '"unknown_root_field"' "$TMP_DIR/model_unknown.json"
+grep -q '"unknown_forest_field"' "$TMP_DIR/model_unknown.json"
+head -n 5 "$WINE_CSV" > "$TMP_DIR/wine_mini.csv"
+$BIN -z "$TMP_DIR/model_unknown.json" -l "$TMP_DIR/wine_mini.csv" > /dev/null
+if grep -E -q '"unknown_root_field"|"unknown_forest_field"|"kappa"|"pool_count"' "$TMP_DIR/model_unknown.json"; then
+    echo "Error: Unknown or runtime fields were not stripped upon saving!"
+    exit 1
+fi
+echo "  [PASS] Clean GEIF JSON schema verified and unknown fields ignored & stripped on save."
 
 # Test 6: Score with automatic column spec restoration from model JSON
 echo "Test 6: Score test CSV without passing -L / -I on CLI (auto-restore from model)..."
