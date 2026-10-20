@@ -62,7 +62,7 @@ struct json_object *geif_forest_to_json_object(const geif_forest_t *f)
     json_object_object_add(root, "format", json_object_new_string("GEIF-1.0"));
     json_object_object_add(root, "algorithm", json_object_new_string(geif_algo_name(f->config.algo)));
     json_object_object_add(root, "dimensions", json_object_new_int((int)f->dimensions));
-    json_object_object_add(root, "tree_count", json_object_new_int((int)(f->tree_count > 0 ? f->tree_count : f->config.tree_count)));
+    json_object_object_add(root, "tree_count", json_object_new_int((int)(f->config.tree_count > 0 ? f->config.tree_count : f->tree_count)));
     json_object_object_add(root, "samples_per_tree", json_object_new_int((int)f->config.samples_per_tree));
     json_object_object_add(root, "max_depth", json_object_new_int((int)f->config.max_depth));
     json_object_object_add(root, "kappa", json_object_new_double(f->config.kappa));

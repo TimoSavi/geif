@@ -5,7 +5,7 @@
 > [!NOTE]
 > **AI-Assisted Development:** GEIF was designed and engineered by Timo Savinen with AI pair-programming assistance (Google Antigravity / Gemini) under human architectural direction. The mathematical specifications, C17 core library, CLI Unix pipelines, test suites, and architectural documentation were developed collaboratively.
 
-**GEIF** (Geometric Extended Isolation Forest) is an industrial-strength, high-performance ISO C17 implementation of a geometric, scale-invariant anomaly detection engine. Building upon and refining the foundational concepts of Isolation Forest (iForest) and Extended Isolation Forest (EIF), GEIF introduces a modular multi-algorithm engine—featuring native default hyperspherical Bubble trees, Voronoi bisectors, continuous Gaussian cuts, and non-tree Exemplar Cauchy kernels—alongside continuous Euclidean envelope distance ("Stadium" metric), multi-category ensemble routing, single-dimension attribution, streaming age decay, and universal Zero Kelvin scale calibration.
+**GEIF** (Geometric Extended Isolation Forest) is an industrial-strength, high-performance ISO C17 implementation of a geometric, scale-invariant anomaly detection engine. Building upon and refining the foundational concepts of Isolation Forest (iForest) and Extended Isolation Forest (EIF), GEIF introduces a modular multi-algorithm engine—featuring native default non-tree Exemplar Cauchy kernels, hyperspherical Bubble trees, Voronoi bisectors, and continuous Gaussian cuts—alongside continuous Euclidean envelope distance ("Stadium" metric), multi-category ensemble routing, single-dimension attribution, streaming age decay, and universal Zero Kelvin scale calibration.
 
 > [!NOTE]
 > **Lineage & Architectural Influence:** GEIF builds upon the architectural insights, streaming designs, and practical production experience established in [CEIF (Continuous Extended Isolation Forest)](https://github.com/TimoSavi/ceif), also created by Timo Savinen. GEIF modernizes and expands these foundations into a fully modular geometric engine with sparse JSON serialization and comprehensive multi-dimensional void detection.
@@ -52,8 +52,19 @@ Standard Isolation Forests make axis-aligned cuts, producing unnatural rectangul
 
 GEIF provides four modular geometric partitioning engines through a polymorphic dispatch table (`geif_algo_ops_t`), selectable at training time with `-B, --algo <name>`:
 
-#### Engine 1: Hyperspherical Bubble Trees (`bubble` — Native Default)
-The primary workhorse of GEIF. Space is partitioned using radial hyperspheres rather than hyperplanes:
+#### Engine 1: Direct SIMD Exemplar Cauchy Density (`exemplar` — Native Default)
+The primary default engine of GEIF. A non-tree kernel density estimation engine operating directly over unique reservoir locations $u_i$ with cap-5 $K$-NN bandwidths $b_i$ (low-end floored at $b_{\min}$), sublinear duplicate weighting $\sqrt{c_i}$, and fractional decay mapping:
+
+$$
+D(x) = \sum_{i=1}^{U_{\text{unique}}} \frac{\sqrt{c_i} \cdot b_i}{b_i^2 + \Vert x - u_i \Vert_{\text{scaled}}^2}, \quad s(x) = 1.0 - \left(\min\left(1.0, \frac{D(x)}{D_{\max}}\right)\right)^{\text{decay}}
+$$
+
+- Bypasses binary tree construction entirely with instantaneous sub-millisecond build latency.
+- Naturally suppresses isolated training outliers ($b_i \gg 1 \implies 1/b_i \to 0$) while growing inlier contours sublinearly with duplicate multiplicity $\sqrt{c_i}$.
+- Evaluates queries via straight-line AVX2/FMA SIMD vector loops ($> 15\text{ M}$ pts/sec).
+
+#### Engine 2: Hyperspherical Bubble Trees (`bubble`)
+Space is partitioned using radial hyperspheres rather than hyperplanes:
 
 $$
 d^2(x, c) \le R^2 \implies \text{interior (left)}, \quad d^2(x, c) > R^2 \implies \text{exterior (right)}
@@ -64,7 +75,7 @@ $$
 - **In-Place Two-Pointer Partitioning**: Partitions sample indices in-place without per-node scratch memory allocations.
 - **Stack-Allocated Center Geometry**: Centers in $D \le 64$ dimensions use stack arrays, eliminating heap allocation bottlenecks.
 
-#### Engine 2: Data-Adaptive Voronoi Bisectors (`voronoi`)
+#### Engine 3: Data-Adaptive Voronoi Bisectors (`voronoi`)
 Hyperplanes placed at the exact perpendicular bisector between two distinct randomly sampled points $A$ and $B$:
 
 $$
@@ -73,17 +84,6 @@ $$
 
 - **Scale Invariant**: Intrinsically adapts to local cluster geometry and extreme aspect ratios (up to $5000:1$) without requiring manual normalization.
 - **Zero-Variance Feature Masking**: Detects constant features and restricts cuts strictly to informative dimensions.
-
-#### Engine 3: Direct SIMD Exemplar Cauchy Density (`exemplar`)
-A non-tree kernel density estimation engine operating directly over unique reservoir locations $u_i$ with cap-5 $K$-NN bandwidths $b_i$ (low-end floored at $b_{\min}$), sublinear duplicate weighting $\sqrt{c_i}$, and fractional decay mapping:
-
-$$
-D(x) = \sum_{i=1}^{U_{\text{unique}}} \frac{\sqrt{c_i} \cdot b_i}{b_i^2 + \Vert x - u_i \Vert_{\text{scaled}}^2}, \quad s(x) = 1.0 - \left(\min\left(1.0, \frac{D(x)}{D_{\max}}\right)\right)^{\text{decay}}
-$$
-
-- Bypasses binary tree construction entirely with instantaneous sub-millisecond build latency.
-- Naturally suppresses isolated training outliers ($b_i \gg 1 \implies 1/b_i \to 0$) while growing inlier contours sublinearly with duplicate multiplicity $\sqrt{c_i}$.
-- Evaluates queries via straight-line AVX2/FMA SIMD vector loops ($> 15\text{ M}$ pts/sec).
 
 #### Engine 4: Continuous Gaussian Cuts (`ceif`)
 Anchored hyperplanes with pairwise margin interpolation and isotropic Gaussian normal vectors, delivering smooth continuous metric depth surfaces.
@@ -172,9 +172,9 @@ geif/
 │   ├── lib/                     # Core algorithmic library
 │   │   ├── algo.h               # Internal algorithm dispatch vtable (geif_algo_ops_t)
 │   │   ├── algo_registry.c      # Algorithm factory & registration
-│   │   ├── algo_bubble.c        # Hyperspherical Bubble tree engine (default)
+│   │   ├── algo_exemplar.c      # Direct Cauchy density kernel engine (default)
+│   │   ├── algo_bubble.c        # Hyperspherical Bubble tree engine
 │   │   ├── algo_voronoi.c       # Data-adaptive Voronoi bisector engine
-│   │   ├── algo_exemplar.c      # Direct Cauchy density kernel engine
 │   │   ├── algo_ceif.c          # Continuous Gaussian hyperplane engine
 │   │   ├── tree_common.c/.h     # Zero Kelvin calibration, scales, leaf relative distances
 │   │   ├── forest.c             # Forest allocation, lifecycle, & scale tracking
@@ -261,7 +261,7 @@ The build compiles with `-std=c17 -O3 -march=native -Wall -Wextra -Wpedantic` an
 
 | Option | Argument | Description |
 |---|---|---|
-| `-B`, `--algo` | `<name>` | Algorithm engine: `bubble` (default), `voronoi`, `exemplar`, `ceif` / `eif`. |
+| `-B`, `--algo` | `<name>` | Algorithm engine: `exemplar` (default), `bubble`, `voronoi`, `ceif` / `eif`. |
 | `-l` | `<file>` | Train / learn mode: stream data from CSV file or `-` (stdin) into model. |
 | `-a` | `<file>` | Analysis / score mode: score data from CSV file or `-` (stdin). |
 | `-c` | `<file>` | Categorize mode: classify samples against all categories and assign best match. |
@@ -365,15 +365,15 @@ cat legacy_model.json | bin/ceif2geif -B exemplar - - > geif_model.json
 ## Production Usage Patterns
 
 ### 1. Batch & Streaming Training
-Train a multi-category model using default hyperspherical Bubble trees from a streaming pipeline:
+Train a multi-category model using the default Exemplar Cauchy density engine from a streaming pipeline:
 ```bash
 grep "2026" raw_stream.csv | geif -l - -L 1 -C "2-4" -m "%'.0f" -e ';' -d 4 -O average -w model.json
 ```
 
-To explicitly select Voronoi bisectors or Exemplar density:
+To explicitly select Hyperspherical Bubble trees or Voronoi bisectors:
 ```bash
+geif -l train.csv -w model_bubble.json -B bubble -C 1 -U "2-10"
 geif -l train.csv -w model_voronoi.json -B voronoi -C 1 -U "2-10"
-geif -l train.csv -w model_exemplar.json -B exemplar -C 1 -U "2-10"
 ```
 
 ### 2. Stream Scoring with Filtering & Sorting
@@ -422,7 +422,7 @@ geif -r model.json -T0.1 -i 50 -e, -d 4 -p "%d,0x%x" -F "-v ^catA$" | grep -v --
 int main(void) {
     geif_ensemble_t *ensemble = NULL;
     geif_config_t config = geif_config_default();
-    config.algo = GEIF_ALGO_BUBBLE; // Native hyperspherical Bubble engine
+    config.algo = GEIF_ALGO_EXEMPLAR; // Native Exemplar Cauchy kernel engine (default)
 
     // 1. Create a 3D ensemble
     geif_ensemble_create(&ensemble, 3, &config);
@@ -453,13 +453,13 @@ int main(void) {
 
 ## Documentation & Deep Dives
 
-Detailed technical documentation is available in [`docs/`](file:///home/timo_savinen_elisa_fi/git/geif/docs/README.md):
-- [**`algorithm_selection.md`**](file:///home/timo_savinen_elisa_fi/git/geif/docs/algorithm_selection.md): Empirical benchmark results, visual topology evaluations, and operational selection matrices across all four engines.
-- [**`algorithm.md`**](file:///home/timo_savinen_elisa_fi/git/geif/docs/algorithm.md): Mathematical derivations, Zero Kelvin calibration, and per-algorithm mechanics.
-- [**`api_reference.md`**](file:///home/timo_savinen_elisa_fi/git/geif/docs/api_reference.md): Comprehensive C17 API and function reference generated directly from in-code Doxygen comments.
-- [**`implementation.md`**](file:///home/timo_savinen_elisa_fi/git/geif/docs/implementation.md): ISO C17 codebase architecture, SIMD vectorization, and data structures.
-- [**`manual.md`**](file:///home/timo_savinen_elisa_fi/git/geif/docs/manual.md): Complete CLI reference manual, templates, and Unix piping patterns.
-- [**`build.md`**](file:///home/timo_savinen_elisa_fi/git/geif/docs/build.md): Build targets, compiler optimization flags, and testing instructions.
+Detailed technical documentation is available in [`docs/`](docs/README.md):
+- [**`algorithm_selection.md`**](docs/algorithm_selection.md): Empirical benchmark results, visual topology evaluations, and operational selection matrices across all four engines.
+- [**`algorithm.md`**](docs/algorithm.md): Mathematical derivations, Zero Kelvin calibration, and per-algorithm mechanics.
+- [**`api_reference.md`**](docs/api_reference.md): Comprehensive C17 API and function reference generated directly from in-code Doxygen comments.
+- [**`implementation.md`**](docs/implementation.md): ISO C17 codebase architecture, SIMD vectorization, and data structures.
+- [**`manual.md`**](docs/manual.md): Complete CLI reference manual, templates, and Unix piping patterns.
+- [**`build.md`**](docs/build.md): Build targets, compiler optimization flags, and testing instructions.
 
 ---
 
@@ -474,9 +474,9 @@ Key architectural components, mathematical models (hyperspherical Bubble trees, 
 ## License & Dataset Attribution
 
 ### Source Code License
-This project is licensed under the terms of the **GNU General Public License Version 3 (GNU GPLv3)**. See the [LICENSE](file:///home/timo_savinen_elisa_fi/git/geif/LICENSE) file for the full license text.
+This project is licensed under the terms of the **GNU General Public License Version 3 (GNU GPLv3)**. See the [LICENSE](LICENSE) file for the full license text.
 
 Copyright (c) 2026 Timo Savinen.
 
 ### Test & Benchmark Datasets License
-The benchmark datasets located in [`test/data/`](file:///home/timo_savinen_elisa_fi/git/geif/test/data/README.md) (`winequality-red.csv` and `paddydataset.csv`) are licensed under the **Creative Commons Attribution 4.0 International (CC BY 4.0)** license. This allows for the sharing and adaptation of the datasets for any purpose, provided that the appropriate credit is given. See [`test/data/README.md`](file:///home/timo_savinen_elisa_fi/git/geif/test/data/README.md) for full citations and licensing terms.
+The benchmark datasets located in [`test/data/`](test/data/README.md) (`winequality-red.csv` and `paddydataset.csv`) are licensed under the **Creative Commons Attribution 4.0 International (CC BY 4.0)** license. This allows for the sharing and adaptation of the datasets for any purpose, provided that the appropriate credit is given. See [`test/data/README.md`](test/data/README.md) for full citations and licensing terms.

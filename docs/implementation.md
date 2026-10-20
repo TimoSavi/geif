@@ -57,9 +57,9 @@ git/geif/
 │   ├── lib/                   # libgeif: Core algorithmic engine
 │   │   ├── algo.h             # Pluggable algorithm vtable interface
 │   │   ├── algo_registry.c    # Algorithm factory and lookup registry
-│   │   ├── algo_bubble.c      # Hyperspherical Bubble tree engine (default)
+│   │   ├── algo_bubble.c      # Hyperspherical Bubble tree engine
 │   │   ├── algo_voronoi.c     # Voronoi perpendicular bisector tree engine
-│   │   ├── algo_exemplar.c    # Exemplar kernel density estimation engine
+│   │   ├── algo_exemplar.c    # Exemplar kernel density estimation engine (default)
 │   │   ├── algo_ceif.c        # Continuous hyperplane isolation engine
 │   │   ├── tree_common.c / .h # Shared tree traversal, Zero Kelvin, nearest nodes
 │   │   ├── forest.c           # Forest lifecycle, span calculation, health masking
@@ -270,7 +270,7 @@ Before tree construction, `init_dimension_scales(geif_forest_t *f)` scans the re
 
 ## 5. Implementation of Algorithm Engines
 
-### 5.1 Hyperspherical Bubble Trees (`algo_bubble.c`, Default)
+### 5.1 Hyperspherical Bubble Trees (`algo_bubble.c`)
 
 The Bubble tree algorithm isolates points using hyperspherical envelopes rather than planar cuts:
 - **Stack-Allocated Center**: Statically allocated `stack_center[GEIF_STACK_BUFFER_DIMS]` on the call stack for $D \le 64$.
@@ -313,7 +313,7 @@ $$
 
 ---
 
-### 5.3 Exemplar Kernel Density (`algo_exemplar.c`)
+### 5.3 Exemplar Kernel Density (`algo_exemplar.c`, Default)
 
 Non-parametric spatial density kernel evaluating unified Cauchy kernel distances across the unique locations $u_i$ in the reservoir pool:
 1. **Training Phase (`geif_exemplar_train`)**: Extracts unique exemplar coordinates $u_i$ and duplicate counts $c_i$, computes mean distance $b_i$ to the $K = 5$ nearest neighbors (with each duplicate set capped at 5 samples so the 5th neighbor always comes from a distinct location), floors $b_i$ at $b_{\min} = \max(0.5 \mu_b, \mu_b - s_b)$ (no high-end clamp), and precomputes $b_i^2$ and $\sqrt{c_i} \cdot b_i$.

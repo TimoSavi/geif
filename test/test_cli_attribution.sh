@@ -51,7 +51,7 @@ $GEIF_BIN -l "$TRAIN_CSV" -w "$MODEL_JSON" -L 1 -C 5 -t 20 -s 64 -W
 # Test 2: Custom templating with precision -d, RGB %x, score %s, label %l, category %c
 echo "Test 2: Test -p templating with %x (RGB), -d precision on %d, and 6-decimal %s/%l/%c..."
 SCORES_OUT="$TEST_DIR/scores_basic.txt"
-run_geif_score -r "$MODEL_JSON" -a "$TEST_CSV" -L 1 -C 5 -d 3 -p "%l;%c;%s;%x;%o;%d" -o "$SCORES_OUT"
+run_geif_score -r "$MODEL_JSON" -a "$TEST_CSV" -L 1 -C 5 -O 0 -d 3 -p "%l;%c;%s;%x;%o;%d" -o "$SCORES_OUT"
 
 cat "$SCORES_OUT"
 # Check row count
@@ -71,7 +71,7 @@ fi
 
 # Verify -d 0 formats sample values as integers while keeping %s at 6 decimals
 SCORES_D0="$TEST_DIR/scores_d0.txt"
-run_geif_score -r "$MODEL_JSON" -a "$TEST_CSV" -L 1 -C 5 -d 0 -p "%l;%s;%d" -o "$SCORES_D0"
+run_geif_score -r "$MODEL_JSON" -a "$TEST_CSV" -L 1 -C 5 -O 0 -d 0 -p "%l;%s;%d" -o "$SCORES_D0"
 FIRST_D0=$(head -n 1 "$SCORES_D0")
 if ! echo "$FIRST_D0" | grep -qE '^inlier1;[0-9]+\.[0-9]{6};10,20,30$'; then
     echo "ERROR: -d 0 line does not match expected format: $FIRST_D0"
@@ -134,7 +134,7 @@ if ! grep -q "^SUMMARY: catA rows=4 outliers=3" "$DUAL_OUT"; then
     echo "ERROR: catA summary was not formatted correctly with -v template"
     exit 1
 fi
-if ! grep -q "^SUMMARY: catB rows=1 outliers=1" "$DUAL_OUT"; then
+if ! grep -q "^SUMMARY: catB rows=1 outliers=0" "$DUAL_OUT"; then
     echo "ERROR: catB summary was not formatted correctly with -v template"
     exit 1
 fi

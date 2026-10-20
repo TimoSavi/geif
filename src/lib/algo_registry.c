@@ -25,7 +25,7 @@ const char *geif_algo_name(geif_algo_type_t algo)
     case GEIF_ALGO_VORONOI:
         return "voronoi";
     default:
-        return "ceif";
+        return "exemplar";
     }
 }
 
@@ -89,6 +89,6 @@ const geif_algo_ops_t *geif_algo_get_ops(geif_algo_type_t algo)
     case GEIF_ALGO_VORONOI:
         return &geif_algo_ops_voronoi;
     default:
-        return &geif_algo_ops_ceif;
+        return &geif_algo_ops_exemplar;
     }
 }

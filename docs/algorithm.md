@@ -22,8 +22,8 @@ Unconstrained spatial partitioning algorithms encounter four fundamental mathema
 
 ### 1.3 The GEIF Architecture
 **GEIF (Geometric Extended Isolation Forest)** resolves these challenges through a modular multi-algorithm engine built upon robust, unified foundational primitives:
-- **Pluggable Spatial Engines**: Selectable via `-B, --algo` (`bubble`, `voronoi`, `exemplar`, `ceif`).
-- **Hyperspherical Cavity Carving**: The default **Bubble** algorithm bounds clusters in compact hyperspherical shells, isolating interior cavities into empty void leaves.
+- **Pluggable Spatial Engines**: Selectable via `-B, --algo` (`exemplar` default, `bubble`, `voronoi`, `ceif`).
+- **Hyperspherical Cavity Carving**: The **Bubble** algorithm bounds clusters in compact hyperspherical shells, isolating interior cavities into empty void leaves.
 - **Universal Scale Calibration ("Zero Kelvin")**: Theoretical deepest-leaf calibration ensures dense cluster centroids reach the physical inlier floor ($s \to 0.0$).
 - **Asymptotic Outer Space Continuum**: Outer space distance decays smoothly towards $1.0$ without boundary saturation artifacts.
 - **Normalized Scale Invariance**: Regularized dimension span weighting eliminates aspect ratio distortions across $5000:1$ spans.
@@ -195,7 +195,7 @@ GEIF ingests streaming data using Algorithm R reservoir sampling:
 
 ---
 
-## 3. Algorithm 1: Hyperspherical Bubble Trees (`bubble`, Default)
+## 3. Algorithm 1: Hyperspherical Bubble Trees (`bubble`)
 
 ### 3.1 Motivation & Concept
 Linear hyperplanes inherently cut through the center of ring and hollow distributions. The **Bubble** algorithm replaces infinite linear cuts with hyperspherical cavity-carving nodes:
@@ -286,7 +286,7 @@ $$
 
 ---
 
-## 5. Algorithm 3: Exemplar Kernel Density Estimation (`exemplar`)
+## 5. Algorithm 3: Exemplar Kernel Density Estimation (`exemplar`, Default)
 
 ### 5.1 Architecture & Exemplar Generation
 The **Exemplar** engine is a non-tree spatial kernel estimator operating directly on the active reservoir sample pool. While tree-based methods (`bubble`, `voronoi`, `ceif`) recursively cut the feature space into discrete polyhedral or hyperspherical cells, Exemplar evaluates a regularized, infinitely differentiable ($C^\infty$) continuous density field across the observation domain.
@@ -401,7 +401,7 @@ The **CEIF Hyperplane Engine** provides data-anchored isotropic Gaussian cuts co
 
 ## 7. Comparative Engine Summary
 
-| Property | Bubble (`bubble`, Default) | Voronoi (`voronoi`) | Exemplar (`exemplar`) | Hyperplane (`ceif`) |
+| Property | Bubble (`bubble`) | Voronoi (`voronoi`) | Exemplar (`exemplar`, Default) | Hyperplane (`ceif`) |
 | :--- | :---: | :---: | :---: | :---: |
 | **Partition Geometry** | Hyperspheres $\mathcal{B}(c, R)$ | Perpendicular Bisectors | Regularized Cauchy Kernel | Gaussian Hyperplanes |
 | **Data Structure** | Binary Tree | Binary Tree | Aligned Sample Array | Binary Tree |

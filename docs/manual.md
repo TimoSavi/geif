@@ -19,7 +19,7 @@ Input data is expected to be character-delimited ASCII/UTF-8 records (default co
 1. **Training Mode (`-l`, `-w`)**:
    Ingest training records and serialize the trained model ensemble to a JSON file (or stdout):
    ```bash
-   ./bin/geif -l train.csv -w model.json -B bubble -t 100 -s 256
+   ./bin/geif -l train.csv -w model.json -B exemplar -t 100 -s 256
    ```
 
 2. **Scoring / Streaming Analysis Mode (`-r`, `-a`, `-o`)**:
@@ -52,7 +52,7 @@ Input data is expected to be character-delimited ASCII/UTF-8 records (default co
 
 | Option | Argument | Description |
 | :--- | :--- | :--- |
-| `-B`, `--algo` | `NAME` | Spatial isolation algorithm: `bubble` (default), `voronoi`, `exemplar`, `ceif`. |
+| `-B`, `--algo` | `NAME` | Spatial isolation algorithm: `exemplar` (default), `bubble`, `voronoi`, `ceif`. |
 | `-l` | `FILE` | Ingest CSV dataset for model training (use `-` for stdin). |
 | `-a` | `FILE` | Score and analyze samples from input CSV (use `-` for stdin). |
 | `-c` | `FILE` | Categorize observations against all sub-forest categories and assign best fit. |

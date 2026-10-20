@@ -22,10 +22,13 @@ p2,12.0,22.0,catA
 p3,11.0,21.0,catA
 p4,13.0,23.0,catA
 p5,10.5,20.5,catA
+p5b,25.0,35.0,catA
 p6,50.0,60.0,catB
 p7,52.0,62.0,catB
 p8,51.0,61.0,catB
 p9,53.0,63.0,catB
+p9b,50.5,60.5,catB
+p10,65.0,75.0,catB
 EOF
 
 MODEL_JSON="$TEST_DIR/model.json"
@@ -118,7 +121,7 @@ EOF
 OUT_COMPAT="$TEST_DIR/compat.txt"
 "$GEIF_BIN" -r "$MODEL_JSON" -a "$ANALYZE_CSV" -L 1 -C 4 -T 0.50 -p "%l;score=%s;outlier=%o" -o "$OUT_COMPAT" || true
 
-if ! grep -q 'p_norm;score=' "$OUT_COMPAT" || ! grep -q 'p_out;score=' "$OUT_COMPAT"; then
+if grep -q 'p_norm;score=' "$OUT_COMPAT" || ! grep -q 'p_out;score=' "$OUT_COMPAT"; then
     echo "ERROR: Analysis mode failed when -T was provided"
     cat "$OUT_COMPAT"
     exit 1

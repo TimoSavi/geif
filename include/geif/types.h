@@ -55,7 +55,7 @@ typedef enum geif_algo_type {
     GEIF_ALGO_VORONOI          /**< Pure Voronoi perpendicular bisector splits */
 } geif_algo_type_t;
 
-#define GEIF_ALGO_DEFAULT GEIF_ALGO_BUBBLE
+#define GEIF_ALGO_DEFAULT GEIF_ALGO_EXEMPLAR
 #define GEIF_ALGO_EIF     GEIF_ALGO_CEIF
 
 /**
@@ -70,7 +70,7 @@ typedef struct geif_config {
     double           decay;                /**< Fractional decay exponent for exemplar score (default: 0.5) */
     uint32_t         ceiling_factor;       /**< Reservoir ceiling factor (default: 3) */
     uint32_t         seed;                 /**< RNG seed (0 for auto / time-based) */
-    geif_algo_type_t algo;                 /**< Algorithm engine selection (default: GEIF_ALGO_BUBBLE) */
+    geif_algo_type_t algo;                 /**< Algorithm engine selection (default: GEIF_ALGO_EXEMPLAR) */
 } geif_config_t;
 
 /**

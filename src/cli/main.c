@@ -43,7 +43,7 @@ static void print_usage(const char *prog)
     printf("  -z <file>      In-place model update (load from file, update with new data, save back)\n");
     printf("  -o <file>      Output file for scores (default: stdout, '-' for stdout)\n");
     printf("  -O <thresh>    Outlier threshold: float [0..1] (scaled by default), 'average', or percentage (e.g. '80%%')\n");
-    printf("  -B, --algo <s> Algorithm engine: bubble (default), ceif, exemplar, voronoi\n");
+    printf("  -B, --algo <s> Algorithm engine: exemplar (default), bubble, ceif, voronoi\n");
     printf("  -T [margin]    Generate synthetic test grid for population drift visualization (margin: e.g. 0.1)\n");
     printf("  -k             Prune most extreme outlier from model reservoir and recalibrate (repeatable)\n");
     printf("  -g <file>      Configuration / RC file (overrides ~/.geifrc and ~/.ceifrc)\n");
@@ -970,8 +970,9 @@ int main(int argc, char *argv[])
     if (!header_explicit && rc_cfg.header_set) {
         skip_header = rc_cfg.header;
     }
+    bool outlier_score_configured = cli_outlier_score_given;
     if (!cli_outlier_score_given && rc_cfg.outlier_score_set) {
-        cli_outlier_score_given = true;
+        outlier_score_configured = true;
         memcpy(cli_outlier_score_spec, rc_cfg.outlier_score_spec, sizeof(cli_outlier_score_spec));
         if (strcmp(rc_cfg.outlier_score_spec, "average") == 0) {
             threshold_is_average = true;
@@ -990,10 +991,11 @@ int main(int argc, char *argv[])
     }
 
     // If analysis file is provided, -T was used as threshold in legacy calls
-    if (analyze_file && run_test_grid && !cli_outlier_score_given) {
+    if (analyze_file && run_test_grid && !outlier_score_configured) {
         threshold = test_extension_factor;
         threshold_is_average = false;
         threshold_is_percentage = false;
+        outlier_score_configured = true;
         cli_outlier_score_given = true;
         snprintf(cli_outlier_score_spec, sizeof(cli_outlier_score_spec), "%g", test_extension_factor);
         run_test_grid = false;
@@ -1024,7 +1026,7 @@ int main(int argc, char *argv[])
                 }
             }
         }
-        if (cli_outlier_score_given) {
+        if (outlier_score_configured) {
             memcpy(ensemble->outlier_score_spec, cli_outlier_score_spec, sizeof(ensemble->outlier_score_spec));
         } else if (ensemble->outlier_score_spec[0] != '\0') {
             if (strcmp(ensemble->outlier_score_spec, "average") == 0) {
@@ -1344,7 +1346,7 @@ int main(int argc, char *argv[])
                 }
             }
         }
-        if (cli_outlier_score_given) {
+        if (outlier_score_configured) {
             memcpy(ensemble->outlier_score_spec, cli_outlier_score_spec, sizeof(ensemble->outlier_score_spec));
         }
         if (active_ignore && active_ignore != ensemble->ignore_dims_spec) {

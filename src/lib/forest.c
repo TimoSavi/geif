@@ -19,7 +19,7 @@
  *  - max_depth:        GEIF_DEFAULT_MAX_DEPTH (adaptive or 32)
  *  - kappa:            GEIF_DEFAULT_KAPPA (1.15 headroom)
  *  - alpha:            GEIF_DEFAULT_ALPHA (1.0 density sensitivity)
- *  - algo:             GEIF_ALGO_DEFAULT (Hyperspherical Bubble trees)
+ *  - algo:             GEIF_ALGO_DEFAULT (Exemplar density kernel)
  *
  * @return Populated geif_config_t structure with factory defaults.
  */

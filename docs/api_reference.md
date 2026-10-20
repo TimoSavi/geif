@@ -90,8 +90,8 @@
 | Enum Constant | Value | CLI Name | Description |
 | :--- | :--- | :--- | :--- |
 | `GEIF_ALGO_CEIF` | `0` | `ceif` / `eif` | Data-anchored isotropic Gaussian cuts with Zero Kelvin scale floor and outer decay. |
-| `GEIF_ALGO_BUBBLE` | `1` | `bubble` | Hyperspherical Bubble tree cavity carving with median quickselect (default). |
-| `GEIF_ALGO_EXEMPLAR` | `2` | `exemplar` | Direct SIMD Cauchy kernel density evaluation on reservoir pool samples. |
+| `GEIF_ALGO_BUBBLE` | `1` | `bubble` | Hyperspherical Bubble tree cavity carving with median quickselect. |
+| `GEIF_ALGO_EXEMPLAR` | `2` | `exemplar` | Direct SIMD Cauchy kernel density evaluation on reservoir pool samples (default). |
 | `GEIF_ALGO_VORONOI` | `3` | `voronoi` | Scale-invariant Voronoi perpendicular bisector hyperplane cuts. |
 
 ---
@@ -1711,7 +1711,7 @@ Defaults:
 - max_depth:        GEIF_DEFAULT_MAX_DEPTH (adaptive or 32)
 - kappa:            GEIF_DEFAULT_KAPPA (1.15 headroom)
 - alpha:            GEIF_DEFAULT_ALPHA (1.0 density sensitivity)
-- algo:             GEIF_ALGO_DEFAULT (Hyperspherical Bubble trees)
+- algo:             GEIF_ALGO_DEFAULT (Exemplar Cauchy kernel density)
 
 **Returns:** Populated geif_config_t structure with factory defaults.
 
