@@ -5,7 +5,7 @@ BIN="bin/geif"
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-WINE_CSV="/home/timo_savinen_elisa_fi/docs/tools/geif/prod_plan/winequality-red.csv"
+WINE_CSV="test/data/winequality-red.csv"
 
 echo "================================================================="
 echo "FEATURE 4 TEST: Category Lifecycle (-F, -R, -N, -M, -p, -S)"

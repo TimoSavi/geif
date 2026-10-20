@@ -10,7 +10,7 @@ BIN="$PROJECT_ROOT/bin/geif"
 TMP_DIR="$(mktemp -d /tmp/geif_test_decay_XXXXXX)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-WINE_CSV="/home/timo_savinen_elisa_fi/docs/tools/geif/prod_plan/winequality-red.csv"
+WINE_CSV="$PROJECT_ROOT/test/data/winequality-red.csv"
 
 echo "================================================================="
 echo "FEATURE 5 TEST: Age & Decay Rate Processing (-D <interval>)"

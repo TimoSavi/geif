@@ -329,7 +329,7 @@ $$
 s(x) = 1.0 - \left(\min\left(1.0, \frac{D(x)}{D_{\max}}\right)\right)^{\text{decay}}
 $$
 
-This single expression attenuates smoothly and monotonically into outer space ($O(1/d)$ for $\text{decay} = 0.5$) without boundary cliff jumps or piecewise outer-stadium splices.
+This single expression attenuates smoothly and monotonically into outer space at rate $O(1/d)$ (for $\text{decay} = 0.5$) without boundary cliff jumps or piecewise outer-stadium splices.
 
 ---
 

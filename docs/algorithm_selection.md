@@ -15,10 +15,10 @@ The table below summarizes the operational characteristics, mathematical partiti
 
 | Algorithm | Partitioning Geometry | Recommended Threshold ($T$ / Mode) | Cavity & Void Resolution | Envelope Tightness & Boundary Precision | Training Complexity | Scoring Throughput Profile | Primary Operational Use Case |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :--- |
-| **`exemplar`** (Default) | Regularized SIMD Cauchy kernel with Square-Root Potential Mapping | `-O 0.50` (Cavity), `-O 0.70` (Wide Halo), `-O 98%` | **Exceptional** (Cavity detected at $T = 0.50$ ($s \approx 0.56$); zero false bridging) | **Ultra-Detailed & Smooth** (Pixel-level fidelity, wide halo at 0.70, zero artifacts) | **Instant** ($O(N \log K)$, $< 1\text{ ms}$) | **Highest** ($O(N)$ straight-line SIMD kernel) | **Zero-training streaming, supervised gating, instant updates, and calibrated continuous density fields** |
-| **`bubble`** | Hyperspherical balls $\Vert x - c \Vert^2 \le R^2$ with empty void leaves | `-O 98%` (Supervised) or `-O 0.48` | **Exceptional** (Clean donut hole & canal separation) | **Highest** (Crisp contour conforming to true manifold) | Moderate ($O(N \log N)$) | Fast ($O(\text{depth})$ tree traversal) | **Supervised boundary gating, safety envelopes, non-convex topologies, and cavity detection** |
-| **`ceif`** | Data-anchored isotropic Gaussian hyperplanes | `-O 0.50` to `-O 0.60` (Relaxed) | **Blind** (Hyperplanes slice across interior hollows) | **Smooth / Relaxed** (Convex-biased global envelope) | Fast ($O(N \log N)$) | Fast ($O(\text{depth})$ tree traversal) | **General unsupervised tabular anomaly detection, high-dimensional data, and relaxed outlier filtering** |
-| **`voronoi`** | Perpendicular bisectors $n = x_2 - x_1$, $p = (x_1 + x_2)/2$ | `-O 0.45` to `-O 0.48` | **Moderate** (Exposes cavities better than CEIF, but erodes tips) | **Good** (Scale-invariant linear polyhedral cuts) | Fast ($O(N \log N)$) | Fast ($O(\text{depth})$ tree traversal) | **Scale-invariant pairwise clustering where linear decision boundaries are preferred** |
+| **`exemplar`** (Default) | Regularized SIMD Cauchy kernel with Square-Root Potential Mapping | `-O 0.50` (Cavity), `-O 0.70` (Wide Halo), `-O 98%` | **Exceptional** (Cavity detected at $T = 0.50$, $s \approx 0.56$; zero false bridging) | **Ultra-Detailed & Smooth** (Pixel-level fidelity, wide halo at 0.70, zero artifacts) | **Instant**: $O(N \log K)$, $< 1\text{ ms}$ | **Highest**: $O(N)$ straight-line SIMD kernel | **Zero-training streaming, supervised gating, instant updates, and calibrated continuous density fields** |
+| **`bubble`** | Hyperspherical balls $\Vert x - c \Vert^2 \le R^2$ with empty void leaves | `-O 98%` (Supervised) or `-O 0.48` | **Exceptional** (Clean donut hole & canal separation) | **Highest** (Crisp contour conforming to true manifold) | Moderate: $O(N \log N)$ | Fast: $O(\text{depth})$ tree traversal | **Supervised boundary gating, safety envelopes, non-convex topologies, and cavity detection** |
+| **`ceif`** | Data-anchored isotropic Gaussian hyperplanes | `-O 0.50` to `-O 0.60` (Relaxed) | **Blind** (Hyperplanes slice across interior hollows) | **Smooth / Relaxed** (Convex-biased global envelope) | Fast: $O(N \log N)$ | Fast: $O(\text{depth})$ tree traversal | **General unsupervised tabular anomaly detection, high-dimensional data, and relaxed outlier filtering** |
+| **`voronoi`** | Perpendicular bisectors $n = x_2 - x_1$, $p = (x_1 + x_2)/2$ | `-O 0.45` to `-O 0.48` | **Moderate** (Exposes cavities better than CEIF, but erodes tips) | **Good** (Scale-invariant linear polyhedral cuts) | Fast: $O(N \log N)$ | Fast: $O(\text{depth})$ tree traversal | **Scale-invariant pairwise clustering where linear decision boundaries are preferred** |
 
 ---
 
@@ -80,7 +80,7 @@ Evaluating engines at thresholds optimized for their distinct geometries:
 - At $T = 0.48$, **`bubble`** achieves complete topological separation between all sub-structures without any bridging.
 - At $T = 0.60$, **`ceif`** produces a broad, forgiving boundary ideal for coarse noise filtering in unstructured tabular data.
 - At $T = 0.45$, **`voronoi`** succeeds in opening the central cavity, but thin linear structures (spike tips) begin to erode and fragment.
-- At $T = 0.70$, **`exemplar`** exploits harmonic distance decay ($s(r) \approx 1 - \sigma/r$) to generate a generous, uniform inlier halo wrapping the entire manifold with zero boundary cliffs or step discontinuities.
+- At $T = 0.70$, **`exemplar`** exploits harmonic distance decay $s(r) \approx 1 - \sigma/r$ to generate a generous, uniform inlier halo wrapping the entire manifold with zero boundary cliffs or step discontinuities.
 
 ---
 
@@ -146,7 +146,7 @@ When running categorization, GEIF outputs both the original/training category (`
 - `%C`: The true category string parsed from training/metadata columns.
 - `%c`: The predicted category string assigned by the model's minimum anomaly score / highest density subforest.
 
-To benchmark categorization accuracy, all four algorithmic engines were evaluated on the real-world agricultural benchmark [`test/data/paddydataset.csv`](file:///home/timo_savinen_elisa_fi/git/geif/test/data/README.md). This dataset contains **2,790 observations** across 10 continuous feature dimensions, categorized across multiple variety and soil classifications (columns 2 through 4).
+To benchmark categorization accuracy, all four algorithmic engines were evaluated on the real-world agricultural benchmark [`test/data/paddydataset.csv`](../test/data/README.md). This dataset contains **2,790 observations** across 10 continuous feature dimensions, categorized across multiple variety and soil classifications (columns 2 through 4).
 
 The models were trained and evaluated using the exact training and categorization pipeline:
 ```bash

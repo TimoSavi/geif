@@ -129,7 +129,7 @@ In C17 (`include/geif/types.h`), this dynamic leaf termination is implemented as
 ```
 
 **Computational Advantage:**  
-By avoiding excessive fine splits down to 1–3 sample leaves, trees remain shallower by 1–2 levels, cutting node allocations and tree construction time. Fine-grained local density resolution is naturally shifted to the continuous Euclidean relative distance evaluation ($d_{\text{rel}}(x)$), eliminating artificial hyperplane slicing artifacts and sharply carving out interior topological cavities (such as donut holes).
+By avoiding excessive fine splits down to 1–3 sample leaves, trees remain shallower by 1–2 levels, cutting node allocations and tree construction time. Fine-grained local density resolution is naturally shifted to the continuous Euclidean relative distance evaluation $d_{\text{rel}}(x)$, eliminating artificial hyperplane slicing artifacts and sharply carving out interior topological cavities (such as donut holes).
 
 To evaluate local cluster density and detect interior voids without constructing an expensive global $k$-d tree, GEIF computes leaf relative distances using a bounding-box projection:
 
@@ -350,7 +350,7 @@ $$
 b_1 = \max\left(\frac{1}{10 D} \sum_{d=1}^D |u_{1,d}|, 10^{-6}\right)
 $$
 
-#### 2. Sublinear Duplicate Growth & Unified Cauchy Kernel Pooling ($D(x)$ and $s(x)$)
+#### 2. Sublinear Duplicate Growth & Unified Cauchy Kernel Pooling: $D(x)$ and $s(x)$
 Instead of normalizing weights to sum to $1$, inverse-bandwidth credibility ($1 / b_i$), sublinear duplicate scaling ($\sqrt{c_i}$), and the Cauchy kernel $1 / (1 + (d / b_i)^2)$ are combined into a single unified sum over the $U_{\text{unique}}$ unique locations:
 
 $$

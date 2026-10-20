@@ -21,8 +21,8 @@ import os
 import sys
 
 GEIF_BIN = os.path.abspath("./bin/geif")
-WINE_CSV = "/home/timo_savinen_elisa_fi/docs/tools/geif/prod_plan/winequality-red.csv"
-PADDY_CSV = "/home/timo_savinen_elisa_fi/docs/tools/geif/prod_plan/paddydataset.csv"
+WINE_CSV = "test/data/winequality-red.csv"
+PADDY_CSV = "test/data/paddydataset.csv"
 TMP_DIR = "/tmp/geif_benchmark_high_dim"
 
 os.makedirs(TMP_DIR, exist_ok=True)

@@ -5,8 +5,8 @@ BIN="bin/geif"
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-WINE_CSV="/home/timo_savinen_elisa_fi/docs/tools/geif/prod_plan/winequality-red.csv"
-PADDY_CSV="/home/timo_savinen_elisa_fi/docs/tools/geif/prod_plan/paddydataset.csv"
+WINE_CSV="test/data/winequality-red.csv"
+PADDY_CSV="test/data/paddydataset.csv"
 
 echo "================================================================="
 echo "FEATURE 3 TEST: Multi-Category Sub-Forest Engine (-C <range>)"
@@ -84,7 +84,7 @@ echo "$CL_SUMMARY" | grep "Label Columns (-L):  1"
 echo "  [PASS] Combined -C 12 and -L 1 correctly resolved to 10 features across 6 sub-forests."
 
 # Test 8: Categorization mode (-c) with 100 circles benchmark dataset
-CIRCLES_TXT="/home/timo_savinen_elisa_fi/docs/tools/geif/prod_plan/circles.txt"
+CIRCLES_TXT="test/data/circles.txt"
 if [ -f "$CIRCLES_TXT" ]; then
     echo "Test 8: Categorization mode (-c) on 100 circles dataset..."
     $BIN -l "$CIRCLES_TXT" -H -C 3 -w "$TMP_DIR/model_circles.json" -t 50 -s 64

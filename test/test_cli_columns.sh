@@ -3,7 +3,7 @@
 set -euo pipefail
 
 BIN="./bin/geif"
-WINE_CSV="/home/timo_savinen_elisa_fi/docs/tools/geif/prod_plan/winequality-red.csv"
+WINE_CSV="test/data/winequality-red.csv"
 
 if [[ ! -f "$WINE_CSV" ]]; then
     echo "Error: Dataset '$WINE_CSV' not found!"

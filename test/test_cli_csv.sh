@@ -2,7 +2,7 @@
 set -euo pipefail
 
 BIN="./bin/geif"
-WINE_CSV="/home/timo_savinen_elisa_fi/docs/tools/geif/prod_plan/winequality-red.csv"
+WINE_CSV="test/data/winequality-red.csv"
 TMP_DIR="$(mktemp -d /tmp/geif_test_csv_XXXXXX)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 

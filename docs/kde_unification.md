@@ -148,10 +148,10 @@ $$
 
 * **Continuous Metric Potential**:
   Instead of discrete integer hops ($1, 2, 3 \ldots$), Exemplar evaluates an infinitely differentiable ($C^\infty$) field with:
-  * Cap-5 $K$-NN adaptive bandwidths ($b_i$) ensuring $b_i > 0$ even in duplicate-heavy datasets
-  * Low-end bandwidth floor only ($b_i \ge b_{\min} = \max(0.5 \mu_b, \mu_b - s_b)$), allowing isolated outliers to naturally vanish ($1 / b_i \to 0$) without high-end clamping
-  * Sublinear duplicate scaling ($\sqrt{c_i}$) to grow dense clusters smoothly without linear duplicate blow-up
-  * Unified fractional decay mapping ($s(x) = 1 - (D(x) / D_{\max})^{\text{decay}}$ with $D_{\max} = 1.05 \max_i D(u_i)$) that attenuates smoothly into outer space without piecewise stadium splices
+  * Cap-5 $K$-NN adaptive bandwidths $b_i$ ensuring $b_i > 0$ even in duplicate-heavy datasets
+  * Low-end bandwidth floor only, $b_i \ge b_{\min} = \max(0.5 \mu_b, \mu_b - s_b)$, allowing isolated outliers to naturally vanish ($1 / b_i \to 0$) without high-end clamping
+  * Sublinear duplicate scaling $\sqrt{c_i}$ to grow dense clusters smoothly without linear duplicate blow-up
+  * Unified fractional decay mapping $s(x) = 1 - (D(x) / D_{\max})^{\text{decay}}$ with $D_{\max} = 1.05 \max_i D(u_i)$ that attenuates smoothly into outer space without piecewise stadium splices
 
 ---
 
