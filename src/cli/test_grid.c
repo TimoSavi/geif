@@ -176,7 +176,7 @@ void geif_generate_test_grid(const geif_ensemble_t *ens,
         if (threshold_is_average) {
             cutoff = f->average_score;
         } else if (threshold_is_percentage) {
-            cutoff = (f->percentage_score > 0.0) ? f->percentage_score : 0.5;
+            cutoff = (f->percentage_score >= 0.0) ? f->percentage_score : 0.5;
         }
 
         // Odometer traversal across all dimension combinations

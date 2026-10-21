@@ -142,11 +142,11 @@ geif_status_t geif_forest_dimension_attribution(const geif_forest_t *forest,
                                                double *attr_scores_out);
 
 /**
- * @brief Computes the percentile anomaly score across the training reservoir sample pool.
+ * @brief Computes the percentile or out-of-sample extrapolated anomaly score for a forest.
  *
  * @param[in] forest     Forest instance containing a populated sample pool.
- * @param[in] percentile Percentile threshold in range [0.0, 100.0] (e.g. 95.0).
- * @return Anomaly score corresponding to the given percentile of training samples.
+ * @param[in] percentile Percentage threshold in range [0.0, 200.0] (0-100% empirical, 100-200% algorithm-extrapolated).
+ * @return Anomaly score corresponding to the given percentage threshold.
  */
 double geif_forest_calculate_percentile_score(const geif_forest_t *forest, double percentile);
 

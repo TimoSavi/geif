@@ -323,16 +323,16 @@ vector with coordinate j taken from point and all other coordinates at category 
 double geif_forest_calculate_percentile_score(const geif_forest_t *forest, double percentile);
 ```
 
-**Description:** Computes the percentile anomaly score across the training reservoir sample pool.
+**Description:** Computes the percentile or out-of-sample extrapolated anomaly score for a forest.
 
 **Parameters:**
 
 | Parameter | Direction | Description |
 | :--- | :--- | :--- |
 | `forest` | `[in]` | Forest instance containing a populated sample pool. |
-| `percentile` | `[in]` | Percentile threshold in range [0.0, 100.0] (e.g. 95.0). |
+| `percentile` | `[in]` | Percentage threshold in range [0.0, 200.0] (0-100% empirical, 100-200% algorithm-extrapolated). |
 
-**Returns:** Anomaly score corresponding to the given percentile of training samples.
+**Returns:** Anomaly score corresponding to the given percentage threshold.
 
 ---
 
@@ -659,7 +659,7 @@ Pluggable algorithm operations vtable, geometric partition trees (Bubble, Vorono
 
 **Module Purpose:** Internal algorithm abstraction interface and registry for GEIF.
 
-#### [`geif_algo_get_ops`](../src/lib/algo.h#L34)
+#### [`geif_algo_get_ops`](../src/lib/algo.h#L37)
 
 ```c
 const geif_algo_ops_t *geif_algo_get_ops(geif_algo_type_t algo);
@@ -872,6 +872,29 @@ asymptotic exponential stadium attenuation: score = 1 - (1 - score)*exp(-0.10*d_
 
 ---
 
+#### [`geif_bubble_extrapolate_percentile`](../src/lib/algo_bubble.c#L408)
+
+```c
+static double geif_bubble_extrapolate_percentile(const geif_forest_t *f, double s_100, double t);
+```
+
+**Description:** Extrapolates an out-of-sample percentile threshold (100% < P <= 200%) for Bubble.
+
+Models hyperspherical cavity drop-off outside the 100% sample boundary combined
+with outer stadium exponential decay.
+
+**Parameters:**
+
+| Parameter | Direction | Description |
+| :--- | :--- | :--- |
+| `f` | `[in]` | Forest instance. |
+| `s_100` | `[in]` | Empirical 100% maximum training sample score. |
+| `t` | `[in]` | Normalized extrapolation factor (P - 100) / 100 in (0.0, 1.0]. |
+
+**Returns:** Extrapolated threshold score in [s_100, 1.0].
+
+---
+
 ### [`src/lib/algo_voronoi.c`](../src/lib/algo_voronoi.c)
 
 **Module Purpose:** Voronoi Algorithm: Pure perpendicular bisector splits between sample pairs.
@@ -946,6 +969,29 @@ static geif_status_t geif_voronoi_score(const geif_forest_t *f, const double *po
 
 ---
 
+#### [`geif_voronoi_extrapolate_percentile`](../src/lib/algo_voronoi.c#L268)
+
+```c
+static double geif_voronoi_extrapolate_percentile(const geif_forest_t *f, double s_100, double t);
+```
+
+**Description:** Extrapolates an out-of-sample percentile threshold (100% < P <= 200%) for Voronoi.
+
+Models perpendicular bisector leaf distance damping c(n / (1 + rho * t))
+combined with outer stadium exponential decay.
+
+**Parameters:**
+
+| Parameter | Direction | Description |
+| :--- | :--- | :--- |
+| `f` | `[in]` | Forest instance. |
+| `s_100` | `[in]` | Empirical 100% maximum training sample score. |
+| `t` | `[in]` | Normalized extrapolation factor (P - 100) / 100 in (0.0, 1.0]. |
+
+**Returns:** Extrapolated threshold score in [s_100, 1.0].
+
+---
+
 ### [`src/lib/algo_exemplar.c`](../src/lib/algo_exemplar.c)
 
 **Module Purpose:** Exemplar Algorithm: Non-tree direct Cauchy density kernel on reservoir samples.
@@ -992,6 +1038,29 @@ static geif_status_t geif_exemplar_score(const geif_forest_t *f, const double *p
 
 D(x) = sum_i (sqrt(c_i) * b_i) / (b_i^2 + ||x - u_i||^2)
 s(x) = 1 - (D(x) / D_max)^decay
+
+---
+
+#### [`geif_exemplar_extrapolate_percentile`](../src/lib/algo_exemplar.c#L319)
+
+```c
+static double geif_exemplar_extrapolate_percentile(const geif_forest_t *f, double s_100, double t);
+```
+
+**Description:** Extrapolates an out-of-sample percentile threshold (100% < P <= 200%) for Exemplar.
+
+Models the natural Cauchy kernel density decay outside the 100% sample boundary
+using the trained exemplar bandwidth ratio (S / avg_b) and configured decay exponent.
+
+**Parameters:**
+
+| Parameter | Direction | Description |
+| :--- | :--- | :--- |
+| `f` | `[in]` | Forest instance. |
+| `s_100` | `[in]` | Empirical 100% maximum training sample score. |
+| `t` | `[in]` | Normalized extrapolation factor (P - 100) / 100 in (0.0, 1.0]. |
+
+**Returns:** Extrapolated threshold score in [s_100, 1.0].
 
 ---
 
@@ -1063,6 +1132,29 @@ static geif_status_t geif_ceif_score(const geif_forest_t *f, const double *point
 | `d_out_out` | `[out]` | Optional pointer to receive outer distance d_out. |
 
 **Returns:** GEIF_OK on success, or error status.
+
+---
+
+#### [`geif_ceif_extrapolate_percentile`](../src/lib/algo_ceif.c#L275)
+
+```c
+static double geif_ceif_extrapolate_percentile(const geif_forest_t *f, double s_100, double t);
+```
+
+**Description:** Extrapolates an out-of-sample percentile threshold (100% < P <= 200%) for CEIF.
+
+Models margin-expanded isotropic Gaussian hyperplane shedding rate outside the
+100% sample boundary combined with outer stadium exponential decay.
+
+**Parameters:**
+
+| Parameter | Direction | Description |
+| :--- | :--- | :--- |
+| `f` | `[in]` | Forest instance. |
+| `s_100` | `[in]` | Empirical 100% maximum training sample score. |
+| `t` | `[in]` | Normalized extrapolation factor (P - 100) / 100 in (0.0, 1.0]. |
+
+**Returns:** Extrapolated threshold score in [s_100, 1.0].
 
 ---
 
@@ -1691,7 +1783,7 @@ and individual tree structures. Seeds PRNG if seed is 0.
 
 ---
 
-#### [`geif_forest_destroy`](../src/lib/forest.c#L143)
+#### [`geif_forest_destroy`](../src/lib/forest.c#L144)
 
 ```c
 void geif_forest_destroy(geif_forest_t *f);
@@ -1712,7 +1804,7 @@ and finally frees the forest container. Safe to invoke with NULL.
 
 ---
 
-#### [`geif_forest_summary`](../src/lib/forest.c#L190)
+#### [`geif_forest_summary`](../src/lib/forest.c#L191)
 
 ```c
 void geif_forest_summary(const geif_forest_t *f, char *buf, size_t size);
@@ -1928,25 +2020,28 @@ static int pscore_cmp(const void *a, const void *b);
 
 ---
 
-#### [`geif_forest_calculate_percentile_score`](../src/lib/evaluate.c#L297)
+#### [`geif_forest_calculate_percentile_score`](../src/lib/evaluate.c#L300)
 
 ```c
 double geif_forest_calculate_percentile_score(const geif_forest_t *forest, double percentile);
 ```
 
-**Description:** Computes the empirical anomaly score threshold corresponding to a given percentile.
+**Description:** Computes the anomaly score threshold corresponding to a given percentage in [0.0, 200.0].
 
-Scores all observations currently in the forest's reservoir sample pool, sorts
-the score array ascendingly via qsort, and returns the score at rank (N - 1) * (percentile / 100).
+For percentile in [0.0, 100.0], scores all observations in the forest's reservoir sample
+pool, sorts the score array ascendingly via qsort, and returns the empirical score at rank
+(N - 1) * (percentile / 100).
+For percentile in (100.0, 200.0], determines the 100% in-sample maximum boundary score (s_100)
+and extrapolates out-of-sample up to 1.0 (at 200%) using the algorithm's native decay curve.
 
 **Parameters:**
 
 | Parameter | Direction | Description |
 | :--- | :--- | :--- |
 | `forest` | `[in]` | Forest instance. |
-| `percentile` | `[in]` | Target percentile in [0.0, 100.0] (e.g. 80.0, 94.0). |
+| `percentile` | `[in]` | Target percentage in [0.0, 200.0] (e.g. 80.0, 100.0, 110.0, 200.0). |
 
-**Returns:** Empirical score cutoff at that percentile rank.
+**Returns:** Score cutoff at that percentile / extrapolated rank.
 
 ---
 
@@ -2634,28 +2729,55 @@ static void process_categorize_row(geif_ensemble_t *ensemble, const geif_column_
 
 ---
 
-#### [`update_ensemble_percentage_scores`](../src/cli/main.c#L637)
+#### [`parse_outlier_score_spec`](../src/cli/main.c#L642)
+
+```c
+static bool parse_outlier_score_spec(const char *spec, bool *is_avg, bool *is_pct, double *pct_out, double *thresh_out);
+```
+
+**Description:** Parses and validates an outlier score specification string (-O or OUTLIER_SCORE).
+
+Accepts:
+- "average": locks threshold to category mean training score
+- "<pct>%": percentage threshold in [0.0, 200.0] (returns false and prints error if out of bounds)
+- "<float>": fixed score threshold
+
+**Parameters:**
+
+| Parameter | Direction | Description |
+| :--- | :--- | :--- |
+| `spec` | `[in]` | Specification string. |
+| `is_avg` | `[out]` | Receives true if "average". |
+| `is_pct` | `[out]` | Receives true if percentage format. |
+| `pct_out` | `[out]` | Receives parsed percentage in [0.0, 200.0]. |
+| `thresh_out` | `[out]` | Receives parsed fixed float threshold. |
+
+**Returns:** true if valid, false if out of bounds or malformed.
+
+---
+
+#### [`update_ensemble_percentage_scores`](../src/cli/main.c#L682)
 
 ```c
 static void update_ensemble_percentage_scores(geif_ensemble_t *ens, double pct, const cat_filter_t *filter, bool verbose);
 ```
 
-**Description:** Recalculates empirical percentile threshold scores for all sub-forests in an ensemble.
+**Description:** Recalculates empirical or extrapolated percentage threshold scores for all sub-forests.
 
-Evaluates reservoir samples to locate the empirical score boundary corresponding
-to the given cumulative percentile (e.g. 80% or 95%).
+Evaluates reservoir samples to locate the score boundary corresponding to the given
+percentage in [0.0, 200.0] (0-100% empirical in-sample, 100-200% algorithm-extrapolated).
 
 **Parameters:**
 
 | Parameter | Direction | Description |
 | :--- | :--- | :--- |
 | `ens` | `[in,out]` | Category ensemble instance. |
-| `pct` | `[in]` | Percentile value (0.0 to 100.0). |
-| `verbose` | `[in]` | True to print per-category percentile diagnostics. |
+| `pct` | `[in]` | Percentage value (0.0 to 200.0). |
+| `verbose` | `[in]` | True to print per-category percentage diagnostics. |
 
 ---
 
-#### [`main`](../src/cli/main.c#L696)
+#### [`main`](../src/cli/main.c#L747)
 
 ```c
 int main(int argc, char *argv[]);

@@ -25,6 +25,9 @@ typedef struct geif_algo_ops {
                             double *score_out,
                             double *metric_depth_out,
                             double *d_out_out);
+    double         (*extrapolate_percentile)(const geif_forest_t *f,
+                                             double s_100,
+                                             double t);
     void           (*destroy)(geif_forest_t *f);
 } geif_algo_ops_t;
 

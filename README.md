@@ -269,7 +269,7 @@ The build compiles with `-std=c17 -O3 -march=native -Wall -Wextra -Wpedantic` an
 | `-r` | `<file>` | Read / load model from JSON file or `-` (stdin); auto-restores saved `-f` and `-e` delimiters. |
 | `-z` | `<file>` | Update model in-place (loads model, updates with `-l`, rewrites file; auto-restores `-f`). |
 | `-o` | `<file>` | Output file for scoring results (default: `-` for stdout). |
-| `-O` | `<spec>` | Outlier threshold: decimal (`0.65`), percentage (`80%`), or `average`. |
+| `-O` | `<spec>` | Outlier threshold: decimal (`0.65`), percentage in `0%`–`200%` (`80%` empirical in-sample, `110%` algorithm-extrapolated out-of-sample border, `200%` $= 1.0$), or `average`. |
 | `-k` | *(flag)* | Recalibrate model / prune reservoir outliers (repeatable: `-k -k`). |
 | `-D` | `<rate>d` | Exponential age decay rate in days (e.g., `-D30d`, `-D7d`). |
 | `-C` | `<spec>` | Category column range/list (e.g., `12`, `"2-4"`, `"1,3,5"`). |

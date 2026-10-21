@@ -195,6 +195,43 @@ GEIF ingests streaming data using Algorithm R reservoir sampling:
 
 ---
 
+### 2.6 Out-of-Sample Percentile Extrapolation (`100%` to `200%`)
+
+Percentage-based thresholds (`-O <pct>%` or `OUTLIER_SCORE <pct>%`) accept values across the validated range $[0, 200]$:
+- **In-Sample Empirical Quantile ($0 \le P \le 100$)**: Evaluates all active reservoir samples and sorts their ascending anomaly scores $s_0 \le s_1 \le \ldots \le s_{N-1}$. At $P = 100$, the cutoff $s_{100}$ equals the maximum training sample score (the exact empirical in-sample border).
+- **Out-of-Sample Extrapolation ($100 < P \le 200$)**: Let $t = (P - 100) / 100 \in (0, 1]$ denote the normalized out-of-sample excursion distance (so $P = 110$ corresponds to $t = 0.10$ span units outside the boundary, and $P = 200$ corresponds to $t = 1.0$). Each algorithm defines a monotonic growth curve $f_{\text{algo}}(t) \in [0, 1]$ normalized by $f_{\text{algo}}(1) > 0$ so that $s(100) = s_{100}$ and $s(200) = 1.0$:
+
+$$
+s(P) = s_{100} + (1.0 - s_{100}) \cdot \frac{f_{\text{algo}}(t)}{f_{\text{algo}}(1)}
+$$
+
+where the unnormalized algorithm-specific progression $f_{\text{algo}}(t)$ reflects each engine's native outer-space physics:
+1. **Exemplar (`exemplar`)**: Uses the trained mean bandwidth ratio $\kappa_{\text{ex}} = \text{clamp}(\sqrt{D} / \bar{b}, 2, 20)$ and the configured Cauchy density exponent $\gamma = \text{decay}$:
+
+$$
+f_{\text{exemplar}}(t) = 1.0 - \left(1.0 + (\kappa_{\text{ex}} \cdot t)^2\right)^{-\gamma}
+$$
+
+2. **Hyperspherical Bubble (`bubble`)**: Combines radial shell distance scaling $\rho = \text{clamp}(\sqrt{D} / \bar{d}_{\text{sample}}, 2, 20)$ with outer stadium attenuation $\lambda = 0.10$:
+
+$$
+f_{\text{bubble}}(t) = 1.0 - \frac{\exp(-\lambda \cdot t)}{1.0 + \rho \cdot t}
+$$
+
+3. **Voronoi Bisectors (`voronoi`)**: Combines harmonic leaf residual damping $(1 + \rho \cdot t)^{-1 / c(\psi)}$ with outer stadium attenuation:
+
+$$
+f_{\text{voronoi}}(t) = 1.0 - \exp(-\lambda \cdot t) \cdot (1.0 + \rho \cdot t)^{-1 / c(\psi)}
+$$
+
+4. **Gaussian Hyperplanes (`ceif`)**: Uses the expected hyperplane shedding rate $\beta_{\text{ceif}} = \lambda + \frac{\ln 2}{c(\psi)} \sqrt{\rho}$:
+
+$$
+f_{\text{ceif}}(t) = 1.0 - \exp(-\beta_{\text{ceif}} \cdot t)
+$$
+
+---
+
 ## 3. Algorithm 1: Hyperspherical Bubble Trees (`bubble`)
 
 ### 3.1 Motivation & Concept

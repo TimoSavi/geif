@@ -153,4 +153,82 @@ if ! grep -q "Percentage score for 'catA':" "$TEST_DIR/pct_log.txt"; then
 fi
 echo "  [PASS] -O 95% computed dynamic percentile score successfully."
 
+# Test 9: Extrapolated Percentage Thresholds (> 100% up to 200%) across all algorithms
+echo "Test 9: Algorithm-specific extrapolated percentage thresholds (100%, 110%, 150%, 200%)..."
+CLEAN_TRAIN_CSV="$TEST_DIR/clean_train.csv"
+grep -v "^bad1," "$TRAIN_CSV" > "$CLEAN_TRAIN_CSV"
+
+for ALGO in exemplar bubble voronoi ceif; do
+    ALGO_MODEL="$TEST_DIR/model_${ALGO}.json"
+    $GEIF_BIN -l "$CLEAN_TRAIN_CSV" -w "$ALGO_MODEL" -B "$ALGO" -L 1 -C 5 -t 20 -s 64 -W
+
+    get_pct_cutoff() {
+        local pct="$1"
+        local log_file="$TEST_DIR/pct_${ALGO}_${pct}.log"
+        run_geif_score -r "$ALGO_MODEL" -a "$CLEAN_TRAIN_CSV" -L 1 -C 5 -O "${pct}%" -v -o /dev/null > "$log_file" 2>&1
+        grep "Percentage score for 'catA':" "$log_file" | sed -E 's/.*: ([0-9.]+) \(.*/\1/'
+    }
+
+    S100=$(get_pct_cutoff 100)
+    S110=$(get_pct_cutoff 110)
+    S150=$(get_pct_cutoff 150)
+    S200=$(get_pct_cutoff 200)
+
+    echo "  [$ALGO] 100%=$S100, 110%=$S110, 150%=$S150, 200%=$S200"
+
+    # Verify strict monotonic progression: s100 < s110 < s150 < s200 == 1.000000
+    if ! awk -v s100="$S100" -v s110="$S110" -v s150="$S150" -v s200="$S200" \
+        'BEGIN { exit !(s100 < s110 && s110 < s150 && s150 < s200 && s200 == 1.0) }'; then
+        echo "ERROR: Non-monotonic or invalid extrapolated cutoffs for algorithm '$ALGO'"
+        exit 1
+    fi
+
+    # At 110% (definite out-of-sample border), all clean training rows must be inliers (exit code 0),
+    # while test_wild (999,999,999) in TEST_CSV must be flagged as an outlier (exit code 2).
+    if ! $GEIF_BIN -r "$ALGO_MODEL" -a "$CLEAN_TRAIN_CSV" -L 1 -C 5 -O "110%" -o /dev/null; then
+        echo "ERROR: Clean training sample flagged as outlier at 110% for '$ALGO'"
+        exit 1
+    fi
+    set +e
+    $GEIF_BIN -r "$ALGO_MODEL" -a "$TEST_CSV" -L 1 -C 5 -O "110%" -o /dev/null
+    RC_110=$?
+    set -e
+    if [ "$RC_110" -ne 2 ]; then
+        echo "ERROR: Expected exit code 2 (outlier detected) at 110% on test.csv for '$ALGO', got $RC_110"
+        exit 1
+    fi
+
+    # At 200% (score 1.0), no observation can exceed 1.0 (exit code 0).
+    if ! $GEIF_BIN -r "$ALGO_MODEL" -a "$TEST_CSV" -L 1 -C 5 -O "200%" -o /dev/null; then
+        echo "ERROR: Expected exit code 0 (no outliers > 1.0) at 200% for '$ALGO'"
+        exit 1
+    fi
+done
+echo "  [PASS] Extrapolated percentage thresholds (100%..200%) verified across all 4 algorithms."
+
+# Test 10: Percentage Range Validation (0%..200% bounds enforcement)
+echo "Test 10: Percentage bounds validation (0%..200%)..."
+set +e
+$GEIF_BIN -r "$MODEL_CLEAN1" -a "$TEST_CSV" -L 1 -C 5 -O "-5%" -o /dev/null 2> "$TEST_DIR/err_neg.txt"
+RC_NEG=$?
+$GEIF_BIN -r "$MODEL_CLEAN1" -a "$TEST_CSV" -L 1 -C 5 -O "205%" -o /dev/null 2> "$TEST_DIR/err_high.txt"
+RC_HIGH=$?
+$GEIF_BIN -r "$MODEL_CLEAN1" -a "$TEST_CSV" -L 1 -C 5 -O "abc%" -o /dev/null 2> "$TEST_DIR/err_bad.txt"
+RC_BAD=$?
+set -e
+
+if [ "$RC_NEG" -ne 1 ] || ! grep -q "between 0% and 200%" "$TEST_DIR/err_neg.txt"; then
+    echo "ERROR: -O -5% did not fail with expected range error (rc=$RC_NEG)"
+    exit 1
+fi
+if [ "$RC_HIGH" -ne 1 ] || ! grep -q "between 0% and 200%" "$TEST_DIR/err_high.txt"; then
+    echo "ERROR: -O 205% did not fail with expected range error (rc=$RC_HIGH)"
+    exit 1
+fi
+if [ "$RC_BAD" -ne 1 ]; then
+    echo "ERROR: -O abc% did not fail with exit code 1 (rc=$RC_BAD)"
+    exit 1
+fi
+echo "  [PASS] Out-of-bounds percentage values (-5%, 205%, abc%) rejected with exit code 1."
+
 echo "=== All GEIF Recalibration & Threshold Integration Tests Passed! ==="

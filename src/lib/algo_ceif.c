@@ -261,11 +261,51 @@ static geif_status_t geif_ceif_score(const geif_forest_t *f,
     return geif_tree_score_point(f, point, score_out, metric_depth_out, d_out_out);
 }
 
+/**
+ * @brief Extrapolates an out-of-sample percentile threshold (100% < P <= 200%) for CEIF.
+ *
+ * Models margin-expanded isotropic Gaussian hyperplane shedding rate outside the
+ * 100% sample boundary combined with outer stadium exponential decay.
+ *
+ * @param[in] f     Forest instance.
+ * @param[in] s_100 Empirical 100% maximum training sample score.
+ * @param[in] t     Normalized extrapolation factor (P - 100) / 100 in (0.0, 1.0].
+ * @return Extrapolated threshold score in [s_100, 1.0].
+ */
+static double geif_ceif_extrapolate_percentile(const geif_forest_t *f,
+                                               double s_100,
+                                               double t)
+{
+    if (t <= 0.0) return s_100;
+    if (t >= 1.0) return 1.0;
+
+    double span = (f && f->scale_range_idx >= 0 && f->envelope_span)
+                  ? f->envelope_span[f->scale_range_idx] : 0.0;
+    double rho = (f && span > 1e-12 && f->avg_sample_dist > 1e-12)
+                 ? (span / f->avg_sample_dist) : 10.0;
+    if (rho < 2.0) rho = 2.0;
+    if (rho > 20.0) rho = 20.0;
+
+    double c_psi = (f && f->c_factor > 0.0) ? f->c_factor : geif_c(256.0);
+    if (c_psi <= 0.0) c_psi = 1.0;
+
+    double rate = GEIF_OUTER_DECAY_RATE + (0.6931471805599453 / c_psi) * sqrt(rho);
+    double f_t = 1.0 - exp(-rate * t);
+    double f_1 = 1.0 - exp(-rate);
+    double g = (f_1 > 1e-12) ? (f_t / f_1) : t;
+
+    double s = s_100 + (1.0 - s_100) * g;
+    if (s < s_100) s = s_100;
+    if (s > 1.0) s = 1.0;
+    return s;
+}
+
 const geif_algo_ops_t geif_algo_ops_ceif = {
     .type = GEIF_ALGO_CEIF,
     .name = "ceif",
     .description = "CEIF: Data-anchored isotropic Gaussian cuts with Zero Kelvin and outer decay",
     .train = geif_ceif_train,
     .score = geif_ceif_score,
+    .extrapolate_percentile = geif_ceif_extrapolate_percentile,
     .destroy = NULL
 };

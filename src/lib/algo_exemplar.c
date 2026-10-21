@@ -305,11 +305,60 @@ static geif_status_t geif_exemplar_score(const geif_forest_t *f,
     return GEIF_OK;
 }
 
+/**
+ * @brief Extrapolates an out-of-sample percentile threshold (100% < P <= 200%) for Exemplar.
+ *
+ * Models the natural Cauchy kernel density decay outside the 100% sample boundary
+ * using the trained exemplar bandwidth ratio (S / avg_b) and configured decay exponent.
+ *
+ * @param[in] f     Forest instance.
+ * @param[in] s_100 Empirical 100% maximum training sample score.
+ * @param[in] t     Normalized extrapolation factor (P - 100) / 100 in (0.0, 1.0].
+ * @return Extrapolated threshold score in [s_100, 1.0].
+ */
+static double geif_exemplar_extrapolate_percentile(const geif_forest_t *f,
+                                                   double s_100,
+                                                   double t)
+{
+    if (t <= 0.0) return s_100;
+    if (t >= 1.0) return 1.0;
+
+    double kappa_ex = 10.0;
+    const geif_exemplar_state_t *st = f ? (const geif_exemplar_state_t *)f->algo_data : NULL;
+    double span = (f && f->scale_range_idx >= 0 && f->envelope_span)
+                  ? f->envelope_span[f->scale_range_idx] : 0.0;
+
+    if (st && st->u_count > 0 && st->b_sq && span > 1e-12) {
+        double sum_b = 0.0;
+        for (size_t i = 0; i < st->u_count; i++) {
+            sum_b += sqrt(st->b_sq[i]);
+        }
+        double avg_b = sum_b / (double)st->u_count;
+        if (avg_b > 1e-12) {
+            kappa_ex = span / avg_b;
+            if (kappa_ex < 2.0) kappa_ex = 2.0;
+            if (kappa_ex > 20.0) kappa_ex = 20.0;
+        }
+    }
+
+    double decay = (f && f->config.decay > 0.0) ? f->config.decay : GEIF_DEFAULT_DECAY;
+    double kt = kappa_ex * t;
+    double f_t = 1.0 - pow(1.0 + kt * kt, -decay);
+    double f_1 = 1.0 - pow(1.0 + kappa_ex * kappa_ex, -decay);
+    double g = (f_1 > 1e-12) ? (f_t / f_1) : t;
+
+    double s = s_100 + (1.0 - s_100) * g;
+    if (s < s_100) s = s_100;
+    if (s > 1.0) s = 1.0;
+    return s;
+}
+
 const geif_algo_ops_t geif_algo_ops_exemplar = {
     .type = GEIF_ALGO_EXEMPLAR,
     .name = "exemplar",
     .description = "Direct non-tree SIMD Cauchy density kernel on reservoir samples",
     .train = geif_exemplar_train,
     .score = geif_exemplar_score,
+    .extrapolate_percentile = geif_exemplar_extrapolate_percentile,
     .destroy = geif_exemplar_destroy
 };

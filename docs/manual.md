@@ -60,7 +60,7 @@ Input data is expected to be character-delimited ASCII/UTF-8 records (default co
 | `-r` | `FILE` | Read model ensemble from a JSON file (supports GEIF-1.0 and legacy formats; auto-restores `-f` and `-e`). |
 | `-z` | `FILE` | Update model in-place: read model from `FILE`, update with streaming data, and rewrite to `FILE` (auto-restores `-f`). |
 | `-o` | `FILE` | Output file path for scoring results (default: stdout, `-` for stdout). |
-| `-O` | `THRESH` | Anomaly threshold: float in $[0.0, 1.0]$ (default 0.50), percentage (e.g. `90%`), or `average`. |
+| `-O` | `THRESH` | Anomaly threshold: float in $[0.0, 1.0]$ (default 0.50), percentage in `0%`–`200%` (e.g. `90%` in-sample or `110%` extrapolated out-of-sample), or `average`. |
 | `-t` | `INT` | Number of isolation trees per sub-forest (default: 100). |
 | `-s` | `INT` | Number of samples subsampled per tree (default: 256). |
 | `-i` | `INT` | Test grid sampling interval (default: 256) or tree count alias. |
@@ -101,8 +101,10 @@ GEIF scales all anomaly scores to the calibrated range $[0.0, 1.0]$ by default:
 ### Threshold Specifications:
 1. **Fixed Numerical Threshold (`-O 0.50`)**:
    Points with score $\ge 0.50$ are flagged as anomalies.
-2. **Percentile Distribution Threshold (`-O 94%`)**:
-   Automatically calculates the empirical score cutoff from the training sample distribution such that 94% of nominal samples fall below the threshold.
+2. **Percentile & Out-of-Sample Extrapolated Threshold (`-O <pct>%`, valid range `0%`–`200%`)**:
+   - **In-Sample Empirical Percentile (`0%` to `100%`, e.g. `-O 94%`)**: Calculates the empirical score cutoff from the category's training sample distribution such that the specified percentage of training samples fall below the threshold (`100%` equals $s_{100}$, the maximum score among training samples).
+   - **Out-of-Sample Algorithm-Specific Extrapolation (`100%` to `200%`, e.g. `-O 110%`)**: Extrapolates beyond the empirical training sample boundary $s_{100}$ (`100%`) up to score $1.0$ (`200%`, where no observation can exceed the cutoff) using the active engine's native spatial decay curve (`exemplar` Cauchy kernel bandwidth and `DECAY` exponent, `bubble` hyperspherical shell distance, `voronoi` leaf harmonic damping, or `ceif` Gaussian hyperplane shedding). Setting a fleet-wide threshold such as `OUTLIER_SCORE 110%` in `~/.geifrc` establishes a self-calibrating, definite out-of-sample anomaly border across diverse sub-forests.
+   - Values outside `0%`–`200%` are rejected with an error (exit code `1`).
 3. **Average Score Threshold (`-O average`)**:
    Sets the anomaly cutoff to the ensemble mean score.
 

@@ -42,7 +42,7 @@ static void print_usage(const char *prog)
     printf("  -r <file>      Load trained model from JSON file (use '-' for stdin)\n");
     printf("  -z <file>      In-place model update (load from file, update with new data, save back)\n");
     printf("  -o <file>      Output file for scores (default: stdout, '-' for stdout)\n");
-    printf("  -O <thresh>    Outlier threshold: float [0..1] (scaled by default), 'average', or percentage (e.g. '80%%')\n");
+    printf("  -O <thresh>    Outlier threshold: float [0..1] (scaled by default), 'average', or percentage [0..200%%] (e.g. '80%%', '110%%')\n");
     printf("  -B, --algo <s> Algorithm engine: exemplar (default), bubble, ceif, voronoi\n");
     printf("  -T [margin]    Generate synthetic test grid for population drift visualization (margin: e.g. 0.1)\n");
     printf("  -k             Prune most extreme outlier from model reservoir and recalibrate (repeatable)\n");
@@ -328,7 +328,7 @@ static void process_scoring_row(geif_ensemble_t *ensemble,
         if (threshold_is_average) {
             eff_threshold = (sub_forest->average_score > 0.0) ? sub_forest->average_score : 0.5;
         } else if (threshold_is_percentage) {
-            eff_threshold = (sub_forest->percentage_score > 0.0) ? sub_forest->percentage_score : 0.5;
+            eff_threshold = (sub_forest->percentage_score >= 0.0) ? sub_forest->percentage_score : 0.5;
         }
 
         (*analyzed)++;
@@ -468,7 +468,7 @@ static void score_and_print_categorize_vec(geif_ensemble_t *ensemble,
     double eff_thresh = 1.0;
     if (score_limit_given) {
         if (threshold_is_percentage) {
-            eff_thresh = (best_forest->percentage_score > 0.0) ? best_forest->percentage_score : 0.5;
+            eff_thresh = (best_forest->percentage_score >= 0.0) ? best_forest->percentage_score : 0.5;
         } else if (threshold_is_average) {
             eff_thresh = (best_forest->average_score > 0.0) ? best_forest->average_score : 0.5;
         } else {
@@ -625,14 +625,59 @@ static void process_categorize_row(geif_ensemble_t *ensemble,
 }
 
 /**
- * @brief Recalculates empirical percentile threshold scores for all sub-forests in an ensemble.
+ * @brief Parses and validates an outlier score specification string (-O or OUTLIER_SCORE).
  *
- * Evaluates reservoir samples to locate the empirical score boundary corresponding
- * to the given cumulative percentile (e.g. 80% or 95%).
+ * Accepts:
+ *  - "average": locks threshold to category mean training score
+ *  - "<pct>%": percentage threshold in [0.0, 200.0] (returns false and prints error if out of bounds)
+ *  - "<float>": fixed score threshold
+ *
+ * @param[in]  spec       Specification string.
+ * @param[out] is_avg     Receives true if "average".
+ * @param[out] is_pct     Receives true if percentage format.
+ * @param[out] pct_out    Receives parsed percentage in [0.0, 200.0].
+ * @param[out] thresh_out Receives parsed fixed float threshold.
+ * @return true if valid, false if out of bounds or malformed.
+ */
+static bool parse_outlier_score_spec(const char *spec,
+                                     bool *is_avg,
+                                     bool *is_pct,
+                                     double *pct_out,
+                                     double *thresh_out)
+{
+    if (!spec || spec[0] == '\0') return false;
+    if (strcmp(spec, "average") == 0) {
+        *is_avg = true;
+        *is_pct = false;
+        return true;
+    }
+    *is_avg = false;
+    size_t olen = strlen(spec);
+    if (olen > 0 && spec[olen - 1] == '%') {
+        char *endptr = NULL;
+        double val = strtod(spec, &endptr);
+        if (endptr == spec || endptr != spec + olen - 1 || isnan(val) || isinf(val) || val < 0.0 || val > 200.0) {
+            fprintf(stderr, "geif: error: outlier percentage '%s' is out of bounds (must be between 0%% and 200%%)\n", spec);
+            return false;
+        }
+        *is_pct = true;
+        *pct_out = val;
+        return true;
+    }
+    *is_pct = false;
+    *thresh_out = atof(spec);
+    return true;
+}
+
+/**
+ * @brief Recalculates empirical or extrapolated percentage threshold scores for all sub-forests.
+ *
+ * Evaluates reservoir samples to locate the score boundary corresponding to the given
+ * percentage in [0.0, 200.0] (0-100% empirical in-sample, 100-200% algorithm-extrapolated).
  *
  * @param[in,out] ens     Category ensemble instance.
- * @param[in]     pct     Percentile value (0.0 to 100.0).
- * @param[in]     verbose True to print per-category percentile diagnostics.
+ * @param[in]     pct     Percentage value (0.0 to 200.0).
+ * @param[in]     verbose True to print per-category percentage diagnostics.
  */
 static void update_ensemble_percentage_scores(geif_ensemble_t *ens, double pct, const cat_filter_t *filter, bool verbose)
 {
@@ -647,9 +692,15 @@ static void update_ensemble_percentage_scores(geif_ensemble_t *ens, double pct, 
         if (sf) {
             sf->percentage_score = geif_forest_calculate_percentile_score(sf, pct);
             if (verbose) {
-                printf("Percentage score for '%s': %.6f (%.2f%% of samples have lower score)\n",
-                       cat_name[0] ? cat_name : "(default)",
-                       sf->percentage_score, pct);
+                if (pct > 100.0) {
+                    printf("Percentage score for '%s': %.6f (%.2f%% extrapolated out-of-sample threshold)\n",
+                           cat_name[0] ? cat_name : "(default)",
+                           sf->percentage_score, pct);
+                } else {
+                    printf("Percentage score for '%s': %.6f (%.2f%% of samples have lower score)\n",
+                           cat_name[0] ? cat_name : "(default)",
+                           sf->percentage_score, pct);
+                }
             }
         }
     }
@@ -804,19 +855,11 @@ int main(int argc, char *argv[])
         case 'O':
             cli_outlier_score_given = true;
             strncpy(cli_outlier_score_spec, optarg, sizeof(cli_outlier_score_spec) - 1);
-            if (strcmp(optarg, "average") == 0) {
-                threshold_is_average = true;
-                threshold_is_percentage = false;
-            } else {
-                threshold_is_average = false;
-                size_t olen = strlen(optarg);
-                if (olen > 0 && optarg[olen - 1] == '%') {
-                    threshold_is_percentage = true;
-                    outlier_percentage = atof(optarg);
-                } else {
-                    threshold_is_percentage = false;
-                    threshold = atof(optarg);
-                }
+            cli_outlier_score_spec[sizeof(cli_outlier_score_spec) - 1] = '\0';
+            if (!parse_outlier_score_spec(optarg, &threshold_is_average, &threshold_is_percentage,
+                                          &outlier_percentage, &threshold)) {
+                geif_cat_filter_free(&cat_filter);
+                return 1;
             }
             break;
         case 't':
@@ -974,19 +1017,10 @@ int main(int argc, char *argv[])
     if (!cli_outlier_score_given && rc_cfg.outlier_score_set) {
         outlier_score_configured = true;
         memcpy(cli_outlier_score_spec, rc_cfg.outlier_score_spec, sizeof(cli_outlier_score_spec));
-        if (strcmp(rc_cfg.outlier_score_spec, "average") == 0) {
-            threshold_is_average = true;
-            threshold_is_percentage = false;
-        } else {
-            threshold_is_average = false;
-            size_t olen = strlen(rc_cfg.outlier_score_spec);
-            if (olen > 0 && rc_cfg.outlier_score_spec[olen - 1] == '%') {
-                threshold_is_percentage = true;
-                outlier_percentage = atof(rc_cfg.outlier_score_spec);
-            } else {
-                threshold_is_percentage = false;
-                threshold = atof(rc_cfg.outlier_score_spec);
-            }
+        if (!parse_outlier_score_spec(rc_cfg.outlier_score_spec, &threshold_is_average, &threshold_is_percentage,
+                                      &outlier_percentage, &threshold)) {
+            geif_cat_filter_free(&cat_filter);
+            return 1;
         }
     }
 
@@ -1029,19 +1063,11 @@ int main(int argc, char *argv[])
         if (outlier_score_configured) {
             memcpy(ensemble->outlier_score_spec, cli_outlier_score_spec, sizeof(ensemble->outlier_score_spec));
         } else if (ensemble->outlier_score_spec[0] != '\0') {
-            if (strcmp(ensemble->outlier_score_spec, "average") == 0) {
-                threshold_is_average = true;
-                threshold_is_percentage = false;
-            } else {
-                threshold_is_average = false;
-                size_t olen = strlen(ensemble->outlier_score_spec);
-                if (olen > 0 && ensemble->outlier_score_spec[olen - 1] == '%') {
-                    threshold_is_percentage = true;
-                    outlier_percentage = atof(ensemble->outlier_score_spec);
-                } else {
-                    threshold_is_percentage = false;
-                    threshold = atof(ensemble->outlier_score_spec);
-                }
+            if (!parse_outlier_score_spec(ensemble->outlier_score_spec, &threshold_is_average, &threshold_is_percentage,
+                                          &outlier_percentage, &threshold)) {
+                geif_cat_filter_free(&cat_filter);
+                geif_ensemble_destroy(ensemble);
+                return 1;
             }
         }
 
@@ -1776,7 +1802,7 @@ int main(int argc, char *argv[])
                 geif_forest_t *sub_forest = matched_entry->forest;
                 double effective_threshold = threshold;
                 if (threshold_is_percentage) {
-                    effective_threshold = (sub_forest->percentage_score > 0.0) ? sub_forest->percentage_score : 0.5;
+                    effective_threshold = (sub_forest->percentage_score >= 0.0) ? sub_forest->percentage_score : 0.5;
                 } else if (threshold_is_average) {
                     effective_threshold = (sub_forest->average_score > 0.0) ? sub_forest->average_score : 0.5;
                 }
@@ -1863,7 +1889,7 @@ int main(int argc, char *argv[])
 
                     double eff_thresh = 1.0;
                     if (threshold_is_percentage) {
-                        eff_thresh = (sub_f && sub_f->percentage_score > 0.0) ? sub_f->percentage_score : 0.5;
+                        eff_thresh = (sub_f && sub_f->percentage_score >= 0.0) ? sub_f->percentage_score : 0.5;
                     } else if (threshold_is_average) {
                         eff_thresh = (sub_f && sub_f->average_score > 0.0) ? sub_f->average_score : 0.5;
                     } else {

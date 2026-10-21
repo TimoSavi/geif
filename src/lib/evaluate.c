@@ -285,14 +285,17 @@ static int pscore_cmp(const void *a, const void *b)
 }
 
 /**
- * @brief Computes the empirical anomaly score threshold corresponding to a given percentile.
+ * @brief Computes the anomaly score threshold corresponding to a given percentage in [0.0, 200.0].
  *
- * Scores all observations currently in the forest's reservoir sample pool, sorts
- * the score array ascendingly via qsort, and returns the score at rank (N - 1) * (percentile / 100).
+ * For percentile in [0.0, 100.0], scores all observations in the forest's reservoir sample
+ * pool, sorts the score array ascendingly via qsort, and returns the empirical score at rank
+ * (N - 1) * (percentile / 100).
+ * For percentile in (100.0, 200.0], determines the 100% in-sample maximum boundary score (s_100)
+ * and extrapolates out-of-sample up to 1.0 (at 200%) using the algorithm's native decay curve.
  *
  * @param[in] forest     Forest instance.
- * @param[in] percentile Target percentile in [0.0, 100.0] (e.g. 80.0, 94.0).
- * @return Empirical score cutoff at that percentile rank.
+ * @param[in] percentile Target percentage in [0.0, 200.0] (e.g. 80.0, 100.0, 110.0, 200.0).
+ * @return Score cutoff at that percentile / extrapolated rank.
  */
 double geif_forest_calculate_percentile_score(const geif_forest_t *forest, double percentile)
 {
@@ -300,7 +303,26 @@ double geif_forest_calculate_percentile_score(const geif_forest_t *forest, doubl
         return (forest && forest->average_score > 0.0) ? forest->average_score : 0.5;
     }
     if (percentile < 0.0) percentile = 0.0;
-    if (percentile > 100.0) percentile = 100.0;
+    if (percentile > 200.0) percentile = 200.0;
+
+    if (percentile > 100.0) {
+        if (percentile >= 200.0) {
+            return 1.0;
+        }
+        double s_100 = 0.0;
+        for (size_t i = 0; i < forest->pool_count; i++) {
+            const double *sample = &forest->sample_pool[i * forest->dimensions];
+            double s = 0.0;
+            geif_forest_score(forest, sample, &s);
+            if (s > s_100) s_100 = s;
+        }
+        double t = (percentile - 100.0) / 100.0;
+        const geif_algo_ops_t *ops = geif_algo_get_ops(forest->config.algo);
+        if (ops && ops->extrapolate_percentile) {
+            return ops->extrapolate_percentile(forest, s_100, t);
+        }
+        return s_100 + (1.0 - s_100) * t;
+    }
 
     double *scores = (double *)malloc(forest->pool_count * sizeof(double));
     if (!scores) {
