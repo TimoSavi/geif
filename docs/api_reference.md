@@ -90,8 +90,8 @@
 | Enum Constant | Value | CLI Name | Description |
 | :--- | :--- | :--- | :--- |
 | `GEIF_ALGO_CEIF` | `0` | `ceif` / `eif` | Data-anchored isotropic Gaussian cuts with Zero Kelvin scale floor and outer decay. |
-| `GEIF_ALGO_BUBBLE` | `1` | `bubble` | Hyperspherical Bubble tree cavity carving with median quickselect (default). |
-| `GEIF_ALGO_EXEMPLAR` | `2` | `exemplar` | Direct SIMD Cauchy kernel density evaluation on reservoir pool samples. |
+| `GEIF_ALGO_BUBBLE` | `1` | `bubble` | Hyperspherical Bubble tree cavity carving with median quickselect. |
+| `GEIF_ALGO_EXEMPLAR` | `2` | `exemplar` | Direct SIMD Cauchy kernel density evaluation on reservoir pool samples (default). |
 | `GEIF_ALGO_VORONOI` | `3` | `voronoi` | Scale-invariant Voronoi perpendicular bisector hyperplane cuts. |
 
 ---
@@ -3825,4 +3825,8 @@ optionally applies retrain overrides, and outputs clean GEIF-1.0 JSON models.
 **Returns:** 0 on success, non-zero exit code on error.
 
 ---
+
+## Development & Attribution
+
+**GEIF** was designed and engineered by **Timo Savinen** with AI pair-programming assistance (Google Antigravity / Gemini) under human architectural direction.
 

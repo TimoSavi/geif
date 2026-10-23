@@ -15,7 +15,7 @@ The table below summarizes the operational characteristics, mathematical partiti
 
 | Algorithm | Partitioning Geometry | Recommended Threshold ($T$ / Mode) | Cavity & Void Resolution | Envelope Tightness & Boundary Precision | Training Complexity | Scoring Throughput Profile | Primary Operational Use Case |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :--- |
-| **`exemplar`** (Default) | Regularized SIMD Cauchy kernel with Square-Root Potential Mapping | `-O 0.50` (Cavity), `-O 0.70` (Wide Halo), `-O 98%` | **Exceptional** (Cavity detected at $T = 0.50$, $s \approx 0.56$; zero false bridging) | **Ultra-Detailed & Smooth** (Pixel-level fidelity, wide halo at 0.70, zero artifacts) | **Instant**: $O(N \log K)$, $< 1\text{ ms}$ | **Highest**: $O(N)$ straight-line SIMD kernel | **Zero-training streaming, supervised gating, instant updates, and calibrated continuous density fields** |
+| **`exemplar`** (Default) | Regularized SIMD Cauchy kernel with Fractional Decay Mapping | `-O 97%` to `-O 110%`, `-O 0.50` (Cavity), `-O 0.70` (Wide Halo) | **Exceptional** (Cavity detected at $T = 0.50$ and `-O 100%`; zero false bridging) | **Ultra-Detailed & Smooth** (Pixel-level fidelity, proportional out-of-sample halos at `105%`–`110%`) | **Instant**: $O(N \log K)$, $< 1\text{ ms}$ | **Highest**: $O(N)$ straight-line SIMD kernel | **Zero-training streaming, percentage-based boundary gating, instant updates, and calibrated continuous density fields** |
 | **`bubble`** | Hyperspherical balls $\Vert x - c \Vert^2 \le R^2$ with empty void leaves | `-O 98%` (Supervised) or `-O 0.48` | **Exceptional** (Clean donut hole & canal separation) | **Highest** (Crisp contour conforming to true manifold) | Moderate: $O(N \log N)$ | Fast: $O(\text{depth})$ tree traversal | **Supervised boundary gating, safety envelopes, non-convex topologies, and cavity detection** |
 | **`ceif`** | Data-anchored isotropic Gaussian hyperplanes | `-O 0.50` to `-O 0.60` (Relaxed) | **Blind** (Hyperplanes slice across interior hollows) | **Smooth / Relaxed** (Convex-biased global envelope) | Fast: $O(N \log N)$ | Fast: $O(\text{depth})$ tree traversal | **General unsupervised tabular anomaly detection, high-dimensional data, and relaxed outlier filtering** |
 | **`voronoi`** | Perpendicular bisectors $n = x_2 - x_1$, $p = (x_1 + x_2)/2$ | `-O 0.45` to `-O 0.48` | **Moderate** (Exposes cavities better than CEIF, but erodes tips) | **Good** (Scale-invariant linear polyhedral cuts) | Fast: $O(N \log N)$ | Fast: $O(\text{depth})$ tree traversal | **Scale-invariant pairwise clustering where linear decision boundaries are preferred** |
@@ -26,14 +26,14 @@ The table below summarizes the operational characteristics, mathematical partiti
 
 GEIF provides two distinct thresholding notations via the `-O` CLI flag:
 1. **Calibrated Absolute Score (`-O <val>`)**: A floating-point value in the range $[0.0, 1.0]$. A query point is flagged as an outlier if $s(x) > T$.
-2. **Empirical Percentile / Percentage Notation (`-O <val>%`)**: An empirical density percentile in the range $[0, 100]$% evaluated over the nominal training distribution. For instance, `-O 98%` sets the threshold at the score value where exactly 98% of training samples are accepted as inliers (2% false-positive rejection budget).
+2. **Empirical Percentile & Out-of-Sample Percentage Notation (`-O <val>%`)**: A percentage threshold in the range $[0, 200]$%. Values in $[0, 100]$% evaluate the empirical score quantile over the nominal training distribution (e.g., `-O 97%` accepts the 97% densest training points, while `-O 100%` encloses 100% of training points at maximum in-sample score $s_{100}$). Values in $(100, 200]$% (e.g., `-O 105%`, `-O 110%`) extrapolate smoothly into outer space beyond $s_{100}$ using each engine's native physical survival decay, creating a proportional spatial buffer around the training manifold up to `-O 200%` ($s = 1.0$).
 
 Different algorithmic engines have distinct score distributions and mathematical properties, making specific notations far more effective for each:
 
 | Algorithm | Preferred Notation | Operational Rationale | Recommended Setting |
 | :--- | :---: | :--- | :---: |
-| **`bubble`** | **Percentile (`-O 98%` / `-O 95%`)** | **Supervised Precision Gating**: The bubble engine creates compact spherical clusters. Percentile thresholding establishes an exact, empirical safety envelope that automatically adapts to the training density without manual calibration. For unsupervised cavity isolation, an absolute score of `-O 0.48` to `-O 0.50` guarantees complete topological separation between adjacent clusters. | `-O 98%` or `-O 0.48` |
-| **`exemplar`** | **Calibrated Absolute (`-O 0.50` / `-O 0.70`)** | **Universal Potential Metric**: Following the 5-pillar architectural remedy, Exemplar implements Zero Kelvin Square-Root Potential Mapping ($s = 1.0 - \sqrt{D/D_{\max}}$). The score scale is universally calibrated: $s = 0.0$ at peak density centroids, $s \approx 0.56$ at the donut cavity (isolated strictly at `-O 0.50`), and $s \approx 0.70$ forms a wide, generous inlier halo enveloping the entire manifold without boundary cliffs. For supervised gating, percentile notation (`-O 98%`) is equally robust and suppresses all corner noise. | `-O 0.50` (strict) or `-O 0.70` (halo) |
+| **`bubble`** | **Percentile (`-O 97%` to `-O 110%`)** | **Supervised Precision Gating**: The bubble engine creates compact spherical clusters. Percentage thresholding establishes an exact empirical safety envelope (`97%`–`100%`) or controlled out-of-sample buffer (`105%`–`110%`) that automatically adapts to the training density without manual calibration. For unsupervised cavity isolation, an absolute score of `-O 0.48` to `-O 0.50` guarantees complete topological separation between adjacent clusters. | `-O 98%`, `-O 105%`, or `-O 0.48` |
+| **`exemplar`** | **Percentage (`-O 97%` to `-O 110%`) or Absolute (`-O 0.50` / `-O 0.70`)** | **Universal Cauchy Potential & Proportional Extrapolation**: Exemplar implements Fractional Decay Mapping $s = 1.0 - (D/D_{\max})^{\text{decay}}$ with collective macro-bandwidth extrapolation. Percentage thresholds (`97%`, `100%`, `105%`, `110%`) produce consistent, topology-preserving boundaries across Gaussian blobs, uniform grids, and non-convex manifolds (see [Chapter 5](#5-chapter-5-percentage-based-score-thresholding-97-100-105-110)). Absolute scores `-O 0.50` (strict) and `-O 0.70` (wide halo) provide fixed density cutoffs. | `-O 97%` to `-O 110%`, `-O 0.50`, or `-O 0.70` |
 | **`ceif`** | **Calibrated Absolute (`-O 0.50` to `-O 0.60`)** | **Monotonic Outer Falloff**: CEIF uses continuous metric depth with Cauchy leaf damping, providing an exceptionally smooth and well-conditioned score decay in outer space. An absolute score of $0.50$ provides standard anomaly screening, while $0.60$ offers a relaxed, forgiving filter for noisy tabular data. Percentile notation is less suited when interior cavities are present because hyperplanes slice through voids. | `-O 0.50` to `-O 0.60` |
 | **`voronoi`** | **Calibrated Absolute (`-O 0.45` to `-O 0.48`)** | **Cavity Emergence Tuning**: Voronoi midpoint hyperplanes require a calibrated absolute threshold between $0.45$ and $0.48$ to force the central cavity to open. Setting the threshold higher (e.g. $0.50$ or 98%) causes Voronoi to bridge across the cavity similarly to CEIF. | `-O 0.45` to `-O 0.48` |
 
@@ -65,7 +65,7 @@ Evaluating all engines at GEIF's universal default threshold $T = 0.50$:
 
 *Key Findings*:
 - **`bubble`** preserves a clear central cavity while beginning to form a light bridge between the top-left cluster and vertical spike.
-- **`exemplar`** delivers an immaculate decision boundary under Square-Root Potential Mapping: the interior donut cavity is decisively flagged as anomalous ($s \approx 0.56 > 0.50$, cleanly hollowed out), all spiderweb caustics and outlier bubbles are abolished, and outer space decays smoothly and monotonically.
+- **`exemplar`** delivers an immaculate decision boundary under Fractional Decay Mapping: the interior donut cavity is decisively flagged as anomalous ($s \approx 0.56 > 0.50$, cleanly hollowed out), all spiderweb caustics and outlier bubbles are abolished, and outer space decays smoothly and monotonically.
 - **`ceif`** and **`voronoi`** form broad, monolithic convex hulls enclosing the entire topology.
 
 #### 1.3.3 Relaxed & Separated Regimes ($T = 0.48, 0.60, 0.45, 0.70$)
@@ -125,7 +125,7 @@ The empirical 80% coverage evaluation reveals dramatic differences in multi-moda
 
 #### Algorithmic Analysis:
 1. **Exemplar (Winner for Balanced Multi-Modal Drift Protection)**:
-   - Thanks to **Pilot Density Credibility Weighting** and **Robust Bandwidth Clamping**, Exemplar's kernel density does not allow high-density clusters to monopolize the score spectrum. Each exemplar's bandwidth is clamped relative to the global median ($0.5 \sigma_m \le \sigma \le 1.5 \sigma_m$, where $\sigma_m$ is median neighbor spacing), and its influence weight is normalized.
+   - Thanks to **Cap-5 $K$-NN Bandwidth Estimation**, **Low-End Bandwidth Flooring ($b_i \ge b_{\min}$)**, and **Sublinear Duplicate Weighting ($\sqrt{c_i}$)**, Exemplar's kernel density does not allow high-density clusters to monopolize the score spectrum. Isolated points acquire wide bandwidths ($b_i \gg 1 \implies 1/b_i \to 0$) while dense clusters are floored at $b_{\min} = \max(0.5 \mu_b, \mu_b - s_b)$.
    - As observed in `complex2d_exemplar_80p.png`, the 80% inlier envelope evenly covers all four concentration centers: the detached cluster, the crescent arc, the radiating spikes, and the donut ring all receive balanced inlier protection.
 2. **Bubble (Winner for Discrete Structural Isolation)**:
    - Because tree splits are hyperspheres $\Vert x - c \Vert^2 \le R^2$, each sub-manifold is partitioned into localized spherical bounding regions. Points in empty space between clusters immediately land in empty void leaves ($I = 0$).
@@ -151,10 +151,10 @@ To benchmark categorization accuracy, all four algorithmic engines were evaluate
 The models were trained and evaluated using the exact training and categorization pipeline:
 ```bash
 # 1. Train multi-category model using columns 2-4 as category routing keys
-./bin/geif -d test/data/paddydataset.csv -f paddy_model.json -B <algo> -c -C 2-4
+./bin/geif -l test/data/paddydataset.csv -w paddy_model.json -B <algo> -C 2-4
 
 # 2. Evaluate categorization accuracy by comparing true category (%C) to predicted category (%c)
-./bin/geif -r paddy_model.json -d test/data/paddydataset.csv -c -p "%C %c"
+./bin/geif -r paddy_model.json -c test/data/paddydataset.csv -p "%C %c"
 ```
 
 ---
@@ -182,9 +182,9 @@ The categorization benchmark reveals a decisive performance disparity: **`exempl
    - In a 10-dimensional continuous feature space with overlapping class manifolds, binary tree cuts introduce significant **discretization quantization noise**. When multiple subforests vote via discrete leaf depths, points near class boundaries suffer from high-variance tie-breaking and random partitioning jitter.
    - In contrast, `exemplar` constructs a **continuous, infinitely differentiable ($C^\infty$) Cauchy density field** for each class subforest. Scoring evaluates true Euclidean density without boundary quantization artifacts, yielding smooth and robust probabilistic voting boundaries.
 2. **Sub-Cluster Density Fidelity**:
-   - The agricultural features in `paddydataset.csv` exhibit non-linear correlations across varieties and soil types. Exemplar's pilot-weighted Cauchy kernels naturally conform to arbitrary manifold shapes without requiring hyperplanes to approximate curved boundaries.
+   - The agricultural features in `paddydataset.csv` exhibit non-linear correlations across varieties and soil types. Exemplar's adaptive Cauchy kernels with low-end bandwidth flooring ($b_i \ge b_{\min}$) naturally conform to arbitrary manifold shapes without requiring hyperplanes to approximate curved boundaries.
 3. **Robustness to Class Imbalance**:
-   - Pilot density credibility weighting ($w_i$) ensures that outlier points in smaller classes do not distort class probability distributions.
+   - Natural inverse-bandwidth outlier suppression ($1 / b_i \to 0$) and sublinear duplicate weighting ($\sqrt{c_i}$) ensure that outlier points in smaller classes do not distort class probability distributions.
 
 ---
 
@@ -239,7 +239,7 @@ Evaluating 60,000 queries on `complex2d.json`:
 #### Why Exemplar Leads in Both Load and Scoring:
 1. **Zero Tree Construction Overhead**:
    - Tree-based models (`ceif`, `voronoi`, `bubble`) store recursive node hierarchies. Loading an enterprise model with 314,400 trees requires millions of recursive heap allocations (`malloc`), pointer linking, and bounding box initializations.
-   - In contrast, `exemplar` completely bypasses binary trees. Its state consists exclusively of contiguous, 64-byte aligned arrays of scaled sample vectors, bandwidths, and pilot weights. Cold-start load is bounded purely by sequential memory bandwidth, loading in **$< 1$ second**.
+   - In contrast, `exemplar` completely bypasses binary trees. Its state consists exclusively of contiguous, 64-byte aligned arrays of scaled sample vectors, bandwidths, and duplicate weights. Cold-start load is bounded purely by sequential memory bandwidth, loading in **$< 1$ second**.
 2. **SIMD Vector Execution vs. Pointer Chasing**:
    - In tree traversal, navigating a binary tree requires following pointer chains (`node->left`, `node->right`). Pointer traversal incurs cache line misses and branch mispredictions.
    - `algo_exemplar.c` evaluates all reservoir samples using an unrolled AVX2/SIMD vector loop over contiguous memory. The CPU prefetcher streams coordinate vectors with 100% cache line utilization, zero branch mispredictions, and full FMA pipelining.
@@ -253,7 +253,58 @@ Evaluating 60,000 queries on `complex2d.json`:
 
 ---
 
-## 5. Operational Summary & Decision Guide
+## 5. Chapter 5: Percentage-Based Score Thresholding (`97%`, `100%`, `105%`, `110%`)
+
+### 5.1 Unified In-Sample Quantile & Out-of-Sample Survival Extrapolation
+
+Percentage-based thresholding (`-O <P>%` on the CLI or `OUTLIER_SCORE <P>%` in `~/.geifrc`) provides a self-calibrating, dataset-independent way to control anomaly boundaries across the full $[0, 200]$% range without manually tuning raw score numbers:
+
+1. **In-Sample Empirical Quantile ($0 \le P \le 100$)**:
+   - GEIF scores all active reservoir samples and sorts their ascending anomaly scores $s_0 \le s_1 \le \ldots \le s_{N-1}$.
+   - **`-O 97%`**: Rejects the outermost 3% of training observations (peripheral tail noise or sparse fringe points), tightly hugging the core density modes.
+   - **`-O 100%`**: Sets the cutoff to the exact maximum in-sample score $s_{100}$ (equal to $s_{N-1}$). Exactly 100% of reservoir training observations fall inside the white inlier envelope, establishing the tightest possible zero-false-positive boundary on the training set.
+
+2. **Out-of-Sample Physical Boundary Extrapolation ($100 < P \le 200$)**:
+   - Above `100%`, no training samples exist to form an empirical quantile. Instead, GEIF maps $t = (P - 100) / 100 \in (0, 1]$ directly to a normalized exterior excursion distance of $t$ feature-span units outside the 100% boundary:
+
+$$
+s(P) = 1.0 - (1.0 - s_{100})(1.0 - t^2) S_{\text{algo}}(t)
+$$
+
+   - In the default **`exemplar`** engine, a point moving $t$ span units into outer space experiences the superposition of all $U$ kernel tails, governed by the ensemble's collective macro-bandwidth $B_{\text{eff}}$ and inverse scale $\kappa_{\text{eff}}$:
+
+$$
+B_{\text{eff}} = \sqrt{\frac{\sum_{i=1}^U \sqrt{c_i} \cdot b_i}{D_{\max}}}, \quad \kappa_{\text{eff}} = \frac{1.0}{B_{\text{eff}}}, \quad S_{\text{exemplar}}(t) = \left(\frac{1 + u_{100}^2}{1 + (u_{100} + \kappa_{\text{eff}} t)^2}\right)^{\gamma}
+$$
+
+   - Because $B_{\text{eff}}$ automatically accounts for both individual kernel widths $b_i$ and cluster spatial extent, a given percentage above `100%` (`105%` or `110%`) produces a **consistent, proportional geometric buffer halo** regardless of whether the underlying dataset is Gaussian, uniform, or non-convex.
+
+---
+
+### 5.2 Visual Comparison Across Canonical Topologies (`97%`, `100%`, `105%`, `110%`)
+
+The $3 \times 4$ gallery below demonstrates the **`exemplar`** decision boundary (white = inlier below threshold, green-to-orange gradient = outlier above threshold, rendered over a `-T 0.5` extended grid) across three canonical benchmark topologies at `97%`, `100%`, `105%`, and `110%`:
+
+| Topology | `-O 97%` (Core Inliers, 3% Tail Trim) | `-O 100%` (Exact In-Sample Envelope) | `-O 105%` (+5% Span Buffer Halo) | `-O 110%` (+10% Span Buffer Halo) |
+| :--- | :---: | :---: | :---: | :---: |
+| **1. Bimodal Gaussian (`2blob`)** | ![2blob 97%](pics/recom/2blob_exemplar_97p.png) | ![2blob 100%](pics/recom/2blob_exemplar_100p.png) | ![2blob 105%](pics/recom/2blob_exemplar_105p.png) | ![2blob 110%](pics/recom/2blob_exemplar_110p.png) |
+| **2. Uniform Grid (`square`)** | ![square 97%](pics/recom/square_exemplar_97p.png) | ![square 100%](pics/recom/square_exemplar_100p.png) | ![square 105%](pics/recom/square_exemplar_105p.png) | ![square 110%](pics/recom/square_exemplar_110p.png) |
+| **3. Non-Convex Manifold (`complex`)** | ![complex 97%](pics/recom/complex2d_exemplar_97p.png) | ![complex 100%](pics/recom/complex2d_exemplar_100p.png) | ![complex 105%](pics/recom/complex2d_exemplar_105p.png) | ![complex 110%](pics/recom/complex2d_exemplar_110p.png) |
+
+---
+
+### 5.3 Topological Behavior & Operational Threshold Selection
+
+| Percentage Threshold | Behavior on `2blob` (Gaussian Clusters) | Behavior on `square` (Uniform Box $[10, 20]^2$) | Behavior on `complex` (Donut + Spikes + Arc + Island) | Primary Production Use Case |
+| :---: | :--- | :--- | :--- | :--- |
+| **`-O 97%`** | Trims outer Gaussian tail scatter; cleanly separates the two modes into distinct white islands. | Slightly rounds and erodes extreme corner/edge points of the $10 \times 10$ lattice. | Trims sparse fringe points along ray tips and arc bridge; preserves crisp central donut hole and isolated top-left island. | **Noisy Training Data**: When historical training logs contain ~1%–3% unlabelled anomalies or fringe jitter that should be excluded from the baseline. |
+| **`-O 100%`** | Encloses 100% of samples—including the outermost tail point at $(2.9, 10.5)$—in a smooth peanut contour. | Encloses the complete $[10, 20] \times [10, 20]$ lattice tightly right up to all four corners. | Encloses every training point across the donut ring, three thin spikes, lower arc, and top-left island while keeping the hollow donut cavity green. | **Clean Baseline / Strict Gating**: When the training dataset represents verified normal operation and zero training points should be flagged. |
+| **`-O 105%`** | Expands the peanut contour outward by a uniform ~5% span margin on all sides. | Forms a smooth, rounded stadium buffer (`[9.2, 20.8]`) around the $10 \times 10$ square. | Expands a uniform ~5% buffer halo around all structures (closing the narrow inner cavity while keeping the top-left satellite island separate). | **Production Drift Tolerance (Recommended Out-of-Sample Default)**: Allows modest, legitimate operational excursions slightly beyond historical extremes without false alarms. |
+| **`-O 110%`** | Expands a generous ~10% span halo around the bimodal envelope while staying well within the outer frame. | Forms a wider rounded stadium buffer (`[8.5, 21.5]`) with smooth corner curvature. | Wraps the main body and arc in a broad ~10% protective envelope while only flagging deep outer-space deviations. | **Coarse / Forgiving Guardrails**: High-variance telemetry or small-sample baselines where only severe outer-space anomalies should trigger alerts. |
+
+---
+
+## 6. Operational Summary & Decision Guide
 
 ```mermaid
 flowchart TD
@@ -264,13 +315,20 @@ flowchart TD
     TaskType -->|"Outlier Detection"| Geometry{"Topological Requirements?"}
     
     Geometry -->|"Hollow Cavities / Safety Gating"| BubbleChoice["Select bubble Engine<br/><code>geif -B bubble -O 98%</code> or <code>-O 0.48</code><br/>Clean donut voids, spherical bounds"]
-    Geometry -->|"Instant Streaming / Fast Load"| ExemplarChoice["Select exemplar Engine<br/><code>geif -B exemplar -O 0.50</code> (Strict)<br/>or <code>-O 0.70</code> (Wide Halo)<br/>Sub-second load, 15M pts/sec"]
+    Geometry -->|"Instant Streaming / Fast Load"| ExemplarChoice["Select exemplar Engine<br/><code>geif -B exemplar -O 97%..110%</code><br/>or <code>-O 0.50</code> / <code>-O 0.70</code><br/>Sub-second load, 15M pts/sec"]
     Geometry -->|"Standard High-Dim Tabular"| CEIFChoice["Select ceif Engine<br/><code>geif -B ceif -O 0.50</code><br/>Smooth isotropic continuous decay"]
     Geometry -->|"Pairwise Midpoint Clustering"| VoronoiChoice["Select voronoi Engine<br/><code>geif -B voronoi -O 0.45</code><br/>Linear polyhedral bisectors"]
 ```
 
 ### Final Operational Rules of Thumb:
 1. **Categorization Tasks (`-c`)**: **Always use `exemplar`**. It delivers 88.5% accuracy compared to ~60% for tree-based engines, loads in sub-second time, and eliminates tree quantization noise.
-2. **High-Precision Safety Envelopes & Cavity Isolation**: **Use `bubble`** with percentile thresholding (`-O 98%` or `-O 95%`) or calibrated score `-O 0.48`. It guarantees zero bridging across empty space and isolates interior hollows.
-3. **High-Throughput Streaming & Dynamic Models**: **Use `exemplar`** with calibrated score `-O 0.50` (cavity detection) or `-O 0.70` (wide halo). Sub-second cold-start load time makes it ideal for microservices, live retraining, and fast container startup.
-4. **General Unsupervised Tabular Data**: **Use `ceif`** with absolute score `-O 0.50` to `-O 0.60` when data has no internal cavities and a smooth convex-like decision boundary is desired.
+2. **Percentage-Based Boundary Gating (`-O 97%` to `-O 110%`)**: **Use `exemplar` (or `bubble`)** with `-O 97%` when training data has minor tail noise, `-O 100%` for an exact in-sample envelope, or `-O 105%` / `-O 110%` to add a proportional out-of-sample tolerance halo around the manifold.
+3. **High-Precision Safety Envelopes & Cavity Isolation**: **Use `bubble`** with percentile thresholding (`-O 98%` or `-O 95%`) or calibrated score `-O 0.48`. It guarantees zero bridging across empty space and isolates interior hollows.
+4. **High-Throughput Streaming & Dynamic Models**: **Use `exemplar`** with percentage threshold `-O 100%` / `-O 105%` or calibrated score `-O 0.50` (cavity detection) / `-O 0.70` (wide halo). Sub-second cold-start load time makes it ideal for microservices, live retraining, and fast container startup.
+5. **General Unsupervised Tabular Data**: **Use `ceif`** with absolute score `-O 0.50` to `-O 0.60` when data has no internal cavities and a smooth convex-like decision boundary is desired.
+
+---
+
+## Development & Attribution
+
+**GEIF** was designed and engineered by **Timo Savinen** with AI pair-programming assistance (Google Antigravity / Gemini) under human architectural direction.

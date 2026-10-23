@@ -66,7 +66,7 @@ LDFLAGS  = -lm -ljson-c
 
 ## 4. Verification & Automated Testing
 
-GEIF includes 12 automated test suites verifying mathematical accuracy, CLI interfaces, and performance:
+GEIF includes 16 automated test suites (3 C unit test binaries and 13 CLI integration/benchmark suites) verifying mathematical accuracy, CLI interfaces, and performance:
 
 ```bash
 make test
@@ -78,9 +78,20 @@ make test
 3. `test_negative`: Negative testing for corrupted inputs, empty files, and zero-variance columns.
 4. `test_cli_lifecycle.sh`: End-to-end training, saving, loading, and scoring pipeline tests.
 5. `test_cli_categories.sh`: Multi-category routing, label extraction, and category filtering.
-6. `test_cli_recalibration.sh`: Outlier pruning (`-k`) and scale recalibration.
+6. `test_cli_recalibration.sh`: Outlier pruning (`-k`), percentage thresholds (`0%`–`200%`), and scale recalibration.
 7. `test_cli_rcfile.sh`: Cascading configuration file parser (`~/.geifrc`, `-g`).
 8. `test_cli_grid.sh`: Synthetic test grid generation and population drift visualization.
 9. `test_cli_ceif2geif.sh`: Legacy model migration and transparent ingestion.
 10. `test_cli_algorithms.sh`: Multi-algorithm engine test suite (`bubble`, `voronoi`, `exemplar`, `ceif`).
-11. `test_ref_bubble.sh`: Hyperspherical Bubble reference benchmark suite and cavity verification.
+11. `test_cli_csv.sh`: CSV dialect, custom delimiter, header skipping, and locale formatting tests.
+12. `test_cli_columns.sh`: Column inclusion (`-U`), ignore (`-I`), label (`-L`), and category (`-C`) routing tests.
+13. `test_cli_attribution.sh`: Single-dimension anomaly attribution (`%e`) and expansion (`-j`) tests.
+14. `test_cli_decay.sh`: Exponential sample age decay (`-D`) and rolling reservoir update tests.
+15. `test_cli_aggregate.sh`: Category value aggregation (`-A`, `--aggregate`) tests.
+16. `test_ref_bubble.sh`: Hyperspherical Bubble reference benchmark suite and cavity verification (plus `test_prod_cron_patterns.sh` via `make test-prod`).
+
+---
+
+## Development & Attribution
+
+**GEIF** was designed and engineered by **Timo Savinen** with AI pair-programming assistance (Google Antigravity / Gemini) under human architectural direction.

@@ -397,8 +397,8 @@ static geif_status_t geif_bubble_score(const geif_forest_t *f,
 /**
  * @brief Extrapolates an out-of-sample percentile threshold (100% < P <= 200%) for Bubble.
  *
- * Models hyperspherical cavity drop-off outside the 100% sample boundary combined
- * with outer stadium exponential decay.
+ * Models macroscopic hyperspherical shell attenuation (1 + t / c(psi))^(-1) outside
+ * the 100% sample boundary combined with outer stadium exponential decay.
  *
  * @param[in] f     Forest instance.
  * @param[in] s_100 Empirical 100% maximum training sample score.
@@ -410,20 +410,13 @@ static double geif_bubble_extrapolate_percentile(const geif_forest_t *f,
                                                  double t)
 {
     if (t <= 0.0) return s_100;
-    if (t >= 1.0) return 1.0;
+    if (t >= 1.0 || s_100 >= 1.0) return 1.0;
 
-    double span = (f && f->scale_range_idx >= 0 && f->envelope_span)
-                  ? f->envelope_span[f->scale_range_idx] : 0.0;
-    double rho = (f && span > 1e-12 && f->avg_sample_dist > 1e-12)
-                 ? (span / f->avg_sample_dist) : 10.0;
-    if (rho < 2.0) rho = 2.0;
-    if (rho > 20.0) rho = 20.0;
+    double c_psi = (f && f->c_factor > 0.0) ? f->c_factor : geif_c(256.0);
+    if (c_psi <= 0.0) c_psi = 1.0;
 
-    double f_t = 1.0 - exp(-GEIF_OUTER_DECAY_RATE * t) / (1.0 + rho * t);
-    double f_1 = 1.0 - exp(-GEIF_OUTER_DECAY_RATE) / (1.0 + rho);
-    double g = (f_1 > 1e-12) ? (f_t / f_1) : t;
-
-    double s = s_100 + (1.0 - s_100) * g;
+    double surv = exp(-GEIF_OUTER_DECAY_RATE * t) / (1.0 + t / c_psi);
+    double s = 1.0 - (1.0 - s_100) * (1.0 - t * t) * surv;
     if (s < s_100) s = s_100;
     if (s > 1.0) s = 1.0;
     return s;

@@ -224,3 +224,9 @@ The `ceif2geif` utility converts legacy CEIF models or existing GEIF models into
 | **`-v`** | `--verbose` | Print migration details and sub-forest statistics. |
 | **`-q`** | `--quiet` | Suppress all non-error output. |
 
+---
+
+## Development & Attribution
+
+**GEIF** was designed and engineered by **Timo Savinen** with AI pair-programming assistance (Google Antigravity / Gemini) under human architectural direction.
+

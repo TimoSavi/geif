@@ -78,6 +78,7 @@ git/geif/
 │       ├── xmalloc.c / .h     # OOM-checked memory allocation wrappers
 │       └── ceif2geif.c        # Model migration utility for legacy formats
 ├── test/                      # Comprehensive integration & unit test suites
+│   ├── test_cli_aggregate.sh  # Category aggregation (-A) verification
 │   ├── test_cli_algorithms.sh # Multi-algorithm engine test suite (-B, --algo)
 │   ├── test_cli_attribution.sh# Dimension attribution scoring verification
 │   ├── test_cli_categories.sh # Multi-category routing and filtering test (-c, -C, -F)
@@ -96,10 +97,13 @@ git/geif/
 │   └── test_voronoi.c         # Unit test: extreme aspect ratio Voronoi bisectors
 └── docs/                      # Technical documentation
     ├── algorithm.md           # Algorithmic and mathematical specification
+    ├── algorithm_selection.md # Empirical algorithm & threshold selection guide
+    ├── api_reference.md       # Complete C17 API and function reference
     ├── implementation.md      # Implementation architecture (this document)
-    ├── heatmaps.md            # Topological heatmaps and empirical scores
+    ├── kde_unification.md     # Kernel density estimation unification theory
     ├── manual.md              # CLI options and usage manual
-    └── build.md               # Build requirements and compilation instructions
+    ├── build.md               # Build requirements and compilation instructions
+    └── README.md              # Documentation index
 ```
 
 ---
@@ -119,6 +123,9 @@ typedef struct geif_algo_ops {
                             double *score_out,
                             double *metric_depth_out,
                             double *d_out_out);
+    double         (*extrapolate_percentile)(const geif_forest_t *f,
+                                             double s100,
+                                             double pct);
     void           (*destroy)(geif_forest_t *f);
 } geif_algo_ops_t;
 ```
@@ -408,3 +415,9 @@ cat stream.csv | ./bin/geif -r model.json -c - -O 0.45 -p "assigned=%c score=%s"
 - **0**: Clean execution; no outliers detected (all scores $< \text{threshold}$).
 - **2**: Outliers detected during scoring (at least one score $\ge \text{threshold}$).
 - **1**: Fatal error (invalid CLI arguments, I/O failure, or memory exhaustion).
+
+---
+
+## Development & Attribution
+
+**GEIF** was designed and engineered by **Timo Savinen** with AI pair-programming assistance (Google Antigravity / Gemini) under human architectural direction.

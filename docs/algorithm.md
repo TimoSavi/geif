@@ -50,7 +50,7 @@ $$
 3. A calibrated universal scale factor is applied:
 
 $$
-H_{\text{max}} = \kappa \cdot H_{\text{train,max}} \quad (\kappa = 1.15)
+H_{\text{max}} = \kappa \cdot H_{\text{train,max}} \quad (\kappa = 1.25)
 $$
 
 4. The raw anomaly score is calculated directly from accumulated continuous metric depth $H(x)$:
@@ -199,35 +199,39 @@ GEIF ingests streaming data using Algorithm R reservoir sampling:
 
 Percentage-based thresholds (`-O <pct>%` or `OUTLIER_SCORE <pct>%`) accept values across the validated range $[0, 200]$:
 - **In-Sample Empirical Quantile ($0 \le P \le 100$)**: Evaluates all active reservoir samples and sorts their ascending anomaly scores $s_0 \le s_1 \le \ldots \le s_{N-1}$. At $P = 100$, the cutoff $s_{100}$ equals the maximum training sample score (the exact empirical in-sample border).
-- **Out-of-Sample Extrapolation ($100 < P \le 200$)**: Let $t = (P - 100) / 100 \in (0, 1]$ denote the normalized out-of-sample excursion distance (so $P = 110$ corresponds to $t = 0.10$ span units outside the boundary, and $P = 200$ corresponds to $t = 1.0$). Each algorithm defines a monotonic growth curve $f_{\text{algo}}(t) \in [0, 1]$ normalized by $f_{\text{algo}}(1) > 0$ so that $s(100) = s_{100}$ and $s(200) = 1.0$:
+- **Out-of-Sample Extrapolation ($100 < P \le 200$)**: Let $t = (P - 100) / 100 \in (0, 1]$ denote the normalized out-of-sample excursion distance in feature-span units (so $P = 105$ corresponds to $t = 0.05$ span units outside the boundary, $P = 110$ to $t = 0.10$, and $P = 200$ to $t = 1.0$). All four engines share a unified survival decay formulation:
 
 $$
-s(P) = s_{100} + (1.0 - s_{100}) \cdot \frac{f_{\text{algo}}(t)}{f_{\text{algo}}(1)}
+s(P) = 1.0 - (1.0 - s_{100})(1.0 - t^2) S_{\text{algo}}(t)
 $$
 
-where the unnormalized algorithm-specific progression $f_{\text{algo}}(t)$ reflects each engine's native outer-space physics:
-1. **Exemplar (`exemplar`)**: Uses the trained mean bandwidth ratio $\kappa_{\text{ex}} = \text{clamp}(\sqrt{D} / \bar{b}, 2, 20)$ and the configured Cauchy density exponent $\gamma = \text{decay}$:
+where $(1.0 - t^2)$ smoothly completes the finite interval $t \in [0, 1]$ to $s(200) = 1.0$ without distorting the physical boundary slope at $t \to 0$, and $S_{\text{algo}}(t) \in (0, 1]$ is each algorithm's physical survival factor at exterior distance $t$:
+1. **Exemplar (`exemplar`)**: Uses the boundary normalized displacement $u_{100}$, the ensemble's collective macro-bandwidth $B_{\text{eff}}$, and inverse scale $\kappa_{\text{eff}}$ (with $\gamma = \text{decay}$):
 
 $$
-f_{\text{exemplar}}(t) = 1.0 - \left(1.0 + (\kappa_{\text{ex}} \cdot t)^2\right)^{-\gamma}
+u_{100} = \sqrt{(1.0 - s_{100})^{-1/\gamma} - 1.0}, \quad B_{\text{eff}} = \sqrt{\frac{\sum_{i=1}^U \sqrt{c_i} \cdot b_i}{D_{\max}}}, \quad \kappa_{\text{eff}} = \frac{1.0}{B_{\text{eff}}}
 $$
 
-2. **Hyperspherical Bubble (`bubble`)**: Combines radial shell distance scaling $\rho = \text{clamp}(\sqrt{D} / \bar{d}_{\text{sample}}, 2, 20)$ with outer stadium attenuation $\lambda = 0.10$:
-
 $$
-f_{\text{bubble}}(t) = 1.0 - \frac{\exp(-\lambda \cdot t)}{1.0 + \rho \cdot t}
+S_{\text{exemplar}}(t) = \left(\frac{1.0 + u_{100}^2}{1.0 + (u_{100} + \kappa_{\text{eff}} \cdot t)^2}\right)^{\gamma}
 $$
 
-3. **Voronoi Bisectors (`voronoi`)**: Combines harmonic leaf residual damping $(1 + \rho \cdot t)^{-1 / c(\psi)}$ with outer stadium attenuation:
+2. **Hyperspherical Bubble (`bubble`)**: Combines expected radial shell shedding $1 / (1 + t / c(\psi))$ with outer stadium attenuation $\lambda = 0.10$:
 
 $$
-f_{\text{voronoi}}(t) = 1.0 - \exp(-\lambda \cdot t) \cdot (1.0 + \rho \cdot t)^{-1 / c(\psi)}
+S_{\text{bubble}}(t) = \frac{\exp(-\lambda \cdot t)}{1.0 + t / c(\psi)}
 $$
 
-4. **Gaussian Hyperplanes (`ceif`)**: Uses the expected hyperplane shedding rate $\beta_{\text{ceif}} = \lambda + \frac{\ln 2}{c(\psi)} \sqrt{\rho}$:
+3. **Voronoi Bisectors (`voronoi`)**: Combines harmonic leaf residual damping $(1 + 2t)^{-1 / c(\psi)}$ with outer stadium attenuation:
 
 $$
-f_{\text{ceif}}(t) = 1.0 - \exp(-\beta_{\text{ceif}} \cdot t)
+S_{\text{voronoi}}(t) = \exp(-\lambda \cdot t) \cdot (1.0 + 2.0 \cdot t)^{-1 / c(\psi)}
+$$
+
+4. **Gaussian Hyperplanes (`ceif`)**: Combines expected hyperplane shedding rate $\frac{\ln 2}{c(\psi)(\kappa - 1)}$ (where $\kappa = 1.25$) with outer stadium attenuation:
+
+$$
+S_{\text{ceif}}(t) = \exp\left(-\left(\lambda + \frac{\ln 2}{c(\psi)(\kappa - 1.0)}\right) t\right)
 $$
 
 ---
@@ -450,3 +454,9 @@ The **CEIF Hyperplane Engine** provides data-anchored isotropic Gaussian cuts co
 | **Categorization Accuracy** | 60.14% | 61.51% | **88.53% (Clear Winner)** | 60.11% |
 
 For detailed multi-algorithm selection guidance, empirical heatmaps, drift analysis, categorization benchmarks, and performance profiles, see [**`docs/algorithm_selection.md`**](algorithm_selection.md).
+
+---
+
+## Development & Attribution
+
+**GEIF** was designed and engineered by **Timo Savinen** with AI pair-programming assistance (Google Antigravity / Gemini) under human architectural direction.

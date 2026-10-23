@@ -206,3 +206,9 @@ Exemplar completed this evolution by taking it to its pure, closed-form conclusi
 All four algorithms in GEIF are indeed implementations of **Kernel Density Estimation**:
 1. **Tree algorithms (`ceif`, `voronoi`, `bubble`)** estimate density by counting how often points survive random geometric cuts without being separated.
 2. **Exemplar (`exemplar`)** cuts out the middleman: it uses the reservoir samples directly as kernel centers and evaluates the exact, regularized Cauchy potential field with AVX2 SIMD hardware acceleration.
+
+---
+
+## Development & Attribution
+
+**GEIF** was designed and engineered by **Timo Savinen** with AI pair-programming assistance (Google Antigravity / Gemini) under human architectural direction.

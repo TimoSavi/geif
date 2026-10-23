@@ -194,23 +194,29 @@ geif/
 │       └── xmalloc.c/.h         # Safe memory allocation wrappers
 ├── docs/                        # Complete technical documentation suite
 │   ├── algorithm.md             # Theoretical specifications & algorithmic comparisons
-│   ├── heatmaps.md              # Empirical decision heatmaps across 6 benchmark datasets
+│   ├── algorithm_selection.md   # Empirical benchmarks, heatmaps, & threshold guide
+│   ├── api_reference.md         # C17 API and function reference manual
 │   ├── implementation.md        # Codebase implementation architecture & internals
+│   ├── kde_unification.md       # Kernel density estimation unification theory
 │   ├── manual.md                # Comprehensive CLI reference manual
 │   ├── build.md                 # Compiler requirements, flags, & build targets
 │   └── README.md                # Documentation index
 ├── test/
-│   ├── unit/                    # C unit test suites
-│   │   ├── test_voronoi.c       # Voronoi bisector geometry tests
-│   │   ├── test_stadium.c       # Outer space stadium metric & decay tests
-│   │   └── test_negative.c      # Negative test cases, garbage inputs, zero-variance
+│   ├── test_voronoi.c           # Voronoi bisector geometry unit tests
+│   ├── test_stadium.c           # Outer space stadium metric & decay unit tests
+│   ├── test_negative.c          # Negative test cases, garbage inputs, zero-variance
 │   ├── test_cli_lifecycle.sh    # CLI lifecycle & streaming pipe tests
 │   ├── test_cli_categories.sh   # Multi-category routing & filtering tests
-│   ├── test_cli_recalibration.sh# Reservoir pruning (-k) & recalibration tests
+│   ├── test_cli_recalibration.sh# Reservoir pruning (-k), 0-200% thresholds & recalibration
 │   ├── test_cli_rcfile.sh       # Cascading RC file tests
 │   ├── test_cli_grid.sh         # Test grid & population drift tests
 │   ├── test_cli_ceif2geif.sh    # Model migration tests
 │   ├── test_cli_algorithms.sh   # Multi-algorithm engine verification tests
+│   ├── test_cli_csv.sh          # CSV dialect, delimiter, and header tests
+│   ├── test_cli_columns.sh      # Column inclusion/exclusion (-U, -I, -L, -C) tests
+│   ├── test_cli_attribution.sh  # Single-dimension attribution (%e, -j) tests
+│   ├── test_cli_decay.sh        # Exponential sample age decay (-D) tests
+│   ├── test_cli_aggregate.sh    # Category value aggregation (-A) tests
 │   ├── test_ref_bubble.sh       # Hyperspherical Bubble reference benchmark tests
 │   └── test_prod_cron_patterns.sh # End-to-end production cron automation tests
 ├── Makefile                     # Multi-target C17 build system
@@ -234,7 +240,7 @@ geif/
 # and CLI binaries (bin/geif, bin/ceif2geif)
 make all
 
-# Run unit tests and all 8 integration feature test suites
+# Run unit tests and all 13 integration feature test suites
 make test
 
 # Run end-to-end production cron test suite against real-world datasets

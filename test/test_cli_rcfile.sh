@@ -173,8 +173,8 @@ echo "DECAY 0.25" > "$RC_LOOSE"
 RC_STRICT="$TEST_DIR/decay_strict.rc"
 echo "DECAY 1.0" > "$RC_STRICT"
 
-SCORE_LOOSE=$(run_geif_score -g "$RC_LOOSE" -r "$EX_MODEL" -a "$DATA_CSV" -L 1 -C 5 -p "%s" -T 0.0 | tail -n 1)
-SCORE_STRICT=$(run_geif_score -g "$RC_STRICT" -r "$EX_MODEL" -a "$DATA_CSV" -L 1 -C 5 -p "%s" -T 0.0 | tail -n 1)
+SCORE_LOOSE=$(run_geif_score -g "$RC_LOOSE" -r "$EX_MODEL" -a "$DATA_CSV" -L 1 -C 5 -p "%s" -O 0.0 | tail -n 1)
+SCORE_STRICT=$(run_geif_score -g "$RC_STRICT" -r "$EX_MODEL" -a "$DATA_CSV" -L 1 -C 5 -p "%s" -O 0.0 | tail -n 1)
 
 if ! awk -v s1="$SCORE_LOOSE" -v s2="$SCORE_STRICT" 'BEGIN { exit !(s2 > s1) }'; then
     echo "ERROR: Expected stricter DECAY 1.0 score ($SCORE_STRICT) > looser DECAY 0.25 score ($SCORE_LOOSE)"

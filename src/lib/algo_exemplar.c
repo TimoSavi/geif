@@ -308,8 +308,10 @@ static geif_status_t geif_exemplar_score(const geif_forest_t *f,
 /**
  * @brief Extrapolates an out-of-sample percentile threshold (100% < P <= 200%) for Exemplar.
  *
- * Models the natural Cauchy kernel density decay outside the 100% sample boundary
- * using the trained exemplar bandwidth ratio (S / avg_b) and configured decay exponent.
+ * Models the collective Cauchy monopole tail outside the 100% sample boundary.
+ * At s_100, the dimensionless Cauchy radius is u_100 = sqrt((1 - s_100)^(-1/decay) - 1).
+ * Stepping outward by t * span increments u by kappa_eff * t, where the macro-bandwidth
+ * is B_eff = sqrt(sum_i(sqrt(c_i) * b_i) / D_max) and kappa_eff = span / B_eff.
  *
  * @param[in] f     Forest instance.
  * @param[in] s_100 Empirical 100% maximum training sample score.
@@ -321,33 +323,30 @@ static double geif_exemplar_extrapolate_percentile(const geif_forest_t *f,
                                                    double t)
 {
     if (t <= 0.0) return s_100;
-    if (t >= 1.0) return 1.0;
+    if (t >= 1.0 || s_100 >= 1.0) return 1.0;
 
-    double kappa_ex = 10.0;
+    double decay = (f && f->config.decay > 0.0) ? f->config.decay : GEIF_DEFAULT_DECAY;
+    double kappa_eff = 4.0;
     const geif_exemplar_state_t *st = f ? (const geif_exemplar_state_t *)f->algo_data : NULL;
     double span = (f && f->scale_range_idx >= 0 && f->envelope_span)
                   ? f->envelope_span[f->scale_range_idx] : 0.0;
 
-    if (st && st->u_count > 0 && st->b_sq && span > 1e-12) {
-        double sum_b = 0.0;
+    if (st && st->u_count > 0 && st->num && st->d_max > 1e-12 && span > 1e-12) {
+        double sum_num = 0.0;
         for (size_t i = 0; i < st->u_count; i++) {
-            sum_b += sqrt(st->b_sq[i]);
+            sum_num += st->num[i];
         }
-        double avg_b = sum_b / (double)st->u_count;
-        if (avg_b > 1e-12) {
-            kappa_ex = span / avg_b;
-            if (kappa_ex < 2.0) kappa_ex = 2.0;
-            if (kappa_ex > 20.0) kappa_ex = 20.0;
+        double b_eff = sqrt(sum_num / st->d_max);
+        if (b_eff > 1e-12) {
+            kappa_eff = span / b_eff;
         }
     }
 
-    double decay = (f && f->config.decay > 0.0) ? f->config.decay : GEIF_DEFAULT_DECAY;
-    double kt = kappa_ex * t;
-    double f_t = 1.0 - pow(1.0 + kt * kt, -decay);
-    double f_1 = 1.0 - pow(1.0 + kappa_ex * kappa_ex, -decay);
-    double g = (f_1 > 1e-12) ? (f_t / f_1) : t;
+    double u_sq_100 = pow(1.0 - s_100, -1.0 / decay) - 1.0;
+    double u_100 = (u_sq_100 > 0.0) ? sqrt(u_sq_100) : 0.0;
+    double u_t = u_100 + kappa_eff * t;
 
-    double s = s_100 + (1.0 - s_100) * g;
+    double s = 1.0 - (1.0 - t * t) * pow(1.0 + u_t * u_t, -decay);
     if (s < s_100) s = s_100;
     if (s > 1.0) s = 1.0;
     return s;

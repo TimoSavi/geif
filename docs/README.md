@@ -18,3 +18,9 @@ This directory contains the core technical documentation, algorithmic specificat
 | [manual.md](manual.md) | Comprehensive CLI reference manual covering all operational modes, options, format templates, configuration files, and UNIX pipeline patterns. | [`src/cli/main.c`](../src/cli/main.c) |
 | [build.md](build.md) | Build instructions, compiler flags, prerequisites, target definitions, and automated testing suite overview. | [`Makefile`](../Makefile) |
 
+---
+
+## Development & Attribution
+
+**GEIF** was designed and engineered by **Timo Savinen** with AI pair-programming assistance (Google Antigravity / Gemini) under human architectural direction.
+
