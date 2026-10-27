@@ -307,8 +307,9 @@ The following template tokens can be used in `-p`, `-v`, `-N`, `-M`, and `-j`:
 
 | Token | Description | Output Example |
 |---|---|---|
-| `%s` | Calibrated anomaly score $[0.0, 1.0)$ | `0.6558` |
-| `%S` | Anomaly score expressed as percentage | `65.58%` |
+| `%s` | Calibrated anomaly score $[0.0, 1.0)$ | `0.655800` |
+| `%S` | Average anomaly score for analyzed data | `0.214500` |
+| `%O` | Effective outlier score limit in $[0.0, 1.0]$ (resolved from `-O`, `OUTLIER_SCORE`, or JSON; prints actual score cutoff for percentages) | `0.500000` |
 | `%l` | Label string | `sample_42` |
 | `%c` / `%C` | Category name | `Cuddalore-CO_43-alluvial` |
 | `%d` | Feature dimension values (joined by delimiter) | `10.5;20.2;30.1` |

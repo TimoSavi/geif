@@ -90,8 +90,8 @@
 | Enum Constant | Value | CLI Name | Description |
 | :--- | :--- | :--- | :--- |
 | `GEIF_ALGO_CEIF` | `0` | `ceif` / `eif` | Data-anchored isotropic Gaussian cuts with Zero Kelvin scale floor and outer decay. |
-| `GEIF_ALGO_BUBBLE` | `1` | `bubble` | Hyperspherical Bubble tree cavity carving with median quickselect. |
-| `GEIF_ALGO_EXEMPLAR` | `2` | `exemplar` | Direct SIMD Cauchy kernel density evaluation on reservoir pool samples (default). |
+| `GEIF_ALGO_BUBBLE` | `1` | `bubble` | Hyperspherical Bubble tree cavity carving with median quickselect (default). |
+| `GEIF_ALGO_EXEMPLAR` | `2` | `exemplar` | Direct SIMD Cauchy kernel density evaluation on reservoir pool samples. |
 | `GEIF_ALGO_VORONOI` | `3` | `voronoi` | Scale-invariant Voronoi perpendicular bisector hyperplane cuts. |
 
 ---
@@ -880,8 +880,8 @@ static double geif_bubble_extrapolate_percentile(const geif_forest_t *f, double 
 
 **Description:** Extrapolates an out-of-sample percentile threshold (100% < P <= 200%) for Bubble.
 
-Models hyperspherical cavity drop-off outside the 100% sample boundary combined
-with outer stadium exponential decay.
+Models macroscopic hyperspherical shell attenuation (1 + t / c(psi))^(-1) outside
+the 100% sample boundary combined with outer stadium exponential decay.
 
 **Parameters:**
 
@@ -977,8 +977,8 @@ static double geif_voronoi_extrapolate_percentile(const geif_forest_t *f, double
 
 **Description:** Extrapolates an out-of-sample percentile threshold (100% < P <= 200%) for Voronoi.
 
-Models perpendicular bisector leaf distance damping c(n / (1 + rho * t))
-combined with outer stadium exponential decay.
+Models macroscopic perpendicular bisector harmonic damping (1 + 2 * t)^(-1 / c(psi))
+outside the 100% sample boundary combined with outer stadium exponential decay.
 
 **Parameters:**
 
@@ -1041,7 +1041,7 @@ s(x) = 1 - (D(x) / D_max)^decay
 
 ---
 
-#### [`geif_exemplar_extrapolate_percentile`](../src/lib/algo_exemplar.c#L319)
+#### [`geif_exemplar_extrapolate_percentile`](../src/lib/algo_exemplar.c#L321)
 
 ```c
 static double geif_exemplar_extrapolate_percentile(const geif_forest_t *f, double s_100, double t);
@@ -1049,8 +1049,10 @@ static double geif_exemplar_extrapolate_percentile(const geif_forest_t *f, doubl
 
 **Description:** Extrapolates an out-of-sample percentile threshold (100% < P <= 200%) for Exemplar.
 
-Models the natural Cauchy kernel density decay outside the 100% sample boundary
-using the trained exemplar bandwidth ratio (S / avg_b) and configured decay exponent.
+Models the collective Cauchy monopole tail outside the 100% sample boundary.
+At s_100, the dimensionless Cauchy radius is u_100 = sqrt((1 - s_100)^(-1/decay) - 1).
+Stepping outward by t * span increments u by kappa_eff * t, where the macro-bandwidth
+is B_eff = sqrt(sum_i(sqrt(c_i) * b_i) / D_max) and kappa_eff = span / B_eff.
 
 **Parameters:**
 
@@ -1143,8 +1145,8 @@ static double geif_ceif_extrapolate_percentile(const geif_forest_t *f, double s_
 
 **Description:** Extrapolates an out-of-sample percentile threshold (100% < P <= 200%) for CEIF.
 
-Models margin-expanded isotropic Gaussian hyperplane shedding rate outside the
-100% sample boundary combined with outer stadium exponential decay.
+Models margin-expanded isotropic Gaussian hyperplane shedding across the exterior
+margin (kappa - 1) outside the 100% sample boundary combined with outer stadium decay.
 
 **Parameters:**
 
@@ -2719,7 +2721,7 @@ determines outlier status against threshold, and formats output via templates.
 
 ---
 
-#### [`process_categorize_row`](../src/cli/main.c#L544)
+#### [`process_categorize_row`](../src/cli/main.c#L543)
 
 ```c
 static void process_categorize_row(geif_ensemble_t *ensemble, const geif_column_config_t *col_cfg, bool direct_feature_mapping, const cat_filter_t *cat_filter, char **tokens, uint32_t n_tok, const char *orig_line, uint64_t line_num, char list_sep, char cat_sep, char label_sep, double threshold, bool threshold_is_average, bool threshold_is_percentage, bool score_limit_given, const char *point_tmpl, int decimals, const char *printf_format, const char *print_dimension, uint32_t low_rgb, uint32_t high_rgb, double *vec, uint32_t dims, FILE *out_fp, uint64_t *analyzed, agg_cat_bucket_t **agg_buckets, size_t *agg_count, size_t *agg_cap);
@@ -2729,7 +2731,7 @@ static void process_categorize_row(geif_ensemble_t *ensemble, const geif_column_
 
 ---
 
-#### [`parse_outlier_score_spec`](../src/cli/main.c#L642)
+#### [`parse_outlier_score_spec`](../src/cli/main.c#L641)
 
 ```c
 static bool parse_outlier_score_spec(const char *spec, bool *is_avg, bool *is_pct, double *pct_out, double *thresh_out);
@@ -2756,7 +2758,7 @@ Accepts:
 
 ---
 
-#### [`update_ensemble_percentage_scores`](../src/cli/main.c#L682)
+#### [`update_ensemble_percentage_scores`](../src/cli/main.c#L681)
 
 ```c
 static void update_ensemble_percentage_scores(geif_ensemble_t *ens, double pct, const cat_filter_t *filter, bool verbose);
@@ -2777,7 +2779,7 @@ percentage in [0.0, 200.0] (0-100% empirical in-sample, 100-200% algorithm-extra
 
 ---
 
-#### [`main`](../src/cli/main.c#L747)
+#### [`main`](../src/cli/main.c#L746)
 
 ```c
 int main(int argc, char *argv[]);
@@ -3182,7 +3184,7 @@ Evaluates tokens such as %s (score), %l (label), %c (category), %m (metric depth
 
 **Module Purpose:** Output templating engine for GEIF CLI (-p, -v, -N, -M).
 
-#### [`geif_format_template`](../src/cli/template.h#L90)
+#### [`geif_format_template`](../src/cli/template.h#L92)
 
 ```c
 size_t geif_format_template(char *out, size_t out_size, const char *tmpl, const geif_template_context_t *ctx);
@@ -3193,6 +3195,7 @@ size_t geif_format_template(char *out, size_t out_size, const char *tmpl, const 
 Supported specifiers (matching CEIF):
 %r - Current input file row number
 %s - Anomaly score (or outlier score threshold in -v summary)
+%O - Effective outlier score limit / threshold (0.0 .. 1.0, 6 decimals)
 %S - Average anomaly score for analyzed data
 %l - Label string
 %c - Category string from input data
@@ -3233,7 +3236,7 @@ Inside dimension template (-j, expanded by %m):
 
 ---
 
-#### [`geif_template_uses_spec`](../src/cli/template.h#L98)
+#### [`geif_template_uses_spec`](../src/cli/template.h#L100)
 
 ```c
 bool geif_template_uses_spec(const char *tmpl, const char *print_dimension, char spec);
@@ -3825,8 +3828,4 @@ optionally applies retrain overrides, and outputs clean GEIF-1.0 JSON models.
 **Returns:** 0 on success, non-zero exit code on error.
 
 ---
-
-## Development & Attribution
-
-**GEIF** was designed and engineered by **Timo Savinen** with AI pair-programming assistance (Google Antigravity / Gemini) under human architectural direction.
 

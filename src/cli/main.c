@@ -64,7 +64,7 @@ static void print_usage(const char *prog)
     printf("  -D <interval>  Drop / prune categories older than interval (e.g. '30d', '7d', '24h', '3600s')\n");
     printf("  -N [tmpl]      Output template for NEW / unseen categories during learning/analysis (default: '%%v')\n");
     printf("  -M [tmpl]      Output template for MISSED categories (default: '%%C')\n");
-    printf("  -p <tmpl>      Output template for scored rows (default: '%%s %%v'; %%s=score, %%l=label, %%c=cat, %%m=metric/dims, %%d=vector, %%e=attrib, %%a=avg, %%t=time, %%u=epoch)\n");
+    printf("  -p <tmpl>      Output template for scored rows (default: '%%s %%v'; %%s=score, %%O=limit, %%l=label, %%c=cat, %%m=metric/dims, %%d=vector, %%e=attrib, %%a=avg, %%t=time, %%u=epoch)\n");
     printf("  -v [tmpl]      Output template for summary/average rows, or verbose flag\n");
     printf("  -d <int>       Floating point decimal precision (default: 6)\n");
     printf("  -j <tmpl>      Per-dimension expansion template for %%m (%%d=val, %%a=avg, %%e=attrib, %%i=index)\n");
@@ -271,6 +271,7 @@ static void process_scoring_row(geif_ensemble_t *ensemble,
                 .category         = cat_buf,
                 .input_category   = cat_buf,
                 .score            = 1.0,
+                .outlier_score    = threshold,
                 .test_average_score = 1.0,
                 .metric_depth     = 0.0,
                 .d_out            = 999.0,
@@ -364,6 +365,7 @@ static void process_scoring_row(geif_ensemble_t *ensemble,
                 .category         = cat_buf,
                 .input_category   = cat_buf,
                 .score            = score,
+                .outlier_score    = eff_threshold,
                 .test_average_score = (matched_entry->analyzed_rows > 0)
                                      ? (matched_entry->sum_score / (double)matched_entry->analyzed_rows)
                                      : score,
@@ -465,19 +467,15 @@ static void score_and_print_categorize_vec(geif_ensemble_t *ensemble,
     geif_forest_t *best_forest = ensemble->entries[best_idx].forest;
     const char *best_cat = ensemble->entries[best_idx].category;
 
-    double eff_thresh = 1.0;
-    if (score_limit_given) {
-        if (threshold_is_percentage) {
-            eff_thresh = (best_forest->percentage_score >= 0.0) ? best_forest->percentage_score : 0.5;
-        } else if (threshold_is_average) {
-            eff_thresh = (best_forest->average_score > 0.0) ? best_forest->average_score : 0.5;
-        } else {
-            eff_thresh = threshold;
-        }
+    double eff_thresh = threshold;
+    if (threshold_is_percentage) {
+        eff_thresh = (best_forest->percentage_score >= 0.0) ? best_forest->percentage_score : 0.5;
+    } else if (threshold_is_average) {
+        eff_thresh = (best_forest->average_score > 0.0) ? best_forest->average_score : 0.5;
+    }
 
-        if (min_score > eff_thresh) {
-            return; // Outlier suppression under -O
-        }
+    if (score_limit_given && min_score > eff_thresh) {
+        return; // Outlier suppression under -O
     }
 
     (*analyzed)++;
@@ -503,6 +501,7 @@ static void score_and_print_categorize_vec(geif_ensemble_t *ensemble,
         .category         = best_cat,
         .input_category   = in_cat,
         .score            = min_score,
+        .outlier_score    = eff_thresh,
         .test_average_score = min_score,
         .metric_depth     = best_metric_depth,
         .d_out            = best_d_out,
@@ -1443,6 +1442,7 @@ int main(int argc, char *argv[])
                     .category         = cat_buf,
                     .input_category   = cat_buf,
                     .score            = 1.0,
+                    .outlier_score    = threshold,
                     .test_average_score = 1.0,
                     .metric_depth     = 0.0,
                     .d_out            = 999.0,
@@ -1515,6 +1515,7 @@ int main(int argc, char *argv[])
                         .category         = cat_buf,
                         .input_category   = cat_buf,
                         .score            = 1.0,
+                        .outlier_score    = threshold,
                         .test_average_score = 1.0,
                         .metric_depth     = 0.0,
                         .d_out            = 999.0,
@@ -1837,6 +1838,7 @@ int main(int argc, char *argv[])
                         .category         = cat_name,
                         .input_category   = cat_name,
                         .score            = score,
+                        .outlier_score    = effective_threshold,
                         .test_average_score = test_avg,
                         .metric_depth     = h_M,
                         .d_out            = d_out,
@@ -1904,6 +1906,7 @@ int main(int argc, char *argv[])
                         .category         = cat_name,
                         .input_category   = cat_name,
                         .score            = eff_thresh,
+                        .outlier_score    = eff_thresh,
                         .test_average_score = test_avg,
                         .metric_depth     = 0.0,
                         .d_out            = 0.0,
@@ -1950,12 +1953,20 @@ int main(int argc, char *argv[])
                     time_t cat_ts = ensemble->entries[i].last_updated;
                     if (cat_ts == 0) cat_ts = time(NULL);
 
+                    double eff_thresh = threshold;
+                    if (threshold_is_percentage) {
+                        eff_thresh = (sub_f && sub_f->percentage_score >= 0.0) ? sub_f->percentage_score : 0.5;
+                    } else if (threshold_is_average) {
+                        eff_thresh = (sub_f && sub_f->average_score > 0.0) ? sub_f->average_score : 0.5;
+                    }
+
                     geif_template_context_t ctx = {
                         .orig_line        = cat_name,
                         .label            = "",
                         .category         = cat_name,
                         .input_category   = cat_name,
                         .score            = 1.0,
+                        .outlier_score    = eff_thresh,
                         .test_average_score = 0.0,
                         .metric_depth     = 0.0,
                         .d_out            = 0.0,

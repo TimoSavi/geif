@@ -208,6 +208,7 @@ void geif_generate_test_grid(const geif_ensemble_t *ens,
                     }
                     geif_template_context_t ctx = {
                         .score           = score,
+                        .outlier_score   = cutoff,
                         .metric_depth    = H_metric,
                         .H_max           = f->H_max,
                         .d_out           = d_out,
@@ -269,6 +270,7 @@ void geif_generate_test_grid(const geif_ensemble_t *ens,
             const double *sample = &f->sample_pool[s * dims];
             geif_template_context_t ctx = {
                 .score           = 0.0,
+                .outlier_score   = cutoff,
                 .metric_depth    = f->H_max,
                 .H_max           = f->H_max,
                 .d_out           = 0.0,

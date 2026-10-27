@@ -150,6 +150,16 @@ size_t geif_format_template(char *out,
             if (n > 0) w += (size_t)n;
             break;
 
+        case 'O': // Effective outlier score limit / threshold in [0.0, 1.0] (6 decimals)
+            {
+                double lim = ctx ? ctx->outlier_score : 0.0;
+                if (lim < 0.0) lim = 0.0;
+                if (lim > 1.0) lim = 1.0;
+                n = format_double(out + w, out_size - w, lim, 6, NULL);
+                if (n > 0) w += (size_t)n;
+            }
+            break;
+
         case 'S': // Average anomaly score for analyzed data
             {
                 double avg_s = (ctx && (ctx->is_summary || ctx->test_average_score > 0.0))

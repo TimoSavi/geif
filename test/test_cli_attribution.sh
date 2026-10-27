@@ -140,15 +140,51 @@ if ! grep -q "^SUMMARY: catB rows=1 outliers=0" "$DUAL_OUT"; then
 fi
 echo "  [PASS] Summary template (-v) and outlier template (-p) evaluated correctly."
 
-# Test 6: Outlier threshold aliases (-O average and -O 80%)
-echo "Test 6: Outlier threshold with -O average and -O 80%..."
-run_geif_score -r "$MODEL_JSON" -a "$TEST_CSV" -L 1 -C 5 -O average -p "%l;%o" -o "$TEST_DIR/scores_avg.txt"
-run_geif_score -r "$MODEL_JSON" -a "$TEST_CSV" -L 1 -C 5 -O 80% -p "%l;%o" -o "$TEST_DIR/scores_80pct.txt"
-
-if [ ! -s "$TEST_DIR/scores_avg.txt" ] || [ ! -s "$TEST_DIR/scores_80pct.txt" ]; then
-    echo "ERROR: -O average or -O 80% failed to produce output"
+# Test 6: Outlier threshold aliases (-O average and -O 80%) and %O directive
+echo "Test 6: Outlier threshold with -O average, -O 80%, -O 110%, RC OUTLIER_SCORE, and %O directive..."
+run_geif_score -r "$MODEL_JSON" -a "$TEST_CSV" -L 1 -C 5 -O 0.42 -p "%l;%o;%O" -o "$TEST_DIR/scores_fixed.txt"
+if ! grep -q ";0\.420000$" "$TEST_DIR/scores_fixed.txt"; then
+    echo "ERROR: %O did not output 0.420000 for -O 0.42:"
+    cat "$TEST_DIR/scores_fixed.txt"
     exit 1
 fi
-echo "  [PASS] -O average and percentage thresholds accepted and evaluated."
+
+run_geif_score -r "$MODEL_JSON" -a "$TEST_CSV" -L 1 -C 5 -O average -p "%l;%o;%O" -o "$TEST_DIR/scores_avg.txt"
+run_geif_score -r "$MODEL_JSON" -a "$TEST_CSV" -L 1 -C 5 -O 80% -p "%l;%o;%O" -o "$TEST_DIR/scores_80pct.txt"
+run_geif_score -r "$MODEL_JSON" -a "$TEST_CSV" -L 1 -C 5 -O 110% -p "%l;%o;%O;%s" -o "$TEST_DIR/scores_110pct.txt"
+
+if [ ! -s "$TEST_DIR/scores_avg.txt" ] || [ ! -s "$TEST_DIR/scores_80pct.txt" ] || [ ! -s "$TEST_DIR/scores_110pct.txt" ]; then
+    echo "ERROR: -O average, -O 80%, or -O 110% failed to produce output"
+    exit 1
+fi
+
+# Verify %O outputs a resolved float in [0.000000, 1.000000] (6 decimals), NOT the percentage number
+for f in "$TEST_DIR/scores_avg.txt" "$TEST_DIR/scores_80pct.txt" "$TEST_DIR/scores_110pct.txt"; do
+    while IFS=';' read -r lbl flag lim rest; do
+        if ! echo "$lim" | grep -qE '^(0\.[0-9]{6}|1\.000000)$'; then
+            echo "ERROR: %O produced out-of-range or poorly formatted limit '$lim' in $f"
+            exit 1
+        fi
+    done < "$f"
+done
+
+# Verify %O from JSON model (saved with -O 90%) and RC file (OUTLIER_SCORE)
+MODEL_PCT_JSON="$TEST_DIR/model_90pct.json"
+RC_TEST="$TEST_DIR/test_geifrc"
+echo "OUTLIER_SCORE 0.35" > "$RC_TEST"
+$GEIF_BIN -l "$TRAIN_CSV" -w "$MODEL_PCT_JSON" -L 1 -C 5 -t 20 -s 64 -O 90% -W
+run_geif_score -r "$MODEL_PCT_JSON" -a "$TEST_CSV" -L 1 -C 5 -p "%l;%O" -o "$TEST_DIR/scores_json_pct.txt"
+if ! head -n 1 "$TEST_DIR/scores_json_pct.txt" | grep -qE ';0\.[0-9]{6}$'; then
+    echo "ERROR: %O from JSON percentage model did not resolve to 0.xxxxxx"
+    cat "$TEST_DIR/scores_json_pct.txt"
+    exit 1
+fi
+run_geif_score -g "$RC_TEST" -r "$MODEL_JSON" -a "$TEST_CSV" -L 1 -C 5 -p "%l;%O" -o "$TEST_DIR/scores_rc.txt"
+if ! grep -q ";0\.350000$" "$TEST_DIR/scores_rc.txt"; then
+    echo "ERROR: %O from RC OUTLIER_SCORE did not output 0.350000:"
+    cat "$TEST_DIR/scores_rc.txt"
+    exit 1
+fi
+echo "  [PASS] -O average, percentage thresholds, JSON threshold, RC OUTLIER_SCORE, and %O directive verified."
 
 echo "=== All GEIF Attribution & Advanced Templating Integration Tests Passed! ==="

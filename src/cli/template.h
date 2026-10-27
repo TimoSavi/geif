@@ -21,6 +21,7 @@ typedef struct {
     const char   *category;          /**< %C: Model / assigned category string */
     const char   *input_category;    /**< %c: Category extracted from input data */
     double        score;             /**< %s: Anomaly score (0.0 .. 1.0) or threshold in -v */
+    double        outlier_score;     /**< %O: Effective outlier score limit / threshold (0.0 .. 1.0) */
     double        test_average_score;/**< %S: Average anomaly score for analyzed data */
     double        metric_depth;      /**< %m: Metric tree depth (internal) */
     double        d_out;             /**< %d (when vector is NULL): Outer stadium distance */
@@ -54,6 +55,7 @@ typedef struct {
  * Supported specifiers (matching CEIF):
  *   %r - Current input file row number
  *   %s - Anomaly score (or outlier score threshold in -v summary)
+ *   %O - Effective outlier score limit / threshold (0.0 .. 1.0, 6 decimals)
  *   %S - Average anomaly score for analyzed data
  *   %l - Label string
  *   %c - Category string from input data

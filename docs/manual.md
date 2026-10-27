@@ -121,6 +121,7 @@ The `-p` (outlier), `-v` (summary), `-N` (unseen), and `-M` (missed) options acc
 | `%r` | Current input file row number. |
 | `%s` | Calibrated anomaly score (e.g. `0.842100`). |
 | `%S` | Average anomaly score for analyzed data. |
+| `%O` | Effective outlier score limit in $[0.0, 1.0]$ with 6 decimal places (resolved from `-O`, `OUTLIER_SCORE`, or the JSON model; for percentage scores like `97%` or `110%`, prints the actual resolved score cutoff rather than the percentage). |
 | `%n` | Number of training rows for a forest. |
 | `%o` | Number of analyzed rows for a forest in summary mode (`-v`), or outlier flag (`1` / `0`) in row mode. |
 | `%h` | Number of analyzed rows having score greater than outlier score threshold in summary mode (`-v`), or forest $H_{\text{max}}$ scale. |
