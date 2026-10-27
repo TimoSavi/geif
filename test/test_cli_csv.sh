@@ -66,20 +66,21 @@ NAN_SCORED=$(wc -l < "$TMP_DIR/nan_out.csv")
 test "$NAN_SCORED" -eq 2
 echo "  [PASS] NaN, Inf, and empty fields gracefully parsed as 0.0 without errors."
 
-# Test 7: Verify field delimiter (-f), list separator (-e), and header (-H) persistence in JSON model
+# Test 7: Verify field delimiter (-f) and header (-H) persistence in JSON model (while -e is runtime-only)
 echo "Test 7: Verify delimiter and header persistence in saved JSON model..."
 $BIN -r "$TMP_DIR/model.json" -q | grep -F "Input Delimiter (-f): ';'"
-$BIN -r "$TMP_DIR/model.json" -q | grep -F "List Separator (-e):  ','"
 $BIN -r "$TMP_DIR/model.json" -q | grep -F "Skip Header (-H):     Yes"
 grep -E -q '"input_separator":[[:space:]]*";"' "$TMP_DIR/model.json"
 grep -E -q '"has_header":[[:space:]]*true' "$TMP_DIR/model.json"
 
-# Also verify explicit -e '|' persistence and no-header model
+# Also verify no-header model and that -e is not persisted in JSON
 $BIN -l "$WINE_CSV" -f ';' -e '|' --no-header -w "$TMP_DIR/custom_sep.json" -i 10 -s 32
 $BIN -r "$TMP_DIR/custom_sep.json" -q | grep -F "Input Delimiter (-f): ';'"
-$BIN -r "$TMP_DIR/custom_sep.json" -q | grep -F "List Separator (-e):  '|'"
 $BIN -r "$TMP_DIR/custom_sep.json" -q | grep -F "Skip Header (-H):     No"
-grep -E -q '"list_separator":[[:space:]]*"\|"' "$TMP_DIR/custom_sep.json"
+if grep -q '"list_separator"' "$TMP_DIR/custom_sep.json"; then
+    echo "ERROR: list_separator should not be persisted in model JSON"
+    exit 1
+fi
 grep -E -q '"has_header":[[:space:]]*false' "$TMP_DIR/custom_sep.json"
 echo "  [PASS] Delimiters and header state properly serialized in root JSON."
 

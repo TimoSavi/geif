@@ -765,7 +765,6 @@ int main(int argc, char *argv[])
     char delimiter           = ',';
     char list_separator      = ',';
     bool field_sep_explicit  = false;
-    bool list_sep_explicit   = false;
     bool skip_header         = false;
     bool header_explicit     = false;
     bool aggregate           = false;
@@ -787,7 +786,6 @@ int main(int argc, char *argv[])
     char label_sep           = '-';
 
     bool cli_outlier_score_given = false;
-    char cli_outlier_score_spec[64] = {0};
     int kill_outliers_count = 0;
 
     bool   run_test_grid         = false;
@@ -802,8 +800,6 @@ int main(int argc, char *argv[])
     bool cli_samples_given = false;
     bool cli_decimals_given = false;
     bool cli_print_dim_given = false;
-    bool cli_point_tmpl_given = false;
-    bool cli_printf_format_given = false;
 
     geif_config_t config = geif_config_default();
 
@@ -853,8 +849,6 @@ int main(int argc, char *argv[])
             break;
         case 'O':
             cli_outlier_score_given = true;
-            strncpy(cli_outlier_score_spec, optarg, sizeof(cli_outlier_score_spec) - 1);
-            cli_outlier_score_spec[sizeof(cli_outlier_score_spec) - 1] = '\0';
             if (!parse_outlier_score_spec(optarg, &threshold_is_average, &threshold_is_percentage,
                                           &outlier_percentage, &threshold)) {
                 geif_cat_filter_free(&cat_filter);
@@ -883,7 +877,6 @@ int main(int argc, char *argv[])
         case 'm':
             if (strchr(optarg, '%') != NULL) {
                 printf_format = optarg;
-                cli_printf_format_given = true;
             } else {
                 config.max_depth = (uint32_t)atoi(optarg);
             }
@@ -902,7 +895,6 @@ int main(int argc, char *argv[])
             break;
         case 'e':
             list_separator = optarg[0];
-            list_sep_explicit = true;
             if (!field_sep_explicit) {
                 delimiter = optarg[0];
             }
@@ -954,7 +946,6 @@ int main(int argc, char *argv[])
             break;
         case 'p':
             point_tmpl = optarg;
-            cli_point_tmpl_given = true;
             break;
         case 'S':
             set_locale = true;
@@ -1015,7 +1006,6 @@ int main(int argc, char *argv[])
     bool outlier_score_configured = cli_outlier_score_given;
     if (!cli_outlier_score_given && rc_cfg.outlier_score_set) {
         outlier_score_configured = true;
-        memcpy(cli_outlier_score_spec, rc_cfg.outlier_score_spec, sizeof(cli_outlier_score_spec));
         if (!parse_outlier_score_spec(rc_cfg.outlier_score_spec, &threshold_is_average, &threshold_is_percentage,
                                       &outlier_percentage, &threshold)) {
             geif_cat_filter_free(&cat_filter);
@@ -1030,7 +1020,6 @@ int main(int argc, char *argv[])
         threshold_is_percentage = false;
         outlier_score_configured = true;
         cli_outlier_score_given = true;
-        snprintf(cli_outlier_score_spec, sizeof(cli_outlier_score_spec), "%g", test_extension_factor);
         run_test_grid = false;
     }
 
@@ -1057,16 +1046,6 @@ int main(int argc, char *argv[])
                 if (rc_cfg.decay_set) {
                     ensemble->entries[i].forest->config.decay = rc_cfg.decay;
                 }
-            }
-        }
-        if (outlier_score_configured) {
-            memcpy(ensemble->outlier_score_spec, cli_outlier_score_spec, sizeof(ensemble->outlier_score_spec));
-        } else if (ensemble->outlier_score_spec[0] != '\0') {
-            if (!parse_outlier_score_spec(ensemble->outlier_score_spec, &threshold_is_average, &threshold_is_percentage,
-                                          &outlier_percentage, &threshold)) {
-                geif_cat_filter_free(&cat_filter);
-                geif_ensemble_destroy(ensemble);
-                return 1;
             }
         }
 
@@ -1096,13 +1075,9 @@ int main(int argc, char *argv[])
                 update_ensemble_percentage_scores(ensemble, outlier_percentage, &cat_filter, verbose);
             }
         }
-        if (cli_decimals_given || rc_cfg.decimals_set) {
-            ensemble->decimals = decimals;
-            for (size_t i = 0; i < ensemble->count; i++) {
-                if (ensemble->entries[i].forest) ensemble->entries[i].forest->decimals = decimals;
-            }
-        } else if (ensemble->decimals >= 0) {
-            decimals = ensemble->decimals;
+        ensemble->decimals = decimals;
+        for (size_t i = 0; i < ensemble->count; i++) {
+            if (ensemble->entries[i].forest) ensemble->entries[i].forest->decimals = decimals;
         }
 
         if (!field_sep_explicit && ensemble->input_delimiter != '\0') {
@@ -1111,14 +1086,6 @@ int main(int argc, char *argv[])
             ensemble->input_delimiter = delimiter;
             for (size_t i = 0; i < ensemble->count; i++) {
                 if (ensemble->entries[i].forest) ensemble->entries[i].forest->input_delimiter = delimiter;
-            }
-        }
-        if (!list_sep_explicit && ensemble->list_separator != '\0') {
-            list_separator = ensemble->list_separator;
-        } else if (list_sep_explicit) {
-            ensemble->list_separator = list_separator;
-            for (size_t i = 0; i < ensemble->count; i++) {
-                if (ensemble->entries[i].forest) ensemble->entries[i].forest->list_separator = list_separator;
             }
         }
         if (!header_explicit) {
@@ -1135,26 +1102,6 @@ int main(int argc, char *argv[])
             ensemble->aggregate = aggregate;
             for (size_t i = 0; i < ensemble->count; i++) {
                 if (ensemble->entries[i].forest) ensemble->entries[i].forest->aggregate = aggregate;
-            }
-        }
-        if (!cli_point_tmpl_given && ensemble->print_string[0] != '\0') {
-            point_tmpl = ensemble->print_string;
-        } else if (cli_point_tmpl_given && point_tmpl) {
-            snprintf(ensemble->print_string, sizeof(ensemble->print_string), "%s", point_tmpl);
-            for (size_t i = 0; i < ensemble->count; i++) {
-                if (ensemble->entries[i].forest) {
-                    snprintf(ensemble->entries[i].forest->print_string, sizeof(ensemble->entries[i].forest->print_string), "%s", point_tmpl);
-                }
-            }
-        }
-        if (!cli_printf_format_given && ensemble->printf_format[0] != '\0') {
-            printf_format = ensemble->printf_format;
-        } else if (cli_printf_format_given && printf_format) {
-            snprintf(ensemble->printf_format, sizeof(ensemble->printf_format), "%s", printf_format);
-            for (size_t i = 0; i < ensemble->count; i++) {
-                if (ensemble->entries[i].forest) {
-                    snprintf(ensemble->entries[i].forest->printf_format, sizeof(ensemble->entries[i].forest->printf_format), "%s", printf_format);
-                }
             }
         }
     }
@@ -1212,20 +1159,14 @@ int main(int argc, char *argv[])
         if (save_file) {
             ensemble->decimals = decimals;
             ensemble->input_delimiter = delimiter;
-            ensemble->list_separator = list_separator;
             ensemble->has_header = skip_header;
             ensemble->aggregate = aggregate;
-            if (point_tmpl) snprintf(ensemble->print_string, sizeof(ensemble->print_string), "%s", point_tmpl);
-            if (printf_format) snprintf(ensemble->printf_format, sizeof(ensemble->printf_format), "%s", printf_format);
             for (size_t i = 0; i < ensemble->count; i++) {
                 if (ensemble->entries[i].forest) {
                     ensemble->entries[i].forest->decimals = decimals;
                     ensemble->entries[i].forest->input_delimiter = delimiter;
-                    ensemble->entries[i].forest->list_separator = list_separator;
                     ensemble->entries[i].forest->has_header = skip_header;
                     ensemble->entries[i].forest->aggregate = aggregate;
-                    if (point_tmpl) snprintf(ensemble->entries[i].forest->print_string, sizeof(ensemble->entries[i].forest->print_string), "%s", point_tmpl);
-                    if (printf_format) snprintf(ensemble->entries[i].forest->printf_format, sizeof(ensemble->entries[i].forest->printf_format), "%s", printf_format);
                 }
             }
             if (set_locale) setlocale(LC_ALL, "C");
@@ -1350,29 +1291,13 @@ int main(int argc, char *argv[])
         ensemble->decimals = decimals;
         ensemble->scale_score = true;
         ensemble->input_delimiter = delimiter;
-        ensemble->list_separator = list_separator;
         ensemble->has_header = skip_header;
         ensemble->aggregate = aggregate;
-        if (point_tmpl && point_tmpl != ensemble->print_string) {
-            snprintf(ensemble->print_string, sizeof(ensemble->print_string), "%s", point_tmpl);
-        }
-        if (printf_format && printf_format != ensemble->printf_format) {
-            snprintf(ensemble->printf_format, sizeof(ensemble->printf_format), "%s", printf_format);
-        }
         for (size_t i = 0; i < ensemble->count; i++) {
             if (ensemble->entries[i].forest) {
                 ensemble->entries[i].forest->aggregate = aggregate;
                 ensemble->entries[i].forest->summary_slot = -1;
-                if (point_tmpl && point_tmpl != ensemble->entries[i].forest->print_string) {
-                    snprintf(ensemble->entries[i].forest->print_string, sizeof(ensemble->entries[i].forest->print_string), "%s", point_tmpl);
-                }
-                if (printf_format && printf_format != ensemble->entries[i].forest->printf_format) {
-                    snprintf(ensemble->entries[i].forest->printf_format, sizeof(ensemble->entries[i].forest->printf_format), "%s", printf_format);
-                }
             }
-        }
-        if (outlier_score_configured) {
-            memcpy(ensemble->outlier_score_spec, cli_outlier_score_spec, sizeof(ensemble->outlier_score_spec));
         }
         if (active_ignore && active_ignore != ensemble->ignore_dims_spec) {
             snprintf(ensemble->ignore_dims_spec, sizeof(ensemble->ignore_dims_spec), "%s", active_ignore);
@@ -1579,11 +1504,6 @@ int main(int argc, char *argv[])
             return 1;
         }
 
-        if (cli_outlier_score_given) {
-            memcpy(ensemble->outlier_score_spec, cli_outlier_score_spec, sizeof(ensemble->outlier_score_spec));
-            ensemble->outlier_score_spec[sizeof(ensemble->outlier_score_spec) - 1] = '\0';
-        }
-
         if (verbose) {
             printf("Training complete across %zu sub-forests.\n", ensemble->count);
         }
@@ -1608,28 +1528,14 @@ int main(int argc, char *argv[])
         if (save_file) {
             ensemble->decimals = decimals;
             ensemble->input_delimiter = delimiter;
-            ensemble->list_separator = list_separator;
             ensemble->has_header = skip_header;
             ensemble->aggregate = aggregate;
-            if (point_tmpl && point_tmpl != ensemble->print_string) {
-                snprintf(ensemble->print_string, sizeof(ensemble->print_string), "%s", point_tmpl);
-            }
-            if (printf_format && printf_format != ensemble->printf_format) {
-                snprintf(ensemble->printf_format, sizeof(ensemble->printf_format), "%s", printf_format);
-            }
             for (size_t i = 0; i < ensemble->count; i++) {
                 if (ensemble->entries[i].forest) {
                     ensemble->entries[i].forest->decimals = decimals;
                     ensemble->entries[i].forest->input_delimiter = delimiter;
-                    ensemble->entries[i].forest->list_separator = list_separator;
                     ensemble->entries[i].forest->has_header = skip_header;
                     ensemble->entries[i].forest->aggregate = aggregate;
-                    if (point_tmpl && point_tmpl != ensemble->entries[i].forest->print_string) {
-                        snprintf(ensemble->entries[i].forest->print_string, sizeof(ensemble->entries[i].forest->print_string), "%s", point_tmpl);
-                    }
-                    if (printf_format && printf_format != ensemble->entries[i].forest->printf_format) {
-                        snprintf(ensemble->entries[i].forest->printf_format, sizeof(ensemble->entries[i].forest->printf_format), "%s", printf_format);
-                    }
                 }
             }
             if (set_locale) setlocale(LC_ALL, "C");
@@ -2015,28 +1921,14 @@ int main(int argc, char *argv[])
         if (!learn_file && save_file) {
             ensemble->decimals = decimals;
             ensemble->input_delimiter = delimiter;
-            ensemble->list_separator = list_separator;
             ensemble->has_header = skip_header;
             ensemble->aggregate = aggregate;
-            if (point_tmpl && point_tmpl != ensemble->print_string) {
-                snprintf(ensemble->print_string, sizeof(ensemble->print_string), "%s", point_tmpl);
-            }
-            if (printf_format && printf_format != ensemble->printf_format) {
-                snprintf(ensemble->printf_format, sizeof(ensemble->printf_format), "%s", printf_format);
-            }
             for (size_t i = 0; i < ensemble->count; i++) {
                 if (ensemble->entries[i].forest) {
                     ensemble->entries[i].forest->decimals = decimals;
                     ensemble->entries[i].forest->input_delimiter = delimiter;
-                    ensemble->entries[i].forest->list_separator = list_separator;
                     ensemble->entries[i].forest->has_header = skip_header;
                     ensemble->entries[i].forest->aggregate = aggregate;
-                    if (point_tmpl && point_tmpl != ensemble->entries[i].forest->print_string) {
-                        snprintf(ensemble->entries[i].forest->print_string, sizeof(ensemble->entries[i].forest->print_string), "%s", point_tmpl);
-                    }
-                    if (printf_format && printf_format != ensemble->entries[i].forest->printf_format) {
-                        snprintf(ensemble->entries[i].forest->printf_format, sizeof(ensemble->entries[i].forest->printf_format), "%s", printf_format);
-                    }
                 }
             }
             if (set_locale) setlocale(LC_ALL, "C");
@@ -2227,28 +2119,14 @@ int main(int argc, char *argv[])
         if (!learn_file && save_file) {
             ensemble->decimals = decimals;
             ensemble->input_delimiter = delimiter;
-            ensemble->list_separator = list_separator;
             ensemble->has_header = skip_header;
             ensemble->aggregate = aggregate;
-            if (point_tmpl && point_tmpl != ensemble->print_string) {
-                snprintf(ensemble->print_string, sizeof(ensemble->print_string), "%s", point_tmpl);
-            }
-            if (printf_format && printf_format != ensemble->printf_format) {
-                snprintf(ensemble->printf_format, sizeof(ensemble->printf_format), "%s", printf_format);
-            }
             for (size_t i = 0; i < ensemble->count; i++) {
                 if (ensemble->entries[i].forest) {
                     ensemble->entries[i].forest->decimals = decimals;
                     ensemble->entries[i].forest->input_delimiter = delimiter;
-                    ensemble->entries[i].forest->list_separator = list_separator;
                     ensemble->entries[i].forest->has_header = skip_header;
                     ensemble->entries[i].forest->aggregate = aggregate;
-                    if (point_tmpl && point_tmpl != ensemble->entries[i].forest->print_string) {
-                        snprintf(ensemble->entries[i].forest->print_string, sizeof(ensemble->entries[i].forest->print_string), "%s", point_tmpl);
-                    }
-                    if (printf_format && printf_format != ensemble->entries[i].forest->printf_format) {
-                        snprintf(ensemble->entries[i].forest->printf_format, sizeof(ensemble->entries[i].forest->printf_format), "%s", printf_format);
-                    }
                 }
             }
             if (set_locale) setlocale(LC_ALL, "C");

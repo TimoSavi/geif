@@ -149,11 +149,8 @@ typedef struct geif_forest {
     int           decimals;               /**< Decimal precision for serialization (-d, default: 6) */
     bool          scale_score;            /**< Flag indicating if anomaly scores are scaled [0..1] via min/max */
     char          input_delimiter;        /**< Field delimiter from -f (default: ',') */
-    char          list_separator;         /**< Output list separator from -e (default: ',') */
     bool          has_header;             /**< Flag indicating input CSV has a header line to skip (-H) */
     bool          aggregate;              /**< Flag indicating sample values are aggregated per category (-A) */
-    char          print_string[256];      /**< Output template string (-p, default: "%s %v") */
-    char          printf_format[64];      /**< Dimension printf format string (-m, e.g. "%'.0f") */
     int64_t       summary_slot;           /**< Ephemeral pool slot index for current session aggregation (-1 if none) */
     bool          is_trained;             /**< Flag indicating whether trees have been built */
     void         *algo_data;              /**< Optional algorithm-specific auxiliary state */
@@ -186,15 +183,11 @@ typedef struct {
     char           include_dims_spec[128]; /**< Included feature columns spec (e.g. "2-10") */
     char           ignore_dims_spec[128];  /**< Ignored columns spec (e.g. "12") */
     char           category_dims_spec[128];/**< Category columns spec (e.g. "12") */
-    char           outlier_score_spec[64]; /**< Outlier score threshold spec (e.g. "0.5", "average", "80%", "0.65s") */
     int            decimals;               /**< Decimal precision for serialization (-d, default: 6) */
     bool           scale_score;            /**< Flag indicating if anomaly scores are scaled [0..1] via min/max */
     char           input_delimiter;        /**< Field delimiter from -f (default: ',') */
-    char           list_separator;         /**< Output list separator from -e (default: ',') */
     bool           has_header;             /**< Flag indicating input CSV has a header line to skip (-H) */
     bool           aggregate;              /**< Flag indicating sample values are aggregated per category (-A) */
-    char           print_string[256];      /**< Output template string (-p, default: "%s %v") */
-    char           printf_format[64];      /**< Dimension printf format string (-m, e.g. "%'.0f") */
 
     geif_category_entry_t *entries;        /**< Dynamic array of category sub-forests */
     size_t         count;                  /**< Number of active sub-forests */

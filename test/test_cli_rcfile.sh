@@ -59,12 +59,12 @@ if ! grep -q '"samples_per_tree": 128' "$MODEL1" && ! grep -q '"samples_per_tree
     exit 1
 fi
 
-# Verify outlier_score 85% in model JSON
-if ! grep -qE '"outlier_score":\s*"85%"' "$MODEL1"; then
-    echo "ERROR: outlier_score 85% from RC file not found in model"
+# Verify outlier_score is NOT persisted in model JSON (runtime/RC setting only)
+if grep -q '"outlier_score"' "$MODEL1"; then
+    echo "ERROR: outlier_score should not be persisted in model JSON"
     exit 1
 fi
-echo "  [PASS] Training respected TREES, MAX_SAMPLES, and OUTLIER_SCORE from RC file."
+echo "  [PASS] Training respected TREES and MAX_SAMPLES from RC file without persisting runtime OUTLIER_SCORE."
 
 # Test 2: CLI overrides RC file
 echo "Test 2: CLI option overrides RC file..."

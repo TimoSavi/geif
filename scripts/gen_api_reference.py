@@ -332,8 +332,8 @@ def main():
     out.append("| Enum Constant | Value | CLI Name | Description |\n")
     out.append("| :--- | :--- | :--- | :--- |\n")
     out.append("| `GEIF_ALGO_CEIF` | `0` | `ceif` / `eif` | Data-anchored isotropic Gaussian cuts with Zero Kelvin scale floor and outer decay. |\n")
-    out.append("| `GEIF_ALGO_BUBBLE` | `1` | `bubble` | Hyperspherical Bubble tree cavity carving with median quickselect (default). |\n")
-    out.append("| `GEIF_ALGO_EXEMPLAR` | `2` | `exemplar` | Direct SIMD Cauchy kernel density evaluation on reservoir pool samples. |\n")
+    out.append("| `GEIF_ALGO_BUBBLE` | `1` | `bubble` | Hyperspherical Bubble tree cavity carving with median quickselect. |\n")
+    out.append("| `GEIF_ALGO_EXEMPLAR` | `2` | `exemplar` | Direct SIMD Cauchy kernel density evaluation on reservoir pool samples (default). |\n")
     out.append("| `GEIF_ALGO_VORONOI` | `3` | `voronoi` | Scale-invariant Voronoi perpendicular bisector hyperplane cuts. |\n\n")
     out.append("---\n\n")
 

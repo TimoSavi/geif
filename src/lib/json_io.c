@@ -209,11 +209,8 @@ geif_status_t geif_forest_save_json(const geif_forest_t *f, const char *path)
     ens.decimals = (f->decimals >= 0) ? f->decimals : 6;
     ens.scale_score = f->scale_score;
     ens.input_delimiter = f->input_delimiter ? f->input_delimiter : ',';
-    ens.list_separator = f->list_separator ? f->list_separator : ',';
     ens.has_header = f->has_header;
     ens.aggregate = f->aggregate;
-    memcpy(ens.print_string, f->print_string, sizeof(ens.print_string));
-    memcpy(ens.printf_format, f->printf_format, sizeof(ens.printf_format));
     ens.entries = &entry;
     ens.count = 1;
     ens.capacity = 1;
@@ -260,23 +257,12 @@ geif_status_t geif_ensemble_save_json(const geif_ensemble_t *ens, const char *pa
     json_object_object_add(root, "include_dims", json_object_new_string(ens->include_dims_spec));
     json_object_object_add(root, "ignore_dims", json_object_new_string(ens->ignore_dims_spec));
     json_object_object_add(root, "category_dims", json_object_new_string(ens->category_dims_spec));
-    const char *outlier_spec = (ens->outlier_score_spec[0] != '\0') ? ens->outlier_score_spec : "0.500000";
-    json_object_object_add(root, "outlier_score", json_object_new_string(outlier_spec));
     int ens_dec = (ens->decimals >= 0) ? ens->decimals : 6;
-    json_object_object_add(root, "decimals", json_object_new_int(ens_dec));
 
     char sep_str[2] = { ens->input_delimiter ? ens->input_delimiter : ',', '\0' };
-    char list_sep_str[2] = { ens->list_separator ? ens->list_separator : ',', '\0' };
     json_object_object_add(root, "input_separator", json_object_new_string(sep_str));
-    json_object_object_add(root, "list_separator", json_object_new_string(list_sep_str));
     json_object_object_add(root, "has_header", json_object_new_boolean(ens->has_header));
     json_object_object_add(root, "aggregate", json_object_new_boolean(ens->aggregate));
-    if (ens->print_string[0] != '\0') {
-        json_object_object_add(root, "print_string", json_object_new_string(ens->print_string));
-    }
-    if (ens->printf_format[0] != '\0') {
-        json_object_object_add(root, "printf_format", json_object_new_string(ens->printf_format));
-    }
 
     // Save sub-forests array with only per-forest state
     struct json_object *j_forests = json_object_new_array();
@@ -413,9 +399,6 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
         strncpy(ens->category_dims_spec, json_object_get_string(j_val), sizeof(ens->category_dims_spec) - 1);
     }
     ens->scale_score = true;
-    if (json_object_object_get_ex(root, "outlier_score", &j_val)) {
-        strncpy(ens->outlier_score_spec, json_object_get_string(j_val), sizeof(ens->outlier_score_spec) - 1);
-    }
 
     if (globals) {
         if (ens->label_dims_spec[0] == '\0' && json_object_object_get_ex(globals, "labelDims", &j_val)) {
@@ -430,39 +413,17 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
         if (ens->category_dims_spec[0] == '\0' && json_object_object_get_ex(globals, "categoryDims", &j_val)) {
             strncpy(ens->category_dims_spec, json_object_get_string(j_val), sizeof(ens->category_dims_spec) - 1);
         }
-        if (ens->outlier_score_spec[0] == '\0' && json_object_object_get_ex(globals, "outlierScore", &j_val)) {
-            strncpy(ens->outlier_score_spec, json_object_get_string(j_val), sizeof(ens->outlier_score_spec) - 1);
-        }
-        if (json_object_object_get_ex(globals, "decimals", &j_val)) {
-            ens->decimals = json_object_get_int(j_val);
-        }
         if ((ens->input_delimiter == '\0' || ens->input_delimiter == ',') &&
             (json_object_object_get_ex(globals, "inputSeparator", &j_val) ||
              json_object_object_get_ex(globals, "input_separator", &j_val))) {
             const char *s = json_object_get_string(j_val);
             if (s && s[0] != '\0') ens->input_delimiter = s[0];
         }
-        if ((ens->list_separator == '\0' || ens->list_separator == ',') &&
-            (json_object_object_get_ex(globals, "listSeparator", &j_val) ||
-             json_object_object_get_ex(globals, "list_separator", &j_val))) {
-            const char *s = json_object_get_string(j_val);
-            if (s && s[0] != '\0') ens->list_separator = s[0];
-        }
         if (json_object_object_get_ex(globals, "header", &j_val)) {
             ens->has_header = json_object_get_boolean(j_val);
         }
         if (json_object_object_get_ex(globals, "aggregate", &j_val)) {
             ens->aggregate = json_object_get_boolean(j_val);
-        }
-        if (json_object_object_get_ex(globals, "printString", &j_val) ||
-            json_object_object_get_ex(globals, "print_string", &j_val)) {
-            const char *s = json_object_get_string(j_val);
-            if (s) strncpy(ens->print_string, s, sizeof(ens->print_string) - 1);
-        }
-        if (json_object_object_get_ex(globals, "printfFormat", &j_val) ||
-            json_object_object_get_ex(globals, "printf_format", &j_val)) {
-            const char *s = json_object_get_string(j_val);
-            if (s) strncpy(ens->printf_format, s, sizeof(ens->printf_format) - 1);
         }
     }
 
@@ -471,31 +432,12 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
         const char *s = json_object_get_string(j_val);
         if (s && s[0] != '\0') ens->input_delimiter = s[0];
     }
-    if (json_object_object_get_ex(root, "list_separator", &j_val) ||
-        json_object_object_get_ex(root, "listSeparator", &j_val)) {
-        const char *s = json_object_get_string(j_val);
-        if (s && s[0] != '\0') ens->list_separator = s[0];
-    }
     if (json_object_object_get_ex(root, "has_header", &j_val) ||
         json_object_object_get_ex(root, "header", &j_val)) {
         ens->has_header = json_object_get_boolean(j_val);
     }
     if (json_object_object_get_ex(root, "aggregate", &j_val)) {
         ens->aggregate = json_object_get_boolean(j_val);
-    }
-    if (json_object_object_get_ex(root, "print_string", &j_val) ||
-        json_object_object_get_ex(root, "printString", &j_val)) {
-        const char *s = json_object_get_string(j_val);
-        if (s) strncpy(ens->print_string, s, sizeof(ens->print_string) - 1);
-    }
-    if (json_object_object_get_ex(root, "printf_format", &j_val) ||
-        json_object_object_get_ex(root, "printfFormat", &j_val)) {
-        const char *s = json_object_get_string(j_val);
-        if (s) strncpy(ens->printf_format, s, sizeof(ens->printf_format) - 1);
-    }
-
-    if (json_object_object_get_ex(root, "decimals", &j_val)) {
-        ens->decimals = json_object_get_int(j_val);
     }
 
     if (has_forests) {
@@ -506,12 +448,10 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
             struct json_object *j_samples = NULL;
             if (geif_forest_from_json_object(&sub, jf, dimensions, &cfg) == GEIF_OK && sub) {
                 // Native GEIF format
-                if (ens->decimals >= 0) sub->decimals = ens->decimals;
             } else if (json_object_object_get_ex(jf, "samples", &j_samples)) {
                 // CEIF format sub-forest with raw samples
                 geif_status_t fstat = geif_forest_create(&sub, dimensions, &cfg);
                 if (fstat == GEIF_OK && sub) {
-                    if (ens->decimals >= 0) sub->decimals = ens->decimals;
                     if (json_object_object_get_ex(jf, "category", &j_val)) {
                         strncpy(sub->category, json_object_get_string(j_val), sizeof(sub->category) - 1);
                     }
@@ -564,35 +504,19 @@ geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char
     if (ens->input_delimiter == ',' && ens->count > 0 && ens->entries[0].forest && ens->entries[0].forest->input_delimiter != '\0') {
         ens->input_delimiter = ens->entries[0].forest->input_delimiter;
     }
-    if (ens->list_separator == ',' && ens->count > 0 && ens->entries[0].forest && ens->entries[0].forest->list_separator != '\0') {
-        ens->list_separator = ens->entries[0].forest->list_separator;
-    }
     if (!ens->has_header && ens->count > 0 && ens->entries[0].forest && ens->entries[0].forest->has_header) {
         ens->has_header = ens->entries[0].forest->has_header;
     }
     if (!ens->aggregate && ens->count > 0 && ens->entries[0].forest && ens->entries[0].forest->aggregate) {
         ens->aggregate = ens->entries[0].forest->aggregate;
     }
-    if (ens->print_string[0] == '\0' && ens->count > 0 && ens->entries[0].forest && ens->entries[0].forest->print_string[0] != '\0') {
-        memcpy(ens->print_string, ens->entries[0].forest->print_string, sizeof(ens->print_string));
-    }
-    if (ens->printf_format[0] == '\0' && ens->count > 0 && ens->entries[0].forest && ens->entries[0].forest->printf_format[0] != '\0') {
-        memcpy(ens->printf_format, ens->entries[0].forest->printf_format, sizeof(ens->printf_format));
-    }
 
     for (size_t i = 0; i < ens->count; i++) {
         if (ens->entries[i].forest) {
             ens->entries[i].forest->scale_score = ens->scale_score;
             ens->entries[i].forest->input_delimiter = ens->input_delimiter;
-            ens->entries[i].forest->list_separator = ens->list_separator;
             ens->entries[i].forest->has_header = ens->has_header;
             ens->entries[i].forest->aggregate = ens->aggregate;
-            if (ens->print_string[0] != '\0') {
-                memcpy(ens->entries[i].forest->print_string, ens->print_string, sizeof(ens->entries[i].forest->print_string));
-            }
-            if (ens->printf_format[0] != '\0') {
-                memcpy(ens->entries[i].forest->printf_format, ens->printf_format, sizeof(ens->entries[i].forest->printf_format));
-            }
             ens->entries[i].forest->summary_slot = -1;
         }
     }

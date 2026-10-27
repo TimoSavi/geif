@@ -46,12 +46,12 @@ MODEL_CLEAN2="$TEST_DIR/model_clean2.json"
 echo "Test 1: Train model containing outlier with -O 80%..."
 $GEIF_BIN -l "$TRAIN_CSV" -w "$MODEL_RAW" -L 1 -C 5 -t 10 -s 64 -O "80%" -W
 
-# Verify JSON contains outlier_score "80%"
-if ! grep -qE '"outlier_score":\s*"80%"' "$MODEL_RAW"; then
-    echo "ERROR: outlier_score '80%' was not persisted in model JSON"
+# Verify JSON does not persist runtime outlier_score
+if grep -q '"outlier_score"' "$MODEL_RAW"; then
+    echo "ERROR: outlier_score should not be persisted in model JSON"
     exit 1
 fi
-echo "  [PASS] -O 80% persisted in model JSON."
+echo "  [PASS] Model JSON saved cleanly without runtime -O threshold."
 
 # Check initial sample count in catA (should be 7)
 SAMPLE_COUNT_RAW=$($GEIF_BIN -r "$MODEL_RAW" -q | grep -oE 'samples=[0-9]+' | head -n 1 | grep -oE '[0-9]+')
@@ -89,10 +89,10 @@ if [ "$SAMPLE_COUNT_CLEAN2" -ne 5 ]; then
 fi
 echo "  [PASS] Repeated -k (-k -k) successfully pruned 2 outliers (samples 7 -> 5)."
 
-# Test 4: Implicit threshold restoration from model JSON
-echo "Test 4: Verify implicit threshold restoration from loaded model..."
+# Test 4: Percentage threshold (-O 80%) on recalibrated model
+echo "Test 4: Verify percentage threshold (-O 80%) on loaded model..."
 SCORES_IMPLICIT="$TEST_DIR/scores_implicit.txt"
-run_geif_score -r "$MODEL_CLEAN1" -a "$TEST_CSV" -L 1 -C 5 -p "%l;%s;%o" -o "$SCORES_IMPLICIT"
+run_geif_score -r "$MODEL_CLEAN1" -a "$TEST_CSV" -O "80%" -L 1 -C 5 -p "%l;%s;%o" -o "$SCORES_IMPLICIT"
 
 cat "$SCORES_IMPLICIT"
 # In test.csv: test_norm is an inlier and suppressed under -p, test_wild is an outlier (o=1)
@@ -104,7 +104,7 @@ if ! grep -q "^test_wild;.*;1$" "$SCORES_IMPLICIT"; then
     echo "ERROR: test_wild was not flagged as outlier"
     exit 1
 fi
-echo "  [PASS] Implicit threshold from model JSON correctly evaluated."
+echo "  [PASS] Percentage threshold (-O 80%) correctly evaluated on loaded model."
 
 # Test 5: Dynamic threshold alias (-O average)
 echo "Test 5: Dynamic threshold alias (-O average)..."

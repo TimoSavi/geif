@@ -267,28 +267,31 @@ The build compiles with `-std=c17 -O3 -march=native -Wall -Wextra -Wpedantic` an
 
 | Option | Argument | Description |
 |---|---|---|
-| `-B`, `--algo` | `<name>` | Algorithm engine: `exemplar` (default), `bubble`, `voronoi`, `ceif` / `eif`. |
+| `-B`, `--algo` | `<name>` | Algorithm engine: `exemplar` (default), `bubble`, `voronoi`, `ceif` / `eif` (persisted in model JSON and restored automatically). |
 | `-l` | `<file>` | Train / learn mode: stream data from CSV file or `-` (stdin) into model. |
 | `-a` | `<file>` | Analysis / score mode: score data from CSV file or `-` (stdin). |
 | `-c` | `<file>` | Categorize mode: classify samples against all categories and assign best match. |
 | `-w` | `<file>` | Write / save model to JSON file or `-` (stdout). |
-| `-r` | `<file>` | Read / load model from JSON file or `-` (stdin); auto-restores saved `-f` and `-e` delimiters. |
-| `-z` | `<file>` | Update model in-place (loads model, updates with `-l`, rewrites file; auto-restores `-f`). |
+| `-r` | `<file>` | Read / load model from JSON file or `-` (stdin); auto-restores model and input schema settings. |
+| `-z` | `<file>` | Update model in-place (loads model, updates with `-l`, rewrites file; auto-restores model and input schema settings). |
 | `-o` | `<file>` | Output file for scoring results (default: `-` for stdout). |
 | `-O` | `<spec>` | Outlier threshold: decimal (`0.65`), percentage in `0%`–`200%` (`80%` empirical in-sample, `110%` algorithm-extrapolated out-of-sample border, `200%` $= 1.0$), or `average`. |
+| `-t` | `<num>` | Number of isolation trees per sub-forest (default: 100; persisted in model JSON and restored automatically). |
+| `-s` | `<num>` | Number of samples subsampled per tree (default: 256; persisted in model JSON and restored automatically). |
 | `-k` | *(flag)* | Recalibrate model / prune reservoir outliers (repeatable: `-k -k`). |
 | `-D` | `<rate>d` | Exponential age decay rate in days (e.g., `-D30d`, `-D7d`). |
-| `-C` | `<spec>` | Category column range/list (e.g., `12`, `"2-4"`, `"1,3,5"`). |
-| `-L` | `<spec>` | Label column range/list (e.g., `1`, `"1-2"`). |
-| `-U` | `<spec>` | Include column range/list for feature vectors. |
-| `-I` | `<spec>` | Ignore column range/list. |
+| `-C` | `<spec>` | Category column range/list (e.g., `12`, `"2-4"`, `"1,3,5"`; persisted in model JSON and restored automatically). |
+| `-L` | `<spec>` | Label column range/list (e.g., `1`, `"1-2"`; persisted in model JSON and restored automatically). |
+| `-U` | `<spec>` | Include column range/list for feature vectors (persisted in model JSON and restored automatically). |
+| `-I` | `<spec>` | Ignore column range/list (persisted in model JSON and restored automatically). |
 | `-H`, `--header` | *(flag)* | Skip header row in input CSV (persisted in model JSON and restored automatically). |
 | `--no-header` | *(flag)* | Explicitly disable header skipping, overriding saved model header state. |
-| `-f` | `<char>` | Input field delimiter (default: `,`; saved in model and restored automatically). |
-| `-e` | `<char>` | List separator for output / field delimiter fallback (saved in model and restored). |
+| `-A`, `--aggregate` | *(flag)* | Sum/aggregate sample values per category across each `-l`, `-a`, or `-c` invocation (persisted in model JSON and restored automatically). |
+| `-f` | `<char>` | Input field delimiter (default: `,`; persisted in model JSON and restored automatically). |
+| `-e` | `<char>` | List separator for output (default: `,`; also sets `-f` if `-f` is not explicitly given). |
 | `-d` | `<num>` | Output floating-point decimal precision (default: 6). |
-| `-m` | `<fmt>` | Printf numeric format string for dimension output (e.g., `"%'.0f"`). Persisted in model JSON and restored automatically. |
-| `-p` | `<tmpl>` | Output template for outlier rows or categorized data (default: `"%s %v"`). In analysis mode (`-a`), only outlier rows (`score > threshold`) are printed; nominal inliers are suppressed. Persisted in model JSON and restored automatically. |
+| `-m` | `<fmt>` | Printf numeric format string for dimension output (e.g., `"%'.0f"`). |
+| `-p` | `<tmpl>` | Output template for outlier rows or categorized data (default: `"%s %v"`). In analysis mode (`-a`), only outlier rows (`score > threshold`) are printed; nominal inliers are suppressed. |
 | `-v` | `[tmpl]` | Print summary statistics calculated from analyzed data using format `<tmpl>` (default: `"%C %r %h"`), or enable verbose mode when given without argument. |
 | `-N`, `--new` | `[tmpl]` | Output template for newly observed, untrained categories during scoring or continuous learning (default: `"%v"`). |
 | `-M`, `--missing` | `[tmpl]` | Output template for missed categories (trained but absent in stream; default: `"%C"`). |
@@ -309,7 +312,7 @@ The following template tokens can be used in `-p`, `-v`, `-N`, `-M`, and `-j`:
 |---|---|---|
 | `%s` | Calibrated anomaly score $[0.0, 1.0)$ | `0.655800` |
 | `%S` | Average anomaly score for analyzed data | `0.214500` |
-| `%O` | Effective outlier score limit in $[0.0, 1.0]$ (resolved from `-O`, `OUTLIER_SCORE`, or JSON; prints actual score cutoff for percentages) | `0.500000` |
+| `%O` | Effective outlier score limit in $[0.0, 1.0]$ (resolved from `-O`, `OUTLIER_SCORE`, or default `0.500000`; prints actual score cutoff for percentages) | `0.500000` |
 | `%l` | Label string | `sample_42` |
 | `%c` / `%C` | Category name | `Cuddalore-CO_43-alluvial` |
 | `%d` | Feature dimension values (joined by delimiter) | `10.5;20.2;30.1` |

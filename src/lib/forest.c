@@ -116,7 +116,6 @@ geif_status_t geif_forest_create(geif_forest_t **forest_out,
     f->scale_score = true;
     f->percentage_score = -1.0;
     f->input_delimiter = ',';
-    f->list_separator = ',';
     f->has_header = false;
     f->aggregate = false;
     f->summary_slot = -1;

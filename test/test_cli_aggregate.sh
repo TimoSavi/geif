@@ -56,7 +56,7 @@ if ! grep -q "rows=1, samples=1" <<< "$Q1"; then
     exit 1
 fi
 
-# Update Days 2-16 using -z WITHOUT passing -A, -C, -H, or -d
+# Update Days 2-16 using -z WITHOUT passing -A, -C, or -H
 for day in $(seq 2 16); do
     "$GEIF" -z "$MODEL" -l "$TMPDIR/day${day}.csv" > /dev/null
 done
@@ -85,7 +85,7 @@ EOF
 
 ANA_OUT="$TMPDIR/ana_out.txt"
 set +e
-"$GEIF" -r "$MODEL" -a "$TMPDIR/test_day.csv" -O 0.5 -e ';' \
+"$GEIF" -r "$MODEL" -a "$TMPDIR/test_day.csv" -O 0.5 -e ';' -d 0 \
     -p "ANOM;%C;%d;%a" -N "NEW;%c;%d" -v "SUM;%C;%o;%h;%a" > "$ANA_OUT"
 RC=$?
 set -e
@@ -139,7 +139,7 @@ EOF
 
 MISS_OUT="$TMPDIR/miss_out.txt"
 set +e
-"$GEIF" -r "$MODEL" -a "$TMPDIR/partial_day.csv" -O 0.5 -e ';' -M "MISS;%C;%a" > "$MISS_OUT"
+"$GEIF" -r "$MODEL" -a "$TMPDIR/partial_day.csv" -O 0.5 -e ';' -d 0 -M "MISS;%C;%a" > "$MISS_OUT"
 RC=$?
 set -e
 if [ "$RC" -ne 2 ]; then
@@ -166,7 +166,7 @@ probe,B,60,600
 EOF
 
 CAT_OUT="$TMPDIR/cat_out.txt"
-"$GEIF" -r "$MODEL" -c "$TMPDIR/cat_day.csv" -e ';' -p "CAT;%c->%C;%d" > "$CAT_OUT"
+"$GEIF" -r "$MODEL" -c "$TMPDIR/cat_day.csv" -e ';' -d 0 -p "CAT;%c->%C;%d" > "$CAT_OUT"
 if ! grep -q "^CAT;probe;A->12;In;250;2500$" "$CAT_OUT"; then
     echo "FAIL: Expected CAT;probe;A->12;In;250;2500 in categorization output"
     cat "$CAT_OUT"

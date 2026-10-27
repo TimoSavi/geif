@@ -84,7 +84,6 @@ geif_status_t geif_ensemble_create(geif_ensemble_t **ensemble_out,
     ens->decimals = 6;
     ens->scale_score = true;
     ens->input_delimiter = ',';
-    ens->list_separator = ',';
     ens->has_header = false;
 
     ens->capacity = GEIF_ENS_INIT_CAPACITY;
@@ -239,7 +238,6 @@ geif_forest_t *geif_ensemble_get_or_create(geif_ensemble_t *ens, const char *cat
     forest->decimals = ens->decimals;
     forest->scale_score = ens->scale_score;
     forest->input_delimiter = ens->input_delimiter;
-    forest->list_separator = ens->list_separator;
     forest->has_header = ens->has_header;
     forest->aggregate = ens->aggregate;
 
@@ -310,9 +308,6 @@ geif_status_t geif_ensemble_add_forest(geif_ensemble_t *ens,
     forest->scale_score = ens->scale_score;
     if (forest->input_delimiter == '\0' || forest->input_delimiter == ',') {
         forest->input_delimiter = ens->input_delimiter ? ens->input_delimiter : ',';
-    }
-    if (forest->list_separator == '\0' || forest->list_separator == ',') {
-        forest->list_separator = ens->list_separator ? ens->list_separator : ',';
     }
     if (!forest->has_header && ens->has_header) {
         forest->has_header = ens->has_header;
@@ -622,7 +617,6 @@ void geif_ensemble_summary(const geif_ensemble_t *ens, char *buffer, size_t buff
                      "  Include Columns (-U): %s\n"
                      "  Ignore Columns (-I):  %s\n"
                      "  Input Delimiter (-f): '%c'\n"
-                     "  List Separator (-e):  '%c'\n"
                      "  Skip Header (-H):     %s\n"
                      "  Aggregate (-A):       %s\n",
                      geif_algo_name(ens->config.algo),
@@ -634,7 +628,6 @@ void geif_ensemble_summary(const geif_ensemble_t *ens, char *buffer, size_t buff
                      ens->include_dims_spec[0] ? ens->include_dims_spec : "(all)",
                      ens->ignore_dims_spec[0] ? ens->ignore_dims_spec : "(none)",
                      ens->input_delimiter ? ens->input_delimiter : ',',
-                     ens->list_separator ? ens->list_separator : ',',
                      ens->has_header ? "Yes" : "No",
                      ens->aggregate ? "Yes" : "No");
     if (n > 0) {

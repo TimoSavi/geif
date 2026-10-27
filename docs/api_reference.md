@@ -90,8 +90,8 @@
 | Enum Constant | Value | CLI Name | Description |
 | :--- | :--- | :--- | :--- |
 | `GEIF_ALGO_CEIF` | `0` | `ceif` / `eif` | Data-anchored isotropic Gaussian cuts with Zero Kelvin scale floor and outer decay. |
-| `GEIF_ALGO_BUBBLE` | `1` | `bubble` | Hyperspherical Bubble tree cavity carving with median quickselect (default). |
-| `GEIF_ALGO_EXEMPLAR` | `2` | `exemplar` | Direct SIMD Cauchy kernel density evaluation on reservoir pool samples. |
+| `GEIF_ALGO_BUBBLE` | `1` | `bubble` | Hyperspherical Bubble tree cavity carving with median quickselect. |
+| `GEIF_ALGO_EXEMPLAR` | `2` | `exemplar` | Direct SIMD Cauchy kernel density evaluation on reservoir pool samples (default). |
 | `GEIF_ALGO_VORONOI` | `3` | `voronoi` | Scale-invariant Voronoi perpendicular bisector hyperplane cuts. |
 
 ---
@@ -1785,7 +1785,7 @@ and individual tree structures. Seeds PRNG if seed is 0.
 
 ---
 
-#### [`geif_forest_destroy`](../src/lib/forest.c#L144)
+#### [`geif_forest_destroy`](../src/lib/forest.c#L143)
 
 ```c
 void geif_forest_destroy(geif_forest_t *f);
@@ -1806,7 +1806,7 @@ and finally frees the forest container. Safe to invoke with NULL.
 
 ---
 
-#### [`geif_forest_summary`](../src/lib/forest.c#L191)
+#### [`geif_forest_summary`](../src/lib/forest.c#L190)
 
 ```c
 void geif_forest_summary(const geif_forest_t *f, char *buf, size_t size);
@@ -2108,7 +2108,7 @@ sub-forest dispatching based on category labels.
 
 ---
 
-#### [`geif_ensemble_destroy`](../src/lib/ensemble.c#L117)
+#### [`geif_ensemble_destroy`](../src/lib/ensemble.c#L116)
 
 ```c
 void geif_ensemble_destroy(geif_ensemble_t *ens);
@@ -2127,7 +2127,7 @@ and frees the ensemble container. Safe to invoke with NULL.
 
 ---
 
-#### [`geif_ensemble_get_entry`](../src/lib/ensemble.c#L159)
+#### [`geif_ensemble_get_entry`](../src/lib/ensemble.c#L158)
 
 ```c
 geif_category_entry_t *geif_ensemble_get_entry(const geif_ensemble_t *ens, const char *category);
@@ -2146,7 +2146,7 @@ geif_category_entry_t *geif_ensemble_get_entry(const geif_ensemble_t *ens, const
 
 ---
 
-#### [`geif_ensemble_find`](../src/lib/ensemble.c#L186)
+#### [`geif_ensemble_find`](../src/lib/ensemble.c#L185)
 
 ```c
 geif_forest_t *geif_ensemble_find(const geif_ensemble_t *ens, const char *category);
@@ -2165,7 +2165,7 @@ geif_forest_t *geif_ensemble_find(const geif_ensemble_t *ens, const char *catego
 
 ---
 
-#### [`geif_ensemble_get_or_create`](../src/lib/ensemble.c#L203)
+#### [`geif_ensemble_get_or_create`](../src/lib/ensemble.c#L202)
 
 ```c
 geif_forest_t *geif_ensemble_get_or_create(geif_ensemble_t *ens, const char *category);
@@ -2188,7 +2188,7 @@ specifications to the newly instantiated sub-forest.
 
 ---
 
-#### [`geif_ensemble_add_forest`](../src/lib/ensemble.c#L281)
+#### [`geif_ensemble_add_forest`](../src/lib/ensemble.c#L279)
 
 ```c
 geif_status_t geif_ensemble_add_forest(geif_ensemble_t *ens, const char *category, geif_forest_t *forest, uint64_t total_rows, time_t last_updated);
@@ -2213,7 +2213,7 @@ the previous forest is destroyed and replaced.
 
 ---
 
-#### [`geif_ensemble_feed`](../src/lib/ensemble.c#L391)
+#### [`geif_ensemble_feed`](../src/lib/ensemble.c#L386)
 
 ```c
 geif_status_t geif_ensemble_feed(geif_ensemble_t *ens, const char *category, const double *point);
@@ -2237,7 +2237,7 @@ streaming reservoir sampling.
 
 ---
 
-#### [`geif_ensemble_prune_categories`](../src/lib/ensemble.c#L432)
+#### [`geif_ensemble_prune_categories`](../src/lib/ensemble.c#L427)
 
 ```c
 geif_status_t geif_ensemble_prune_categories(geif_ensemble_t *ens, uint64_t min_rows);
@@ -2260,7 +2260,7 @@ but are marked with filtered = true so active operations skip them.
 
 ---
 
-#### [`geif_ensemble_prune_age`](../src/lib/ensemble.c#L453)
+#### [`geif_ensemble_prune_age`](../src/lib/ensemble.c#L448)
 
 ```c
 geif_status_t geif_ensemble_prune_age(geif_ensemble_t *ens, time_t max_age_seconds, time_t now);
@@ -2280,7 +2280,7 @@ geif_status_t geif_ensemble_prune_age(geif_ensemble_t *ens, time_t max_age_secon
 
 ---
 
-#### [`geif_ensemble_train`](../src/lib/ensemble.c#L515)
+#### [`geif_ensemble_train`](../src/lib/ensemble.c#L510)
 
 ```c
 geif_status_t geif_ensemble_train(geif_ensemble_t *ens);
@@ -2301,7 +2301,7 @@ unfiltered sub-forest with pool_count > 0.
 
 ---
 
-#### [`geif_ensemble_score_detailed`](../src/lib/ensemble.c#L548)
+#### [`geif_ensemble_score_detailed`](../src/lib/ensemble.c#L543)
 
 ```c
 geif_status_t geif_ensemble_score_detailed(const geif_ensemble_t *ens, const char *category, const double *point, double *score_out, double *metric_depth_out, double *d_out_out);
@@ -2328,7 +2328,7 @@ training, returns maximum outlier score (1.0 - 1e-6) and GEIF_ERR_INVALID_ARG.
 
 ---
 
-#### [`geif_ensemble_summary`](../src/lib/ensemble.c#L604)
+#### [`geif_ensemble_summary`](../src/lib/ensemble.c#L599)
 
 ```c
 void geif_ensemble_summary(const geif_ensemble_t *ens, char *buffer, size_t buffer_size);
@@ -2349,7 +2349,7 @@ for each active sub-forest (rows seen, pool size, tree count, calibrated H_max, 
 
 ---
 
-#### [`geif_forest_remove_outliers`](../src/lib/ensemble.c#L687)
+#### [`geif_forest_remove_outliers`](../src/lib/ensemble.c#L680)
 
 ```c
 geif_status_t geif_forest_remove_outliers(geif_forest_t *f, uint32_t k);
@@ -2372,7 +2372,7 @@ memmove, and retrains the trees to recalibrate spatial boundaries without outlie
 
 ---
 
-#### [`geif_ensemble_remove_outliers`](../src/lib/ensemble.c#L738)
+#### [`geif_ensemble_remove_outliers`](../src/lib/ensemble.c#L731)
 
 ```c
 geif_status_t geif_ensemble_remove_outliers(geif_ensemble_t *ens, uint32_t k);
@@ -2520,7 +2520,7 @@ the same unified GEIF-1.0 schema.
 
 ---
 
-#### [`geif_ensemble_save_json`](../src/lib/json_io.c#L234)
+#### [`geif_ensemble_save_json`](../src/lib/json_io.c#L231)
 
 ```c
 geif_status_t geif_ensemble_save_json(const geif_ensemble_t *ens, const char *path);
@@ -2542,7 +2542,7 @@ of sub-forest objects containing only category, last_updated, total_rows, and sa
 
 ---
 
-#### [`geif_ensemble_load_json`](../src/lib/json_io.c#L320)
+#### [`geif_ensemble_load_json`](../src/lib/json_io.c#L306)
 
 ```c
 geif_status_t geif_ensemble_load_json(geif_ensemble_t **ensemble_out, const char *path);
@@ -2564,7 +2564,7 @@ model schemas, dynamically reconstructing memory structures and building trees.
 
 ---
 
-#### [`geif_forest_load_json`](../src/lib/json_io.c#L615)
+#### [`geif_forest_load_json`](../src/lib/json_io.c#L539)
 
 ```c
 geif_status_t geif_forest_load_json(geif_forest_t **forest_out, const char *path);
