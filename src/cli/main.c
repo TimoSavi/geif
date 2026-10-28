@@ -19,8 +19,6 @@
 #include <time.h>
 #include <locale.h>
 
-#define GEIF_VERSION "1.1.0"
-
 /**
  * @brief Displays command-line syntax and comprehensive option reference for GEIF CLI.
  *
@@ -28,7 +26,7 @@
  */
 static void print_usage(const char *prog)
 {
-    printf("GEIF - Geometric Extended Isolation Forest (v%s)\n\n", GEIF_VERSION);
+    printf("GEIF - Geometric Extended Isolation Forest (v%s)\n\n", GEIF_VERSION_STRING);
     printf("Usage:\n");
     printf("  Train a model:     %s -l <train.csv> -w <model.json> [-t trees] [-s samples] [-f sep] [-H] [-I range] [-U range] [-L range] [-C range] [-R min_rows]\n", prog);
     printf("  Score streaming:   %s -r <model.json> -a <test.csv> [-o <out.csv>] [-O threshold] [-F regex] [-N tmpl] [-M tmpl] [-p tmpl] [-S]\n", prog);

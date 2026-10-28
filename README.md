@@ -255,7 +255,7 @@ make clean
 
 The build compiles with `-std=c17 -O3 -march=native -Wall -Wextra -Wpedantic` and produces:
 - `lib/libgeif.a` (Static Library)
-- `lib/libgeif.so` (Shared Library)
+- `lib/libgeif.so.1.1.0` with `lib/libgeif.so.1` (`SONAME`) and `lib/libgeif.so` symlinks (Shared Library)
 - `bin/geif` (Production CLI Binary)
 - `bin/ceif2geif` (Model Migration Utility)
 

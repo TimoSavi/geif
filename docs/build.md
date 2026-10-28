@@ -38,8 +38,10 @@ make clean
 ```
 
 ### Generated Artifacts:
-- `lib/libgeif.a`: Static C17 library for static linking.
-- `lib/libgeif.so`: Dynamically linked shared library.
+- `lib/libgeif.a`: Static C17 library for static linking (`-lgeif`).
+- `lib/libgeif.so.1.1.0`: Dynamically linked shared library with embedded `SONAME` (`libgeif.so.1`).
+- `lib/libgeif.so.1` $\rightarrow$ `libgeif.so.1.1.0`: Runtime ABI `SONAME` symlink.
+- `lib/libgeif.so` $\rightarrow$ `libgeif.so.1`: Compile-time linker symlink (`-lgeif`).
 - `bin/geif`: Primary command-line interface executable.
 - `bin/ceif2geif`: Model migration utility for converting legacy models.
 

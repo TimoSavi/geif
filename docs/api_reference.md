@@ -2616,7 +2616,7 @@ Command-line pipeline driver, streaming loops, OOM-safe memory allocation, colum
 
 **Module Purpose:** GEIF CLI frontend for training, inference, and model management.
 
-#### [`print_usage`](../src/cli/main.c#L29)
+#### [`print_usage`](../src/cli/main.c#L27)
 
 ```c
 static void print_usage(const char *prog);
@@ -2632,7 +2632,7 @@ static void print_usage(const char *prog);
 
 ---
 
-#### [`tokenize_line`](../src/cli/main.c#L90)
+#### [`tokenize_line`](../src/cli/main.c#L88)
 
 ```c
 static uint32_t tokenize_line(char *line, char delim, char **tokens, uint32_t max_tokens);
@@ -2656,7 +2656,7 @@ delimiters, and trims surrounding whitespace. Modifies the input line buffer in-
 
 ---
 
-#### [`parse_delete_interval`](../src/cli/main.c#L144)
+#### [`parse_delete_interval`](../src/cli/main.c#L142)
 
 ```c
 static time_t parse_delete_interval(const char *s);
@@ -2677,7 +2677,7 @@ Supports units: 'y' (years), 'm'/'M' (months or minutes depending on context),
 
 ---
 
-#### [`process_scoring_row`](../src/cli/main.c#L223)
+#### [`process_scoring_row`](../src/cli/main.c#L221)
 
 ```c
 static void process_scoring_row(geif_ensemble_t *ensemble, const geif_column_config_t *col_cfg, const cat_filter_t *cat_filter, char **tokens, uint32_t n_tok, const char *orig_line, uint64_t line_num, char list_sep, char cat_sep, char label_sep, double threshold, bool threshold_is_average, bool threshold_is_percentage, const char *point_tmpl, const char *average_tmpl, const char *new_cat_tmpl, int decimals, const char *printf_format, const char *print_dimension, uint32_t low_rgb, uint32_t high_rgb, double *vec, uint32_t dims, FILE *out_fp, uint64_t *analyzed, uint64_t *total_outliers);
@@ -2721,7 +2721,7 @@ determines outlier status against threshold, and formats output via templates.
 
 ---
 
-#### [`process_categorize_row`](../src/cli/main.c#L543)
+#### [`process_categorize_row`](../src/cli/main.c#L541)
 
 ```c
 static void process_categorize_row(geif_ensemble_t *ensemble, const geif_column_config_t *col_cfg, bool direct_feature_mapping, const cat_filter_t *cat_filter, char **tokens, uint32_t n_tok, const char *orig_line, uint64_t line_num, char list_sep, char cat_sep, char label_sep, double threshold, bool threshold_is_average, bool threshold_is_percentage, bool score_limit_given, const char *point_tmpl, int decimals, const char *printf_format, const char *print_dimension, uint32_t low_rgb, uint32_t high_rgb, double *vec, uint32_t dims, FILE *out_fp, uint64_t *analyzed, agg_cat_bucket_t **agg_buckets, size_t *agg_count, size_t *agg_cap);
@@ -2731,7 +2731,7 @@ static void process_categorize_row(geif_ensemble_t *ensemble, const geif_column_
 
 ---
 
-#### [`parse_outlier_score_spec`](../src/cli/main.c#L641)
+#### [`parse_outlier_score_spec`](../src/cli/main.c#L639)
 
 ```c
 static bool parse_outlier_score_spec(const char *spec, bool *is_avg, bool *is_pct, double *pct_out, double *thresh_out);
@@ -2758,7 +2758,7 @@ Accepts:
 
 ---
 
-#### [`update_ensemble_percentage_scores`](../src/cli/main.c#L681)
+#### [`update_ensemble_percentage_scores`](../src/cli/main.c#L679)
 
 ```c
 static void update_ensemble_percentage_scores(geif_ensemble_t *ens, double pct, const cat_filter_t *filter, bool verbose);
@@ -2779,7 +2779,7 @@ percentage in [0.0, 200.0] (0-100% empirical in-sample, 100-200% algorithm-extra
 
 ---
 
-#### [`main`](../src/cli/main.c#L746)
+#### [`main`](../src/cli/main.c#L744)
 
 ```c
 int main(int argc, char *argv[]);
@@ -3781,7 +3781,7 @@ void   xreset_total_allocated(void);
 
 **Module Purpose:** CEIF JSON model to GEIF-1.0 JSON model migration tool.
 
-#### [`parse_algo_option`](../src/cli/ceif2geif.c#L21)
+#### [`parse_algo_option`](../src/cli/ceif2geif.c#L19)
 
 ```c
 static bool parse_algo_option(const char *name, geif_algo_type_t *algo_out);
@@ -3791,7 +3791,7 @@ static bool parse_algo_option(const char *name, geif_algo_type_t *algo_out);
 
 ---
 
-#### [`print_usage`](../src/cli/ceif2geif.c#L44)
+#### [`print_usage`](../src/cli/ceif2geif.c#L42)
 
 ```c
 static void print_usage(const char *prog);
@@ -3807,7 +3807,7 @@ static void print_usage(const char *prog);
 
 ---
 
-#### [`main`](../src/cli/ceif2geif.c#L72)
+#### [`main`](../src/cli/ceif2geif.c#L70)
 
 ```c
 int main(int argc, char *argv[]);

@@ -13,8 +13,6 @@
 #include <unistd.h>
 #include <getopt.h>
 
-#define CEIF2GEIF_VERSION "1.1.0"
-
 /**
  * @brief Validates and parses an algorithm name string for -B / --algo.
  */
@@ -43,7 +41,7 @@ static bool parse_algo_option(const char *name, geif_algo_type_t *algo_out)
  */
 static void print_usage(const char *prog)
 {
-    printf("ceif2geif v%s - Migrate CEIF JSON models to GEIF-1.0 JSON models\n", CEIF2GEIF_VERSION);
+    printf("ceif2geif v%s - Migrate CEIF JSON models to GEIF-1.0 JSON models\n", GEIF_VERSION_STRING);
     printf("Author / Maintainer: Timo Savinen (AI-assisted)\n\n");
     printf("Usage:\n");
     printf("  %s [options] <input_ceif.json> [output_geif.json]\n", prog);
@@ -108,7 +106,7 @@ int main(int argc, char *argv[])
         case 'v': verbose = true; break;
         case 'q': quiet = true; break;
         case 'h': print_usage(argv[0]); return 0;
-        case 'V': printf("ceif2geif version %s\n", CEIF2GEIF_VERSION); return 0;
+        case 'V': printf("ceif2geif version %s\n", GEIF_VERSION_STRING); return 0;
         default:
             print_usage(argv[0]);
             return 1;

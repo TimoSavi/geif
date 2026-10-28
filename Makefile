@@ -45,12 +45,19 @@ MIGRATE_OBJS = src/cli/ceif2geif.o
 BIN_DIR = bin
 LIB_DIR = lib
 
-STATIC_LIB = $(LIB_DIR)/libgeif.a
-SHARED_LIB = $(LIB_DIR)/libgeif.so
-CLI_BIN    = $(BIN_DIR)/geif
-MIGRATE_BIN = $(BIN_DIR)/ceif2geif
+VERSION_MAJOR := $(shell awk '/^#define GEIF_VERSION_MAJOR/ {print $$3}' include/geif/geif.h)
+VERSION_MINOR := $(shell awk '/^#define GEIF_VERSION_MINOR/ {print $$3}' include/geif/geif.h)
+VERSION_PATCH := $(shell awk '/^#define GEIF_VERSION_PATCH/ {print $$3}' include/geif/geif.h)
+VERSION       := $(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_PATCH)
 
-.PHONY: all clean test test-prod test-all dirs doc
+STATIC_LIB        = $(LIB_DIR)/libgeif.a
+SHARED_LIB_REAL   = $(LIB_DIR)/libgeif.so.$(VERSION)
+SHARED_LIB_SONAME = $(LIB_DIR)/libgeif.so.$(VERSION_MAJOR)
+SHARED_LIB        = $(LIB_DIR)/libgeif.so
+CLI_BIN           = $(BIN_DIR)/geif
+MIGRATE_BIN       = $(BIN_DIR)/ceif2geif
+
+.PHONY: all clean install uninstall test test-prod test-all dirs doc
 
 all: dirs $(STATIC_LIB) $(SHARED_LIB) $(CLI_BIN) $(MIGRATE_BIN)
 
@@ -69,8 +76,28 @@ src/cli/%.o: src/cli/%.c
 $(STATIC_LIB): $(LIB_OBJS) | dirs
 	$(AR) rcs $@ $^
 
-$(SHARED_LIB): $(LIB_OBJS) | dirs
-	$(CC) -shared $(OPTFLAGS) -o $@ $^ $(LIBS)
+$(SHARED_LIB_REAL): $(LIB_OBJS) | dirs
+	$(CC) -shared $(OPTFLAGS) -Wl,-soname,libgeif.so.$(VERSION_MAJOR) -o $@ $^ $(LIBS)
+
+$(SHARED_LIB_SONAME): $(SHARED_LIB_REAL)
+	ln -sf libgeif.so.$(VERSION) $@
+
+$(SHARED_LIB): $(SHARED_LIB_SONAME)
+	ln -sf libgeif.so.$(VERSION_MAJOR) $@
+
+install: all
+	install -d $(DESTDIR)$(PREFIX)/bin $(DESTDIR)$(PREFIX)/lib $(DESTDIR)$(PREFIX)/include/geif
+	install -m 755 $(CLI_BIN) $(MIGRATE_BIN) $(DESTDIR)$(PREFIX)/bin/
+	install -m 644 $(STATIC_LIB) $(DESTDIR)$(PREFIX)/lib/
+	install -m 755 $(SHARED_LIB_REAL) $(DESTDIR)$(PREFIX)/lib/
+	ln -sf libgeif.so.$(VERSION) $(DESTDIR)$(PREFIX)/lib/libgeif.so.$(VERSION_MAJOR)
+	ln -sf libgeif.so.$(VERSION_MAJOR) $(DESTDIR)$(PREFIX)/lib/libgeif.so
+	install -m 644 include/geif/*.h $(DESTDIR)$(PREFIX)/include/geif/
+
+uninstall:
+	rm -f $(DESTDIR)$(PREFIX)/bin/geif $(DESTDIR)$(PREFIX)/bin/ceif2geif
+	rm -f $(DESTDIR)$(PREFIX)/lib/libgeif.a $(DESTDIR)$(PREFIX)/lib/libgeif.so*
+	rm -rf $(DESTDIR)$(PREFIX)/include/geif
 
 $(CLI_BIN): $(CLI_OBJS) $(STATIC_LIB) | dirs
 	$(CC) $(CFLAGS) $(OPTFLAGS) $^ $(LIBS) -o $@
