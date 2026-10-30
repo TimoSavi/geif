@@ -46,39 +46,50 @@ Input data is expected to be character-delimited ASCII/UTF-8 records (default co
    ./bin/geif -r model.json -q
    ```
 
+6. **In-Place Model Maintenance & Parameter Updates (`-z`, `-r` / `-w`)**:
+   Update persisted model parameters (`-s`, `-B`, `-t`, `-f`, `-H` / `--no-header`, `-A` / `--no-aggregate`, `-C`, `-L`, `-I`, `-U`) or prune/filter categories (`-D`, `-R`, `-F`, `-k`) on an existing JSON model without ingesting new data:
+   ```bash
+   # Resize reservoir capacity to 200 samples per tree (truncating existing pools > 200)
+   ./bin/geif -z model.json -s 200
+
+   # Switch algorithm engine or CSV schema settings in-place
+   ./bin/geif -z model.json -B bubble -t 150 --no-header -f ';'
+   ```
+
 ---
 
 ## 2. Command-Line Options Reference
 
 | Option | Argument | Description |
 | :--- | :--- | :--- |
-| `-B`, `--algo` | `NAME` | Spatial isolation algorithm: `exemplar` (default), `bubble`, `voronoi`, `ceif`. Persisted in model JSON and restored automatically. |
+| `-B`, `--algo` | `NAME` | Spatial isolation algorithm: `exemplar` (default), `bubble`, `voronoi`, `ceif`. Persisted in model JSON, restored automatically, and updateable via `-z` / `-w`. |
 | `-l` | `FILE` | Ingest CSV dataset for model training (use `-` for stdin). |
 | `-a` | `FILE` | Score and analyze samples from input CSV (use `-` for stdin). |
 | `-c` | `FILE` | Categorize observations against all sub-forest categories and assign best fit. |
 | `-w` | `FILE` | Write trained model ensemble to a JSON file (use `-` for stdout). |
 | `-r` | `FILE` | Read model ensemble from a JSON file (supports GEIF-1.0 and legacy formats; auto-restores model and input schema settings). |
-| `-z` | `FILE` | Update model in-place: read model from `FILE`, update with streaming data, and rewrite to `FILE` (auto-restores model and input schema settings). |
+| `-z` | `FILE` | Update model in-place: read model from `FILE`, apply streaming data (`-l`) or standalone parameter/maintenance updates, and rewrite to `FILE` (auto-restores model and input schema settings). |
 | `-o` | `FILE` | Output file path for scoring results (default: stdout, `-` for stdout). |
 | `-O` | `THRESH` | Anomaly threshold: float in $[0.0, 1.0]$ (default 0.50), percentage in `0%`–`200%` (e.g. `90%` in-sample or `110%` extrapolated out-of-sample), or `average`. |
-| `-t` | `INT` | Number of isolation trees per sub-forest (default: 100). Persisted in model JSON and restored automatically. |
-| `-s` | `INT` | Number of samples subsampled per tree (default: 256). Persisted in model JSON and restored automatically. |
+| `-t` | `INT` | Number of isolation trees per sub-forest (default: 100). Persisted in model JSON, restored automatically, and updateable via `-z` / `-w`. |
+| `-s` | `INT` | Number of samples subsampled per tree (default: 256). Persisted in model JSON, restored automatically, and updateable via `-z` / `-w` (resizes/truncates reservoir pools). |
 | `-i` | `INT` | Test grid sampling interval (default: 256) or tree count alias. |
 | `-T` | `[FLOAT]` | Generate synthetic test grid with optional domain extension margin (e.g. `0.1`). |
 | `-k` | (none) | Prune the most extreme outlier sample from the reservoir pool and recalibrate (repeatable). |
 | `-g` | `FILE` | Load configuration / RC file (overrides `~/.geifrc` and `~/.ceifrc`). Repeatable. |
-| `-f` | `CHAR` | Input field delimiter character (default: `,`). Persisted in model JSON and restored automatically. |
+| `-f` | `CHAR` | Input field delimiter character (default: `,`). Persisted in model JSON, restored automatically, and updateable via `-z` / `-w`. |
 | `-e` | `CHAR` | Output field separator character (default: `,`; also sets `-f` if `-f` is not explicitly given). |
-| `-H`, `--header` | (none) | Ignore header line in input CSV files. Persisted in model JSON and restored automatically. |
+| `-H`, `--header` | (none) | Ignore header line in input CSV files. Persisted in model JSON, restored automatically, and updateable via `-z` / `-w`. |
 | `--no-header` | (none) | Explicitly disable header skipping, overriding saved model header state. |
-| `-I` | `RANGE` | Comma-separated list of 1-based column indices/ranges to ignore (e.g. `1,3,5-7`). Persisted in model JSON and restored automatically. |
-| `-U` | `RANGE` | Comma-separated list of 1-based column indices/ranges to include exclusively. Persisted in model JSON and restored automatically. |
-| `-L` | `RANGE` | Column indices/ranges to treat as descriptive labels (excluded from features). Persisted in model JSON and restored automatically. |
-| `-C` | `RANGE` | Column indices/ranges to treat as category keys for multi-category routing. Persisted in model JSON and restored automatically. |
+| `-I` | `RANGE` | Comma-separated list of 1-based column indices/ranges to ignore (e.g. `1,3,5-7`). Persisted in model JSON, restored automatically, and updateable via `-z` / `-w`. |
+| `-U` | `RANGE` | Comma-separated list of 1-based column indices/ranges to include exclusively. Persisted in model JSON, restored automatically, and updateable via `-z` / `-w`. |
+| `-L` | `RANGE` | Column indices/ranges to treat as descriptive labels (excluded from features). Persisted in model JSON, restored automatically, and updateable via `-z` / `-w`. |
+| `-C` | `RANGE` | Column indices/ranges to treat as category keys for multi-category routing. Persisted in model JSON, restored automatically, and updateable via `-z` / `-w`. |
 | `-F` | `REGEXP` | Filter out categories matching regular expression (prefix with `-v ` to invert / keep only). |
 | `-R` | `INT` | Minimum row count required to retain a category across training, analysis (`-a`), categorization (`-c`), and maintenance. |
 | `-D` | `INTERVAL`| Drop sub-forest categories older than specified age (e.g. `30d`, `7d`, `24h`, `3600s`). |
-| `-A`, `--aggregate` | (none) | Instead of taking samples as individual rows, sum/aggregate new sample values per category across each `-l`, `-a`, or `-c` invocation. Only one aggregated sample per category is added per `-l` session. Persisted in model JSON and restored automatically. |
+| `-A`, `--aggregate` | (none) | Instead of taking samples as individual rows, sum/aggregate new sample values per category across each `-l`, `-a`, or `-c` invocation. Only one aggregated sample per category is added per `-l` session. Persisted in model JSON, restored automatically, and updateable via `-z` / `-w`. |
+| `--no-aggregate` | (none) | Explicitly disable per-category sample value aggregation, overriding saved model state. |
 | `-N`, `--new` | `[TMPL]` | Output format template for newly observed, unseen categories during scoring or continuous learning (default: `"%v"`). Evaluated immediately for any new category sample regardless of sample counts. |
 | `-M`, `--missing` | `[TMPL]` | Output format template for missed categories (trained but absent in test stream; default: `"%C"`). |
 | `-p` | `TMPL` | Printf-style format template for scored anomaly rows or categorized data. In analysis mode (`-a`), only outlier rows (`score > threshold`) are printed; nominal inlier rows are suppressed. Default is `"%s %v"`. |
@@ -108,7 +119,7 @@ GEIF scales all anomaly scores to the calibrated range $[0.0, 1.0]$ by default:
 3. **Average Score Threshold (`-O average`)**:
    Sets the anomaly cutoff to the ensemble mean score.
 
-All model architecture and input schema options (`-B`, `-t`, `-s`, `-f`, `-H`, `-A`, `-C`, `-L`, `-I`, `-U`) are persisted into the JSON model file during training (`-w`) or update (`-z`). When reading models (`-r` or `-z`), these settings are automatically restored and do not need to be re-specified. Runtime output formatting and threshold options (`-O`, `-p`, `-m`, `-e`, `-d`) are controlled via CLI flags and `~/.geifrc`.
+All model architecture and input schema options (`-B`, `-t`, `-s`, `-f`, `-H` / `--no-header`, `-A` / `--no-aggregate`, `-C`, `-L`, `-I`, `-U`) are persisted into the JSON model file during training (`-w`) or update (`-z`). When reading models (`-r` or `-z`), these settings are automatically restored and do not need to be re-specified, or they can be explicitly overridden on the CLI and saved back to disk (`geif -z model.json -s 200`). Runtime output formatting and threshold options (`-O`, `-p`, `-m`, `-e`, `-d`) are controlled via CLI flags and `~/.geifrc`.
 
 ---
 

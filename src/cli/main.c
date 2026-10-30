@@ -67,7 +67,8 @@ static void print_usage(const char *prog)
     printf("  -d <int>       Floating point decimal precision (default: 6)\n");
     printf("  -j <tmpl>      Per-dimension expansion template for %%m (%%d=val, %%a=avg, %%e=attrib, %%i=index)\n");
     printf("  -W             Enable metric auto-scaling (accepted for backward compatibility)\n");
-    printf("  -A, --aggregate Aggregate sample values by category rather than storing/scoring raw rows\n");
+    printf("  -A, --aggregate    Aggregate sample values by category rather than storing/scoring raw rows\n");
+    printf("      --no-aggregate Disable sample aggregation (override model setting)\n");
     printf("  -S, --set-locale Apply environment locale settings (for number and timestamp formatting)\n");
     printf("  -q             Print model summary / diagnostics and exit\n");
     printf("  -h             Show this help message and exit\n");
@@ -794,6 +795,7 @@ int main(int argc, char *argv[])
     geif_rc_config_init(&rc_cfg);
     geif_rc_load_default(&rc_cfg);
 
+    bool cli_algo_given = false;
     bool cli_trees_given = false;
     bool cli_samples_given = false;
     bool cli_decimals_given = false;
@@ -816,6 +818,7 @@ int main(int argc, char *argv[])
         {"header",       no_argument,       0, 'H'},
         {"no-header",    no_argument,       0, 1001},
         {"aggregate",    no_argument,       0, 'A'},
+        {"no-aggregate", no_argument,       0, 1002},
         {"set-locale",   no_argument,       0, 'S'},
         {"help",         no_argument,       0, 'h'},
         {"version",      no_argument,       0, 'v'},
@@ -825,7 +828,10 @@ int main(int argc, char *argv[])
     int opt;
     while ((opt = getopt_long(argc, argv, "l:a:c:w:r:z:o:T::O:t:i:s:m:f:e:HqvhI:U:L:C:F:R:N::M::p:SD:d:j:v::WAkg:B:", long_options, NULL)) != -1) {
         switch (opt) {
-        case 'B': config.algo = geif_algo_from_name(optarg); break;
+        case 'B':
+            config.algo = geif_algo_from_name(optarg);
+            cli_algo_given = true;
+            break;
         case 'l': learn_file = optarg; break;
         case 'a': analyze_file = optarg; break;
         case 'c': categorize_file = optarg; break;
@@ -955,6 +961,10 @@ int main(int argc, char *argv[])
             aggregate = true;
             aggregate_explicit = true;
             break;
+        case 1002:
+            aggregate = false;
+            aggregate_explicit = true;
+            break;
         case 'q': query_mode = true; break;
         case 'v':
             if (optarg != NULL) {
@@ -1047,6 +1057,98 @@ int main(int argc, char *argv[])
             }
         }
 
+        if (cli_algo_given || cli_trees_given || cli_samples_given) {
+            geif_algo_type_t target_algo = cli_algo_given ? config.algo : ensemble->config.algo;
+            uint32_t new_samples = cli_samples_given ? config.samples_per_tree : ensemble->config.samples_per_tree;
+            uint32_t new_trees;
+            if (target_algo == GEIF_ALGO_EXEMPLAR) {
+                new_trees = 1;
+            } else if (cli_trees_given) {
+                new_trees = config.tree_count;
+            } else if (ensemble->config.algo == GEIF_ALGO_EXEMPLAR && ensemble->config.tree_count <= 1) {
+                new_trees = GEIF_DEFAULT_TREE_COUNT;
+            } else {
+                new_trees = ensemble->config.tree_count;
+            }
+
+            ensemble->config.algo = target_algo;
+            ensemble->config.tree_count = new_trees;
+            ensemble->config.samples_per_tree = new_samples;
+
+            for (size_t i = 0; i < ensemble->count; i++) {
+                geif_forest_t *f = ensemble->entries[i].forest;
+                if (f) {
+                    if (f->trees) {
+                        for (uint32_t t = 0; t < f->tree_count; t++) {
+                            if (f->trees[t].nodes) xfree(f->trees[t].nodes);
+                            if (f->trees[t].normals_pool) xfree(f->trees[t].normals_pool);
+                            if (f->trees[t].leaf_samples) xfree(f->trees[t].leaf_samples);
+                        }
+                        xfree(f->trees);
+                    }
+                    f->config.algo = target_algo;
+                    f->tree_count = new_trees;
+                    f->config.tree_count = new_trees;
+                    f->config.samples_per_tree = new_samples;
+                    f->is_trained = false;
+                    f->trees = (geif_tree_t *)xcalloc(new_trees, sizeof(geif_tree_t));
+
+                    size_t needed_cap = (target_algo == GEIF_ALGO_EXEMPLAR) ? (size_t)new_samples : (size_t)new_trees * new_samples;
+                    if (needed_cap > f->pool_capacity) {
+                        f->sample_pool = (double *)xrealloc(f->sample_pool, needed_cap * f->dimensions * sizeof(double));
+                    }
+                    f->pool_capacity = needed_cap;
+                    if (f->pool_count > needed_cap) {
+                        f->pool_count = needed_cap;
+                    }
+                    if (f->summary_slot >= (int64_t)needed_cap) {
+                        f->summary_slot = -1;
+                    }
+                    if (f->scaled_pool) {
+                        xfree(f->scaled_pool);
+                        f->scaled_pool = NULL;
+                    }
+                }
+            }
+        }
+
+        if (ignore_spec || include_spec || label_spec || category_spec) {
+            const char *eff_ignore   = ignore_spec   ? ignore_spec   : (ensemble->ignore_dims_spec[0]   ? ensemble->ignore_dims_spec   : NULL);
+            const char *eff_include  = include_spec  ? include_spec  : (ensemble->include_dims_spec[0]  ? ensemble->include_dims_spec  : NULL);
+            const char *eff_label    = label_spec    ? label_spec    : (ensemble->label_dims_spec[0]    ? ensemble->label_dims_spec    : NULL);
+            const char *eff_category = category_spec ? category_spec : (ensemble->category_dims_spec[0] ? ensemble->category_dims_spec : NULL);
+
+            if (!learn_file && !analyze_file && !categorize_file && ensemble->total_input_cols > 0) {
+                geif_column_config_t col_cfg;
+                geif_column_config_init(&col_cfg, eff_ignore, eff_include, eff_label, eff_category);
+                bool resolved = geif_column_config_resolve(&col_cfg, ensemble->total_input_cols);
+                uint32_t new_dims = col_cfg.feature_dim_count;
+                geif_column_config_free(&col_cfg);
+                if (!resolved || new_dims != ensemble->dimensions) {
+                    fprintf(stderr, "geif: error: updated column masks (-I, -U, -L, -C) resolve to %u feature dimensions (from %u total input columns), but model has %u dimensions\n",
+                            new_dims, ensemble->total_input_cols, ensemble->dimensions);
+                    geif_cat_filter_free(&cat_filter);
+                    geif_ensemble_destroy(ensemble);
+                    return 1;
+                }
+            }
+
+            if (ignore_spec)   snprintf(ensemble->ignore_dims_spec,   sizeof(ensemble->ignore_dims_spec),   "%s", ignore_spec);
+            if (include_spec)  snprintf(ensemble->include_dims_spec,  sizeof(ensemble->include_dims_spec),  "%s", include_spec);
+            if (label_spec)    snprintf(ensemble->label_dims_spec,    sizeof(ensemble->label_dims_spec),    "%s", label_spec);
+            if (category_spec) snprintf(ensemble->category_dims_spec, sizeof(ensemble->category_dims_spec), "%s", category_spec);
+
+            for (size_t i = 0; i < ensemble->count; i++) {
+                geif_forest_t *f = ensemble->entries[i].forest;
+                if (f) {
+                    if (ignore_spec)   snprintf(f->ignore_dims_spec,   sizeof(f->ignore_dims_spec),   "%s", ignore_spec);
+                    if (include_spec)  snprintf(f->include_dims_spec,  sizeof(f->include_dims_spec),  "%s", include_spec);
+                    if (label_spec)    snprintf(f->label_dims_spec,    sizeof(f->label_dims_spec),    "%s", label_spec);
+                    if (category_spec) snprintf(f->category_dims_spec, sizeof(f->category_dims_spec), "%s", category_spec);
+                }
+            }
+        }
+
         if (!learn_file) {
             if (delete_interval > 0) {
                 size_t before = ensemble->count;
@@ -1059,7 +1161,9 @@ int main(int argc, char *argv[])
             apply_category_filters(ensemble, min_cat_rows, &cat_filter, verbose);
         }
 
-        if (!learn_file && !query_mode) {
+        bool need_trained_forests = (analyze_file != NULL || categorize_file != NULL ||
+                                     run_test_grid || kill_outliers_count > 0 || threshold_is_percentage);
+        if (!learn_file && !query_mode && need_trained_forests) {
             for (size_t i = 0; i < ensemble->count; i++) {
                 if (ensemble->entries[i].filtered) {
                     continue;
@@ -1125,10 +1229,12 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    // Standalone model maintenance (-D pruning, -R/-F filtering, and/or -k outlier recalibration): -r <model> [-D <interval>] [-R <min_rows>] [-F <regex>] [-k] -w <model>
-    if (!learn_file && !analyze_file && !categorize_file && (delete_interval > 0 || kill_outliers_count > 0 || min_cat_rows > 0)) {
+    // Standalone model maintenance / parameter update (-z <model> or -r <model> ... -w <model>)
+    if (!learn_file && !analyze_file && !categorize_file && !run_test_grid &&
+        (save_file != NULL || delete_interval > 0 || kill_outliers_count > 0 || min_cat_rows > 0)) {
         if (!ensemble) {
-            fprintf(stderr, "Error: maintenance operations (-D, -R, -k) require a loaded model via -r <model.json>\n");
+            fprintf(stderr, "Error: maintenance/update operations require a loaded model via -r or -z <model.json>\n");
+            geif_cat_filter_free(&cat_filter);
             return 1;
         }
         if (delete_interval > 0) {

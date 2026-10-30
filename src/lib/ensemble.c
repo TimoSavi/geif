@@ -610,26 +610,48 @@ void geif_ensemble_summary(const geif_ensemble_t *ens, char *buffer, size_t buff
                      "GEIF Ensemble Diagnostic Summary:\n"
                      "  Algorithm (-B):      %s\n"
                      "  Dimensions:          %u\n"
-                     "  Sub-forests:         %zu\n"
-                     "  Total Input Cols:    %u\n"
-                     "  Category Columns (-C): %s\n"
-                     "  Label Columns (-L):  %s\n"
-                     "  Include Columns (-U): %s\n"
-                     "  Ignore Columns (-I):  %s\n"
-                     "  Input Delimiter (-f): '%c'\n"
-                     "  Skip Header (-H):     %s\n"
-                     "  Aggregate (-A):       %s\n",
+                     "  Sub-forests:         %zu\n",
                      geif_algo_name(ens->config.algo),
                      ens->dimensions,
-                     active_count,
-                     ens->total_input_cols,
-                     ens->category_dims_spec[0] ? ens->category_dims_spec : "(none - global forest)",
-                     ens->label_dims_spec[0] ? ens->label_dims_spec : "(none)",
-                     ens->include_dims_spec[0] ? ens->include_dims_spec : "(all)",
-                     ens->ignore_dims_spec[0] ? ens->ignore_dims_spec : "(none)",
-                     ens->input_delimiter ? ens->input_delimiter : ',',
-                     ens->has_header ? "Yes" : "No",
-                     ens->aggregate ? "Yes" : "No");
+                     active_count);
+    if (n > 0) {
+        if ((size_t)n >= buffer_size - written) {
+            return;
+        }
+        written += (size_t)n;
+    }
+
+    if (ens->config.algo != GEIF_ALGO_EXEMPLAR) {
+        n = snprintf(buffer + written, buffer_size - written,
+                     "  Trees (-t):          %u\n",
+                     ens->config.tree_count);
+        if (n > 0) {
+            if ((size_t)n >= buffer_size - written) {
+                return;
+            }
+            written += (size_t)n;
+        }
+    }
+
+    n = snprintf(buffer + written, buffer_size - written,
+                 "  Samples/Tree (-s):   %u\n"
+                 "  Total Input Cols:    %u\n"
+                 "  Category Columns (-C): %s\n"
+                 "  Label Columns (-L):  %s\n"
+                 "  Include Columns (-U): %s\n"
+                 "  Ignore Columns (-I):  %s\n"
+                 "  Input Delimiter (-f): '%c'\n"
+                 "  Skip Header (-H):     %s\n"
+                 "  Aggregate (-A):       %s\n",
+                 ens->config.samples_per_tree,
+                 ens->total_input_cols,
+                 ens->category_dims_spec[0] ? ens->category_dims_spec : "(none - global forest)",
+                 ens->label_dims_spec[0] ? ens->label_dims_spec : "(none)",
+                 ens->include_dims_spec[0] ? ens->include_dims_spec : "(all)",
+                 ens->ignore_dims_spec[0] ? ens->ignore_dims_spec : "(none)",
+                 ens->input_delimiter ? ens->input_delimiter : ',',
+                 ens->has_header ? "Yes" : "No",
+                 ens->aggregate ? "Yes" : "No");
     if (n > 0) {
         if ((size_t)n >= buffer_size - written) {
             return;

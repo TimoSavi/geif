@@ -273,21 +273,22 @@ The build compiles with `-std=c17 -O3 -march=native -Wall -Wextra -Wpedantic` an
 | `-c` | `<file>` | Categorize mode: classify samples against all categories and assign best match. |
 | `-w` | `<file>` | Write / save model to JSON file or `-` (stdout). |
 | `-r` | `<file>` | Read / load model from JSON file or `-` (stdin); auto-restores model and input schema settings. |
-| `-z` | `<file>` | Update model in-place (loads model, updates with `-l`, rewrites file; auto-restores model and input schema settings). |
+| `-z` | `<file>` | Update model in-place (loads model, updates with `-l` or standalone parameter overrides, rewrites file; auto-restores model and input schema settings). |
 | `-o` | `<file>` | Output file for scoring results (default: `-` for stdout). |
 | `-O` | `<spec>` | Outlier threshold: decimal (`0.65`), percentage in `0%`–`200%` (`80%` empirical in-sample, `110%` algorithm-extrapolated out-of-sample border, `200%` $= 1.0$), or `average`. |
-| `-t` | `<num>` | Number of isolation trees per sub-forest (default: 100; persisted in model JSON and restored automatically). |
-| `-s` | `<num>` | Number of samples subsampled per tree (default: 256; persisted in model JSON and restored automatically). |
+| `-t` | `<num>` | Number of isolation trees per sub-forest (default: 100; persisted in model JSON and updateable via `-z` / `-w`). |
+| `-s` | `<num>` | Number of samples subsampled per tree (default: 256; persisted in model JSON and updateable via `-z` / `-w`, resizing/truncating the reservoir pool accordingly). |
 | `-k` | *(flag)* | Recalibrate model / prune reservoir outliers (repeatable: `-k -k`). |
 | `-D` | `<rate>d` | Exponential age decay rate in days (e.g., `-D30d`, `-D7d`). |
-| `-C` | `<spec>` | Category column range/list (e.g., `12`, `"2-4"`, `"1,3,5"`; persisted in model JSON and restored automatically). |
-| `-L` | `<spec>` | Label column range/list (e.g., `1`, `"1-2"`; persisted in model JSON and restored automatically). |
-| `-U` | `<spec>` | Include column range/list for feature vectors (persisted in model JSON and restored automatically). |
-| `-I` | `<spec>` | Ignore column range/list (persisted in model JSON and restored automatically). |
-| `-H`, `--header` | *(flag)* | Skip header row in input CSV (persisted in model JSON and restored automatically). |
+| `-C` | `<spec>` | Category column range/list (e.g., `12`, `"2-4"`, `"1,3,5"`; persisted in model JSON and updateable via `-z` / `-w`). |
+| `-L` | `<spec>` | Label column range/list (e.g., `1`, `"1-2"`; persisted in model JSON and updateable via `-z` / `-w`). |
+| `-U` | `<spec>` | Include column range/list for feature vectors (persisted in model JSON and updateable via `-z` / `-w`). |
+| `-I` | `<spec>` | Ignore column range/list (persisted in model JSON and updateable via `-z` / `-w`). |
+| `-H`, `--header` | *(flag)* | Skip header row in input CSV (persisted in model JSON and updateable via `-z` / `-w`). |
 | `--no-header` | *(flag)* | Explicitly disable header skipping, overriding saved model header state. |
-| `-A`, `--aggregate` | *(flag)* | Sum/aggregate sample values per category across each `-l`, `-a`, or `-c` invocation (persisted in model JSON and restored automatically). |
-| `-f` | `<char>` | Input field delimiter (default: `,`; persisted in model JSON and restored automatically). |
+| `-A`, `--aggregate` | *(flag)* | Sum/aggregate sample values per category across each `-l`, `-a`, or `-c` invocation (persisted in model JSON and updateable via `-z` / `-w`). |
+| `--no-aggregate` | *(flag)* | Explicitly disable per-category sample value aggregation, overriding saved model state. |
+| `-f` | `<char>` | Input field delimiter (default: `,`; persisted in model JSON and updateable via `-z` / `-w`). |
 | `-e` | `<char>` | List separator for output (default: `,`; also sets `-f` if `-f` is not explicitly given). |
 | `-d` | `<num>` | Output floating-point decimal precision (default: 6). |
 | `-m` | `<fmt>` | Printf numeric format string for dimension output (e.g., `"%'.0f"`). |

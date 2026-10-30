@@ -99,4 +99,41 @@ else
     exit 1
 fi
 
+# Test 8: Standalone in-place JSON parameter updates (-z / -r -w)
+echo "Test 8: Verify standalone in-place updates of persisted JSON parameters (-s, -B, -t, -f, -H, -A, -L/-I)..."
+cp "$TMP_DIR/model_l_i.json" "$TMP_DIR/model_update.json"
+# Shrink sample count from 64 to 40 in-place with -z
+$BIN -z "$TMP_DIR/model_update.json" -s 40
+UPD_Q1=$($BIN -r "$TMP_DIR/model_update.json" -q)
+echo "$UPD_Q1" | grep "Samples/Tree (-s):   40" > /dev/null
+echo "$UPD_Q1" | grep "samples=40" > /dev/null
+# Expand sample count to 100, switch algorithm to bubble with 25 trees, toggle header/aggregate/delimiter, and swap -L 1 -I 12 -> -L 12 -I 1
+$BIN -z "$TMP_DIR/model_update.json" -B bubble -t 25 -s 100 -f ',' --no-header -A -L 12 -I 1
+UPD_Q2=$($BIN -r "$TMP_DIR/model_update.json" -q)
+echo "$UPD_Q2" | grep "Algorithm (-B):      bubble" > /dev/null
+echo "$UPD_Q2" | grep "Trees (-t):          25" > /dev/null
+echo "$UPD_Q2" | grep "Samples/Tree (-s):   100" > /dev/null
+echo "$UPD_Q2" | grep "samples=40, trees=25" > /dev/null
+echo "$UPD_Q2" | grep "Input Delimiter (-f): ','" > /dev/null
+echo "$UPD_Q2" | grep "Skip Header (-H):     No" > /dev/null
+echo "$UPD_Q2" | grep "Aggregate (-A):       Yes" > /dev/null
+echo "$UPD_Q2" | grep "Label Columns (-L):  12" > /dev/null
+echo "$UPD_Q2" | grep "Ignore Columns (-I):  1" > /dev/null
+# Toggle --no-aggregate and -H back via -r ... -w ...
+$BIN -r "$TMP_DIR/model_update.json" --no-aggregate -H -f ';' -w "$TMP_DIR/model_update2.json"
+UPD_Q3=$($BIN -r "$TMP_DIR/model_update2.json" -q)
+echo "$UPD_Q3" | grep "Skip Header (-H):     Yes" > /dev/null
+echo "$UPD_Q3" | grep "Aggregate (-A):       No" > /dev/null
+echo "$UPD_Q3" | grep "Input Delimiter (-f): ';'" > /dev/null
+# Verify error if standalone column update would alter feature dimensionality
+set +e
+DIM_ERR=$($BIN -z "$TMP_DIR/model_update2.json" -I 1,2 2>&1)
+DIM_RC=$?
+set -e
+if [[ "$DIM_RC" -eq 0 ]] || ! echo "$DIM_ERR" | grep -q "resolve to 9 feature dimensions"; then
+    echo "Error: Failed to reject standalone column mask update that changes feature dimensionality! Output: $DIM_ERR"
+    exit 1
+fi
+echo "  [PASS] Standalone in-place JSON parameter updates (-z / -r -w) verified."
+
 echo ">>> ALL FEATURE 2 TESTS PASSED SUCCESSFULLY! <<<"
