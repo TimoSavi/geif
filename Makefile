@@ -45,9 +45,9 @@ MIGRATE_OBJS = src/cli/ceif2geif.o
 BIN_DIR = bin
 LIB_DIR = lib
 
-VERSION_MAJOR := $(shell awk '/^#define GEIF_VERSION_MAJOR/ {print $$3}' include/geif/geif.h)
-VERSION_MINOR := $(shell awk '/^#define GEIF_VERSION_MINOR/ {print $$3}' include/geif/geif.h)
-VERSION_PATCH := $(shell awk '/^#define GEIF_VERSION_PATCH/ {print $$3}' include/geif/geif.h)
+VERSION_MAJOR := $(shell awk '$$2 == "GEIF_VERSION_MAJOR" {print $$3}' include/geif/geif.h)
+VERSION_MINOR := $(shell awk '$$2 == "GEIF_VERSION_MINOR" {print $$3}' include/geif/geif.h)
+VERSION_PATCH := $(shell awk '$$2 == "GEIF_VERSION_PATCH" {print $$3}' include/geif/geif.h)
 VERSION       := $(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_PATCH)
 
 STATIC_LIB        = $(LIB_DIR)/libgeif.a
